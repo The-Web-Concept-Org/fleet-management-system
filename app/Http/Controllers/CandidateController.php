@@ -1,0 +1,4211 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Candidate;
+use App\Models\CandidateDocument;
+use App\Models\CandidateShare;
+use App\Models\CandidateSubmission;
+use App\Models\CandidateWithdrawal;
+use App\Models\Company;
+use App\Models\CompanyLog;
+use App\Models\DocumentType;
+use App\Services\DocumentCompressionService;
+use App\Support\Notifier;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+class CandidateController extends Controller
+{
+    // --------------------------------------------------------------------------
+    // List — GET /candidates
+    // --------------------------------------------------------------------------
+
+    public function index(Request $request): JsonResponse
+    {
+        $this->requireAnyPermission($request, ['candidates.view', 'documents.view']);
+        $query = Candidate::with(['company', 'documents', 'withdrawal'])
+            ->withCount('documents')
+            ->orderByRaw('COALESCE(joined_date, CAST(created_at AS date)) DESC')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+
+        if ($search = $request->query('search')) {
+            $query->where(function ($q) use ($search): void {
+                $cleanDigits = preg_replace('/\D/', '', $search);
+                $q->where('first_name', 'ilike', "%{$search}%")
+                    ->orWhere('last_name', 'ilike', "%{$search}%")
+                    ->orWhere('passport_number', 'ilike', "%{$search}%")
+                    ->orWhere('cnic_number', 'ilike', "%{$search}%")
+                    ->orWhere('code', 'ilike', "%{$search}%")
+                    ->orWhere('trade', 'ilike', "%{$search}%");
+
+                if (strlen($cleanDigits) >= 4) {
+                    $q->orWhereRaw("REPLACE(REPLACE(COALESCE(cnic_number, ''), '-', ''), ' ', '') ILIKE ?", ["%{$cleanDigits}%"]);
+                }
+            });
+        }
+
+        if ($status = $request->query('status')) {
+            if ($status === 'active') {
+                $query->whereIn('status', ['available', 'active']);
+                $mandatoryTypes = DocumentType::where('is_mandatory', true)->get();
+                foreach ($mandatoryTypes as $dt) {
+                    $query->whereHas('documents', function ($q) use ($dt): void {
+                        $q->where(function ($sub) use ($dt): void {
+                            $sub->where('document_type_id', (string) $dt->id)
+                                ->orWhere('document_type_id', $dt->code)
+                                ->orWhere('document_type_name', $dt->name);
+                            if (strcasecmp($dt->code, 'PASSPORT') === 0) {
+                                $sub->orWhere('document_type_id', 'doc-type-1')
+                                    ->orWhere('document_type_name', 'like', '%Passport%');
+                            }
+                        });
+                    });
+                }
+            } elseif ($status === 'processing') {
+                $query->where(function ($q): void {
+                    $q->where('status', 'processing')
+                      ->orWhere(function ($subQ): void {
+                          $subQ->whereIn('status', ['available', 'active']);
+                          $mandatoryTypes = DocumentType::where('is_mandatory', true)->get();
+                          if ($mandatoryTypes->isNotEmpty()) {
+                              $subQ->where(function ($missingQ) use ($mandatoryTypes): void {
+                                  foreach ($mandatoryTypes as $dt) {
+                                      $missingQ->orWhereDoesntHave('documents', function ($q) use ($dt): void {
+                                          $q->where(function ($inner) use ($dt): void {
+                                              $inner->where('document_type_id', (string) $dt->id)
+                                                  ->orWhere('document_type_id', $dt->code)
+                                                  ->orWhere('document_type_name', $dt->name);
+                                              if (strcasecmp($dt->code, 'PASSPORT') === 0) {
+                                                  $inner->orWhere('document_type_id', 'doc-type-1')
+                                                      ->orWhere('document_type_name', 'like', '%Passport%');
+                                              }
+                                          });
+                                      });
+                                  }
+                              });
+                          }
+                      });
+                });
+            } else {
+                $query->where('status', $status);
+            }
+        }
+
+        if ($companyId = $request->query('company_id')) {
+            if ($companyId === 'unassigned') {
+                $query->whereNull('current_company_id');
+            } else {
+                $query->where('current_company_id', $companyId);
+            }
+        }
+
+        if ($trade = $request->query('trade')) {
+            $query->where('trade', 'ilike', "%{$trade}%");
+        }
+
+        $candidates = $query->get();
+
+        // Calculate counts across candidates (scoped by company if filtered)
+        $countsQuery = Candidate::query();
+        if ($companyId = $request->query('company_id')) {
+            if ($companyId === 'unassigned') {
+                $countsQuery->whereNull('current_company_id');
+            } else {
+                $countsQuery->where('current_company_id', $companyId);
+            }
+        }
+
+        $allScoped = (clone $countsQuery)->with('documents')->get();
+        $totalCount = $allScoped->count();
+        $placedCount = $allScoped->where('status', 'placed')->count();
+        $withdrawnCount = $allScoped->where('status', 'withdrawn')->count();
+
+        $activeCount = 0;
+        $processingCount = 0;
+        foreach ($allScoped as $cand) {
+            if ($cand->status === 'placed' || $cand->status === 'withdrawn') {
+                continue;
+            }
+            if ($this->candidateHasAllMandatoryDocuments($cand)) {
+                $activeCount++;
+            } else {
+                $processingCount++;
+            }
+        }
+
+        return response()->json([
+            'candidates' => $candidates->map(fn (Candidate $c): array => $this->presentList($c))->values(),
+            'counts' => [
+                'all' => $totalCount,
+                'active' => $activeCount,
+                'available' => $activeCount,
+                'processing' => $processingCount,
+                'placed' => $placedCount,
+                'withdrawn' => $withdrawnCount,
+            ],
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Show — GET /candidates/{candidate}
+    // --------------------------------------------------------------------------
+
+    public function show(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requireAnyPermission($request, ['candidates.view', 'documents.view']);
+        $candidate->load(['company', 'documents', 'submissions.company', 'withdrawal']);
+
+        return response()->json([
+            'candidate' => $this->presentDetail($candidate),
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Store — POST /candidates
+    // --------------------------------------------------------------------------
+
+    public function store(Request $request): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.create');
+        $data = $request->validate([
+            'firstName'        => ['nullable', 'string', 'max:100'],
+            'lastName'         => ['required', 'string', 'max:100'],
+            'gender'           => ['nullable', 'string', 'max:20'],
+            'email'            => ['nullable', 'email', 'max:255'],
+            'phone'            => ['required', 'string', 'max:50'],
+            'passportNumber'   => ['required', 'string', 'max:50'],
+            'passportExpiry'   => ['required', 'date'],
+            'passportIssueDate'=> ['nullable', 'date'],
+            'cnicNumber'       => ['required', 'string', 'max:20'],
+            'nationality'      => ['nullable', 'string', 'max:100'],
+            'currentLocation'  => ['nullable', 'string', 'max:200'],
+            'address'          => ['nullable', 'string', 'max:500'],
+            'targetCountry'    => ['nullable', 'string', 'max:200'],
+            'joinedDate'       => ['nullable', 'date'],
+            'trade'            => ['nullable', 'string', 'max:255'],
+            'experienceYears'  => ['nullable', 'integer', 'min:0'],
+            'balance'          => ['nullable', 'numeric', 'min:0'],
+            'serviceCharges'   => ['nullable', 'numeric', 'min:0'],
+            'service_charges'  => ['nullable', 'numeric', 'min:0'],
+            'country_service_charges' => ['nullable'],
+            'countryServiceCharges'   => ['nullable'],
+            'photo'            => ['nullable', 'image', 'max:5120'], // 5 MB max
+            'signature'        => ['nullable'],
+            'fatherName'       => ['nullable', 'string', 'max:150'],
+            'motherName'       => ['nullable', 'string', 'max:150'],
+            'placeOfBirth'     => ['nullable', 'string', 'max:150'],
+            'dateOfBirth'      => ['nullable', 'date'],
+            'civilStatus'      => ['nullable', 'string', 'max:50'],
+            'wifeDetails'      => ['nullable'],
+            'wife_details'     => ['nullable'],
+            'childrenCount'    => ['nullable', 'string', 'max:20'],
+            'childrenDetails'  => ['nullable'],
+            'passportSeries'   => ['nullable', 'string', 'max:50'],
+            'citizenship'      => ['nullable', 'string', 'max:100'],
+            'town'             => ['nullable', 'string', 'max:150'],
+            'country'          => ['nullable', 'string', 'max:100'],
+            'occupationField'  => ['nullable', 'string', 'max:255'],
+            'careOf'           => ['nullable', 'string', 'max:150'],
+            'age'              => ['nullable', 'integer', 'min:0', 'max:150'],
+            'license'          => ['nullable', 'string', 'max:150'],
+            'currentJob'       => ['nullable', 'string', 'max:150'],
+            'qualification'    => ['nullable', 'string', 'max:150'],
+            'notes'            => ['nullable', 'string'],
+            'embassyDetails'   => ['nullable'],
+            'embassy_details'  => ['nullable'],
+            'foreignVisit'     => ['nullable'],
+            'foreign_visit'    => ['nullable'],
+        ]);
+
+        // Enforce unique passport number across all active candidates & historical passports
+        $rawPassport = strtoupper(trim((string) $data['passportNumber']));
+        $existing = Candidate::whereRaw('UPPER(passport_number) = ?', [$rawPassport])->first();
+        if (!$existing) {
+            $existing = Candidate::where(function ($q) use ($data, $rawPassport) {
+                $q->whereJsonContains('passport_history', [['passportNumber' => $data['passportNumber']]])
+                  ->orWhereRaw("UPPER(passport_history::text) LIKE ?", ['%"PASSPORTNUMBER":"' . $rawPassport . '"%']);
+            })->first();
+        }
+        if ($existing) {
+            return response()->json([
+                'message' => "Passport number '{$data['passportNumber']}' is already registered to candidate {$existing->first_name} {$existing->last_name} ({$existing->code}). Each passport number can only be used once.",
+                'errors' => [
+                    'passportNumber' => ["Passport number is already registered to candidate {$existing->first_name} {$existing->last_name} ({$existing->code})."],
+                ],
+            ], 422);
+        }
+
+        // Generate guaranteed unique sequential codes
+        [$code, $psnCode] = $this->generateUniqueCandidateCodes();
+
+        $skills = $request->input('skills');
+        if (is_string($skills)) {
+            $decoded = json_decode($skills, true);
+            $skills  = is_array($decoded) ? $decoded : [$skills];
+        }
+        if (empty($skills) && !empty($data['trade'])) {
+            $skills = array_values(array_filter(array_map('trim', explode(',', $data['trade']))));
+        }
+
+        $age = $data['age'] ?? null;
+        if ($age === null && !empty($data['dateOfBirth'])) {
+            try {
+                $age = \Carbon\Carbon::parse($data['dateOfBirth'])->age;
+            } catch (\Throwable) {
+                $age = null;
+            }
+        }
+
+        $countryServiceCharges = $request->input('countryServiceCharges') ?? $request->input('country_service_charges');
+        if (is_string($countryServiceCharges)) {
+            $decoded = json_decode($countryServiceCharges, true);
+            $countryServiceCharges = is_array($decoded) ? $decoded : null;
+        }
+
+        $serviceCharges = $data['serviceCharges'] ?? $data['service_charges'] ?? $data['balance'] ?? null;
+        if (!empty($countryServiceCharges) && is_array($countryServiceCharges)) {
+            $sumCharges = 0;
+            $hasExplicit = false;
+            foreach ($countryServiceCharges as $csc) {
+                if (isset($csc['serviceCharges']) || isset($csc['service_charges'])) {
+                    $hasExplicit = true;
+                    $sumCharges += (float) ($csc['serviceCharges'] ?? $csc['service_charges'] ?? 0);
+                }
+            }
+            if ($hasExplicit || $serviceCharges === null) {
+                $serviceCharges = (float) $sumCharges;
+            }
+        }
+        $serviceCharges = (float) ($serviceCharges ?? 0);
+
+        $passportSeries = $data['passportSeries'] ?? null;
+        if (empty($passportSeries) && !empty($data['passportNumber'])) {
+            if (preg_match('/^([A-Za-z]+)/', trim($data['passportNumber']), $pm)) {
+                $passportSeries = strtoupper($pm[1]);
+            }
+        }
+
+        $fatherName = $this->normalizePersonName($data['fatherName'] ?? null, $data['lastName'] ?? null);
+        $careOf = !empty($data['careOf']) ? trim((string) $data['careOf']) : null;
+
+        $placeOfBirth = $data['placeOfBirth'] ?? $data['town'] ?? $data['currentLocation'] ?? null;
+        $town = $data['town'] ?? $placeOfBirth ?? $data['currentLocation'] ?? null;
+        $currentLocation = $data['currentLocation'] ?? $placeOfBirth ?? $town ?? null;
+
+        $childrenDetails = $request->input('childrenDetails');
+        if (is_string($childrenDetails)) {
+            $decoded = json_decode($childrenDetails, true);
+            $childrenDetails = is_array($decoded) ? $decoded : null;
+        }
+
+        $wifeDetails = $request->input('wifeDetails') ?? $request->input('wife_details');
+        if (is_string($wifeDetails)) {
+            $decoded = json_decode($wifeDetails, true);
+            $wifeDetails = is_array($decoded) ? $decoded : null;
+        }
+
+        $embassyDetails = $request->input('embassyDetails') ?? $request->input('embassy_details');
+        if (is_string($embassyDetails)) {
+            $decoded = json_decode($embassyDetails, true);
+            $embassyDetails = is_array($decoded) ? $decoded : null;
+        }
+
+        $candidate = Candidate::create([
+            'code'                    => $code,
+            'psn_code'                => $psnCode,
+            'first_name'              => $data['firstName'] ?? null,
+            'last_name'               => $data['lastName'],
+            'gender'                  => $data['gender'] ?? 'Male',
+            'email'                   => $data['email'] ?? null,
+            'phone'                   => $data['phone'] ?? null,
+            'passport_number'         => $data['passportNumber'],
+            'passport_expiry'         => $data['passportExpiry'] ?? null,
+            'passport_issue_date'     => $data['passportIssueDate'] ?? null,
+            'cnic_number'             => $data['cnicNumber'] ?? null,
+            'nationality'             => !empty($data['nationality']) ? $data['nationality'] : null,
+            'current_location'        => !empty($currentLocation) ? $currentLocation : null,
+            'address'                 => $data['address'] ?? null,
+            'target_country'          => $data['targetCountry'] ?? null,
+            'trade'                   => $data['trade'] ?? null,
+            'experience_years'        => $data['experienceYears'] ?? 0,
+            'photo_path'              => null,
+            'signature_path'          => null,
+            'status'                  => 'processing',
+            'recruitment_stage'       => 'registered',
+            'skills'                  => $skills ?? [],
+            'service_charges'         => $serviceCharges,
+            'country_service_charges' => $countryServiceCharges,
+            'joined_date'             => $data['joinedDate'] ?? now()->toDateString(),
+            'father_name'             => $fatherName,
+            'mother_name'             => $data['motherName'] ?? null,
+            'placeOfBirth'            => $placeOfBirth,
+            'place_of_birth'          => $placeOfBirth,
+            'date_of_birth'           => $data['dateOfBirth'] ?? null,
+            'civil_status'            => $data['civilStatus'] ?? null,
+            'wife_details'            => $wifeDetails,
+            'children_count'          => $data['childrenCount'] ?? null,
+            'children_details'        => $childrenDetails,
+            'passport_series'         => $passportSeries,
+            'citizenship'             => $data['citizenship'] ?? null,
+            'town'                    => $town,
+            'country'                 => $data['country'] ?? null,
+            'occupation_field'        => $data['occupationField'] ?? null,
+            'care_of'                 => $careOf,
+            'age'                     => $age,
+            'license'                 => $data['license'] ?? null,
+            'current_job'             => $data['currentJob'] ?? null,
+            'qualification'           => $data['qualification'] ?? null,
+            'notes'                   => $data['notes'] ?? null,
+            'embassy_details'         => $embassyDetails,
+            'foreign_visit'           => is_array($data['foreignVisit'] ?? $data['foreign_visit'] ?? null) ? json_encode($data['foreignVisit'] ?? $data['foreign_visit']) : ($data['foreignVisit'] ?? $data['foreign_visit'] ?? null),
+        ]);
+
+        // Handle photo upload directly inside candidate folder (file or base64)
+        $photoPath = null;
+        if ($request->hasFile('photo')) {
+            $compPhoto = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('photo'),
+                'candidates/' . $candidate->id,
+                'public'
+            );
+            $photoPath = $compPhoto['path'];
+        } elseif ($request->filled('photo') && is_string($request->input('photo')) && str_starts_with($request->input('photo'), 'data:image')) {
+            $photoPath = app(DocumentCompressionService::class)->storeBase64AndCompress(
+                $request->input('photo'),
+                'candidates/' . $candidate->id,
+                'public',
+                'photo_'
+            );
+        }
+
+        // Handle signature upload directly inside candidate folder (file or base64)
+        $signaturePath = null;
+        if ($request->hasFile('signature')) {
+            $compSig = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('signature'),
+                'candidates/' . $candidate->id,
+                'public'
+            );
+            $signaturePath = $compSig['path'];
+        } elseif ($request->filled('signature') && is_string($request->input('signature')) && str_starts_with($request->input('signature'), 'data:image')) {
+            $signaturePath = app(DocumentCompressionService::class)->storeBase64AndCompress(
+                $request->input('signature'),
+                'candidates/' . $candidate->id,
+                'public',
+                'sig_'
+            );
+        }
+
+        // Handle thumbprint / fingerprint upload directly inside candidate folder
+        $fingerprintPath = null;
+        $fingerprintTemplate = null;
+        $fingerprintQuality = null;
+        $fingerprintCapturedAt = null;
+
+        if ($request->hasFile('fingerprint')) {
+            $compFp = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('fingerprint'),
+                'candidates/' . $candidate->id,
+                'public'
+            );
+            $fingerprintPath = $compFp['path'];
+            $fingerprintCapturedAt = now();
+        } elseif ($request->filled('fingerprint') && is_string($request->input('fingerprint')) && str_starts_with($request->input('fingerprint'), 'data:image')) {
+            $fingerprintPath = app(DocumentCompressionService::class)->storeBase64AndCompress(
+                $request->input('fingerprint'),
+                'candidates/' . $candidate->id,
+                'public',
+                'fp_'
+            );
+            $fingerprintCapturedAt = now();
+        }
+
+        if ($request->filled('fingerprint_template') || $request->filled('fingerprintTemplate')) {
+            $fingerprintTemplate = (string) ($request->input('fingerprint_template') ?? $request->input('fingerprintTemplate'));
+            $fingerprintCapturedAt = now();
+        }
+        if ($request->filled('fingerprint_quality') || $request->filled('fingerprintQuality')) {
+            $fingerprintQuality = (int) ($request->input('fingerprint_quality') ?? $request->input('fingerprintQuality'));
+        }
+
+        if ($photoPath !== null || $signaturePath !== null || $fingerprintPath !== null || $fingerprintTemplate !== null) {
+            $candidate->update([
+                'photo_path'              => $photoPath,
+                'signature_path'          => $signaturePath,
+                'fingerprint_path'        => $fingerprintPath,
+                'fingerprint_template'    => $fingerprintTemplate,
+                'fingerprint_quality'     => $fingerprintQuality,
+                'fingerprint_captured_at' => $fingerprintCapturedAt,
+            ]);
+        }
+
+        $this->syncCandidateStatus($candidate);
+        $candidate->load(['company', 'documents', 'submissions', 'withdrawal']);
+
+        Notifier::staff(
+            'CANDIDATE_ADDED',
+            'New candidate registered',
+            trim("{$candidate->first_name} {$candidate->last_name}") . " ({$candidate->code}) was added" . ($candidate->trade ? " as {$candidate->trade}." : '.'),
+            ['candidateId' => $candidate->id, 'candidateCode' => $candidate->code],
+            "/dashboard/candidates/{$candidate->id}",
+            $request
+        );
+
+        return response()->json([
+            'candidate' => $this->presentDetail($candidate->fresh()),
+        ], 201);
+    }
+
+    // --------------------------------------------------------------------------
+    // Download Sample Template — GET /candidates/template/download
+    // --------------------------------------------------------------------------
+
+    public function downloadTemplate(Request $request): StreamedResponse
+    {
+        $this->requirePermission($request, 'candidates.view');
+        $format = strtolower($request->query('format', 'xlsx'));
+
+        $headers = [
+            'SR NO',
+            'NAME',
+            'FATHER NAME',
+            'PASSPORT NO',
+            'PASSPORT EXPIRE DATE',
+            'C/O',
+            'CONTACT NO',
+            'RATE',
+            'DATE OF BIRTH',
+            'AGE',
+            'FILE RECEIVING DATE',
+            'MOTHER NAME',
+            'MARTIAL STATUS',
+            'KIDS',
+            'LICENSE',
+            'CURRENT JOB',
+            'PLACE OF BIRTH',
+            'QUALIFICATION',
+            'STATUS',
+            'TRADE',
+        ];
+
+        $sampleData = [
+            [
+                1,
+                'MUHAMMAD UMAIR',
+                'MUHAMMAD YOUSAF TAHIR',
+                'CK2298911',
+                '23.04.2035',
+                'SELF',
+                '0370-3849513 / 0317-1798225',
+                '4,000,000',
+                '28.04.2006',
+                20,
+                '07.09.2026',
+                'NUSRAT PARVEEN',
+                'SINGLE',
+                'N/A',
+                'BIKE',
+                'FREE',
+                'MANDI BAHAUDDIN, PAK',
+                'MIDDLE',
+                'available',
+                '',
+            ],
+            [
+                2,
+                'TARIQ MAHMOOD',
+                'MAHMOOD KHAN',
+                'CC9876543',
+                '15.10.2032',
+                'SELF',
+                '0321-7654321',
+                '3,500,000',
+                '15.08.1998',
+                28,
+                '10.09.2026',
+                'FATIMA BIBI',
+                'MARRIED',
+                '2',
+                'CAR',
+                'ELECTRICIAN',
+                'RAWALPINDI, PAK',
+                'MATRIC',
+                'available',
+                'Electrician',
+            ],
+        ];
+
+        if ($format === 'csv') {
+            $filename = 'candidates_bulk_template.csv';
+            return response()->stream(function () use ($headers, $sampleData): void {
+                $file = fopen('php://output', 'w');
+                fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM
+                fputcsv($file, $headers);
+                foreach ($sampleData as $row) {
+                    fputcsv($file, $row);
+                }
+                fclose($file);
+            }, 200, [
+                'Content-Type'        => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            ]);
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Candidates Template');
+
+        // Headers
+        $colIndex = 1;
+        foreach ($headers as $header) {
+            $sheet->setCellValueExplicit([$colIndex, 1], $header, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $colLetter = Coordinate::stringFromColumnIndex($colIndex);
+            $sheet->getColumnDimension($colLetter)->setAutoSize(true);
+            $colIndex++;
+        }
+
+        $highestCol = Coordinate::stringFromColumnIndex(count($headers));
+        $headerRange = "A1:{$highestCol}1";
+        $sheet->getStyle($headerRange)->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet->getStyle($headerRange)->getFill()->setFillType(Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('1E3A8A');
+
+        // Rows
+        $rowNum = 2;
+        foreach ($sampleData as $row) {
+            $colNum = 1;
+            foreach ($row as $val) {
+                $sheet->setCellValueExplicit([$colNum, $rowNum], (string) $val, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                $colNum++;
+            }
+            $rowNum++;
+        }
+
+        $filename = 'candidates_bulk_template.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer): void {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Export Selected Candidates — POST /candidates/export
+    // --------------------------------------------------------------------------
+
+    public function exportExcel(Request $request): StreamedResponse
+    {
+        $this->requirePermission($request, 'candidates.view');
+
+        $format = strtolower($request->input('format', 'xlsx'));
+        $candidateIds = $request->input('candidate_ids', []);
+        $selectedFields = $request->input('fields', []);
+
+        if (is_string($candidateIds)) {
+            $candidateIds = array_values(array_filter(array_map('trim', explode(',', $candidateIds))));
+        }
+
+        $query = Candidate::with(['company', 'documents', 'withdrawal']);
+        if (!empty($candidateIds)) {
+            $query->whereIn('id', $candidateIds);
+        }
+
+        $candidates = $query->orderBy('id', 'asc')->get();
+
+        $fieldDefinitions = $this->getExportFieldDefinitions();
+
+        // If no fields specified, use standard default fields
+        if (empty($selectedFields) || !is_array($selectedFields)) {
+            $selectedFields = [
+                'sr_no',
+                'code',
+                'name',
+                'father_name',
+                'passport_number',
+                'passport_expiry',
+                'cnic_number',
+                'phone',
+                'trade',
+                'experience_years',
+                'company',
+                'status',
+            ];
+        }
+
+        $fieldsToExport = [];
+        foreach ($selectedFields as $f) {
+            $key = $this->normalizeFieldKey((string) $f);
+            if (isset($fieldDefinitions[$key])) {
+                $fieldsToExport[$key] = $fieldDefinitions[$key];
+            }
+        }
+
+        if (empty($fieldsToExport)) {
+            $fieldsToExport = $fieldDefinitions;
+        }
+
+        $headers = array_column(array_values($fieldsToExport), 'label');
+        $timestamp = now()->format('Y-m-d_His');
+
+        if ($format === 'csv') {
+            $filename = "candidates_export_{$timestamp}.csv";
+            return response()->streamDownload(function () use ($headers, $fieldsToExport, $candidates): void {
+                $file = fopen('php://output', 'w');
+                fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM
+                fputcsv($file, $headers);
+
+                $srNo = 1;
+                foreach ($candidates as $cand) {
+                    $row = [];
+                    foreach ($fieldsToExport as $fieldDef) {
+                        $resolver = $fieldDef['resolver'];
+                        $row[] = (string) $resolver($cand, $srNo);
+                    }
+                    fputcsv($file, $row);
+                    $srNo++;
+                }
+                fclose($file);
+            }, $filename, [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Selected Candidates');
+
+        // Headers
+        $colIndex = 1;
+        foreach ($headers as $header) {
+            $sheet->setCellValueExplicit([$colIndex, 1], $header, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $colLetter = Coordinate::stringFromColumnIndex($colIndex);
+            $sheet->getColumnDimension($colLetter)->setAutoSize(true);
+            $colIndex++;
+        }
+
+        $highestCol = Coordinate::stringFromColumnIndex(count($headers));
+        $headerRange = "A1:{$highestCol}1";
+        $sheet->getStyle($headerRange)->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet->getStyle($headerRange)->getFill()->setFillType(Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('1E3A8A');
+        $sheet->getRowDimension(1)->setRowHeight(28);
+
+        // Freeze top header row
+        $sheet->freezePane('A2');
+
+        // Rows
+        $rowNum = 2;
+        $srNo = 1;
+        foreach ($candidates as $cand) {
+            $colNum = 1;
+            foreach ($fieldsToExport as $fieldDef) {
+                $resolver = $fieldDef['resolver'];
+                $val = (string) $resolver($cand, $srNo);
+                $sheet->setCellValueExplicit([$colNum, $rowNum], $val, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                $colNum++;
+            }
+
+            // Zebra striping
+            if ($rowNum % 2 === 1) {
+                $rowRange = "A{$rowNum}:{$highestCol}{$rowNum}";
+                $sheet->getStyle($rowRange)->getFill()->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB('F8FAFC');
+            }
+            $sheet->getRowDimension($rowNum)->setRowHeight(22);
+            $rowNum++;
+            $srNo++;
+        }
+
+        $filename = "candidates_export_{$timestamp}.xlsx";
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer): void {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    private function normalizeFieldKey(string $key): string
+    {
+        $clean = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', trim($key)));
+        $aliases = [
+            'sr_no'                => 'sr_no',
+            'sr'                   => 'sr_no',
+            's_no'                 => 'sr_no',
+            'serial_no'            => 'sr_no',
+            'serial_number'        => 'sr_no',
+            'sr_number'            => 'sr_no',
+            'candidate_name'       => 'name',
+            'full_name'            => 'name',
+            'company_name'         => 'company',
+            'current_company_name' => 'company',
+            'current_company'      => 'company',
+            'current_company_id'   => 'company',
+            'passport_no'          => 'passport_number',
+            'passport'             => 'passport_number',
+            'contact'              => 'phone',
+            'contact_no'           => 'phone',
+            'exp'                  => 'experience_years',
+            'experience'           => 'experience_years',
+            'martial_status'       => 'civil_status',
+            'marital_status'       => 'civil_status',
+            'kids'                 => 'children_count',
+            'file_receiving_date'  => 'joined_date',
+        ];
+
+        return $aliases[$clean] ?? $clean;
+    }
+
+    private function getExportFieldDefinitions(): array
+    {
+        return [
+            // Basic & Identification
+            'sr_no' => [
+                'label'    => 'Sr. No',
+                'category' => 'Basic & Identification',
+                'resolver' => fn ($c, $idx = 1) => (string) $idx,
+            ],
+            'code' => [
+                'label'    => 'Candidate Code',
+                'category' => 'Basic & Identification',
+                'resolver' => fn ($c) => $c->code ?? '',
+            ],
+            'psn_code' => [
+                'label'    => 'PSN Code',
+                'category' => 'Basic & Identification',
+                'resolver' => fn ($c) => $c->psn_code ?? '',
+            ],
+            'status' => [
+                'label'    => 'Status',
+                'category' => 'Basic & Identification',
+                'resolver' => fn ($c) => strtoupper($c->status ?? ''),
+            ],
+            'recruitment_stage' => [
+                'label'    => 'Recruitment Stage',
+                'category' => 'Basic & Identification',
+                'resolver' => fn ($c) => ucwords(str_replace('_', ' ', $c->recruitment_stage ?? '')),
+            ],
+            'joined_date' => [
+                'label'    => 'File Receiving / Joined Date',
+                'category' => 'Basic & Identification',
+                'resolver' => fn ($c) => $c->joined_date ? \Carbon\Carbon::parse($c->joined_date)->format('d/m/Y') : '',
+            ],
+
+            // Personal Information
+            'name' => [
+                'label'    => 'Candidate Name (Full)',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => trim(($c->first_name ?? '') . ' ' . ($c->last_name ?? '')),
+            ],
+            'first_name' => [
+                'label'    => 'First Name',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => $c->first_name ?? '',
+            ],
+            'last_name' => [
+                'label'    => 'Last Name',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => $c->last_name ?? '',
+            ],
+            'father_name' => [
+                'label'    => 'Father Name',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => $c->father_name ?? '',
+            ],
+            'mother_name' => [
+                'label'    => 'Mother Name',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => $c->mother_name ?? '',
+            ],
+            'care_of' => [
+                'label'    => 'C/O (Care Of)',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => $c->care_of ?? '',
+            ],
+            'date_of_birth' => [
+                'label'    => 'Date of Birth',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => $c->date_of_birth ? \Carbon\Carbon::parse($c->date_of_birth)->format('d/m/Y') : '',
+            ],
+            'age' => [
+                'label'    => 'Age',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => $c->age ?? '',
+            ],
+            'place_of_birth' => [
+                'label'    => 'Place of Birth',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => $c->place_of_birth ?? '',
+            ],
+            'civil_status' => [
+                'label'    => 'Marital / Civil Status',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => ucfirst($c->civil_status ?? ''),
+            ],
+            'wife_details' => [
+                'label'    => 'Wife / Spouse Details',
+                'category' => 'Personal Information',
+                'resolver' => function ($c) {
+                    $w = $c->wife_details;
+                    if (!is_array($w) || empty($w)) return '';
+                    $parts = array_filter([
+                        !empty($w['name']) ? "Name: {$w['name']}" : null,
+                        !empty($w['surname']) ? "Surname: {$w['surname']}" : null,
+                        !empty($w['dateOfBirth']) ? "DOB: {$w['dateOfBirth']}" : null,
+                        !empty($w['age']) ? "Age: {$w['age']}" : null,
+                    ]);
+                    return implode(', ', $parts);
+                },
+            ],
+            'children_count' => [
+                'label'    => 'Children Count',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => $c->children_count ?? '',
+            ],
+            'children_details' => [
+                'label'    => 'Children Details',
+                'category' => 'Personal Information',
+                'resolver' => function ($c) {
+                    $cd = $c->children_details;
+                    if (!is_array($cd) || empty($cd)) return '';
+                    $list = [];
+                    foreach ($cd as $idx => $child) {
+                        $parts = array_filter([
+                            !empty($child['name']) ? $child['name'] : 'Child #' . ($idx + 1),
+                            !empty($child['surname']) ? $child['surname'] : null,
+                            !empty($child['dateOfBirth']) ? 'DOB: ' . $child['dateOfBirth'] : null,
+                            !empty($child['age']) ? "{$child['age']} yrs" : null,
+                        ]);
+                        $list[] = implode(' ', $parts);
+                    }
+                    return implode('; ', $list);
+                },
+            ],
+            'license' => [
+                'label'    => 'License',
+                'category' => 'Personal Information',
+                'resolver' => fn ($c) => $c->license ?? '',
+            ],
+
+            // Passport & Identity
+            'passport_number' => [
+                'label'    => 'Passport Number',
+                'category' => 'Passport & Identity',
+                'resolver' => fn ($c) => $c->passport_number ?? '',
+            ],
+            'passport_expiry' => [
+                'label'    => 'Passport Expiry Date',
+                'category' => 'Passport & Identity',
+                'resolver' => fn ($c) => $c->passport_expiry ? \Carbon\Carbon::parse($c->passport_expiry)->format('d/m/Y') : '',
+            ],
+            'passport_issue_date' => [
+                'label'    => 'Passport Issue Date',
+                'category' => 'Passport & Identity',
+                'resolver' => fn ($c) => $c->passport_issue_date ? \Carbon\Carbon::parse($c->passport_issue_date)->format('d/m/Y') : '',
+            ],
+            'passport_series' => [
+                'label'    => 'Passport Series',
+                'category' => 'Passport & Identity',
+                'resolver' => fn ($c) => $c->passport_series ?? '',
+            ],
+            'cnic_number' => [
+                'label'    => 'CNIC / Identity Number',
+                'category' => 'Passport & Identity',
+                'resolver' => fn ($c) => $c->cnic_number ?? '',
+            ],
+            'nationality' => [
+                'label'    => 'Nationality',
+                'category' => 'Passport & Identity',
+                'resolver' => fn ($c) => $c->nationality ?? '',
+            ],
+            'citizenship' => [
+                'label'    => 'Citizenship',
+                'category' => 'Passport & Identity',
+                'resolver' => fn ($c) => $c->citizenship ?? '',
+            ],
+            'foreign_visit' => [
+                'label'    => 'Any Foreign Visit / Travel History',
+                'category' => 'Passport & Identity',
+                'resolver' => fn ($c) => $c->foreign_visit ?? '',
+            ],
+
+            // Contact & Location
+            'phone' => [
+                'label'    => 'Phone / Contact Number',
+                'category' => 'Contact & Location',
+                'resolver' => fn ($c) => $c->phone ?? '',
+            ],
+            'email' => [
+                'label'    => 'Email Address',
+                'category' => 'Contact & Location',
+                'resolver' => fn ($c) => $c->email ?? '',
+            ],
+            'current_location' => [
+                'label'    => 'Current Location / Address',
+                'category' => 'Contact & Location',
+                'resolver' => fn ($c) => $c->current_location ?? '',
+            ],
+            'town' => [
+                'label'    => 'Town / City',
+                'category' => 'Contact & Location',
+                'resolver' => fn ($c) => $c->town ?? '',
+            ],
+            'country' => [
+                'label'    => 'Country',
+                'category' => 'Contact & Location',
+                'resolver' => fn ($c) => $c->country ?? '',
+            ],
+            'target_country' => [
+                'label'    => 'Target Country',
+                'category' => 'Contact & Location',
+                'resolver' => fn ($c) => $c->target_country ?? '',
+            ],
+
+            // Professional & Experience
+            'trade' => [
+                'label'    => 'Trade / Role',
+                'category' => 'Professional & Experience',
+                'resolver' => fn ($c) => $c->trade ?? '',
+            ],
+            'occupation_field' => [
+                'label'    => 'Occupation Field',
+                'category' => 'Professional & Experience',
+                'resolver' => fn ($c) => $c->occupation_field ?? '',
+            ],
+            'experience_years' => [
+                'label'    => 'Experience (Years)',
+                'category' => 'Professional & Experience',
+                'resolver' => fn ($c) => isset($c->experience_years) ? "{$c->experience_years} yrs" : '0 yrs',
+            ],
+            'current_job' => [
+                'label'    => 'Current Job',
+                'category' => 'Professional & Experience',
+                'resolver' => fn ($c) => $c->current_job ?? '',
+            ],
+            'qualification' => [
+                'label'    => 'Qualification / Education',
+                'category' => 'Professional & Experience',
+                'resolver' => fn ($c) => $c->qualification ?? '',
+            ],
+            'skills' => [
+                'label'    => 'Skills',
+                'category' => 'Professional & Experience',
+                'resolver' => fn ($c) => is_array($c->skills) ? implode(', ', $c->skills) : ($c->skills ?? ''),
+            ],
+            'cv_summary' => [
+                'label'    => 'CV Summary / Profile',
+                'category' => 'Professional & Experience',
+                'resolver' => fn ($c) => $c->cv_summary ?? '',
+            ],
+
+            // Company & Financial
+            'company' => [
+                'label'    => 'Assigned Company',
+                'category' => 'Company & Financial',
+                'resolver' => fn ($c) => $c->company ? $c->company->name : 'Unassigned',
+            ],
+            'balance' => [
+                'label'    => 'Service Charges',
+                'category' => 'Company & Financial',
+                'resolver' => function ($c) {
+                    $csc = $c->country_service_charges;
+                    if (is_array($csc) && count($csc) > 1) {
+                        $parts = [];
+                        foreach ($csc as $item) {
+                            $cntry = $item['country'] ?? '';
+                            $rate = (float) ($item['service_charges'] ?? $item['serviceCharges'] ?? 0);
+                            if ($cntry) {
+                                $parts[] = "{$cntry}: PKR " . number_format($rate, 2);
+                            }
+                        }
+                        if (!empty($parts)) {
+                            return implode(' | ', $parts);
+                        }
+                    }
+                    return ($c->service_charges ?? $c->balance) ? number_format((float) ($c->service_charges ?? $c->balance), 2) : '0.00';
+                },
+            ],
+            'service_charges' => [
+                'label'    => 'Service Charges',
+                'category' => 'Company & Financial',
+                'resolver' => function ($c) {
+                    $csc = $c->country_service_charges;
+                    if (is_array($csc) && count($csc) > 1) {
+                        $parts = [];
+                        foreach ($csc as $item) {
+                            $cntry = $item['country'] ?? '';
+                            $rate = (float) ($item['service_charges'] ?? $item['serviceCharges'] ?? 0);
+                            if ($cntry) {
+                                $parts[] = "{$cntry}: PKR " . number_format($rate, 2);
+                            }
+                        }
+                        if (!empty($parts)) {
+                            return implode(' | ', $parts);
+                        }
+                    }
+                    return ($c->service_charges ?? $c->balance) ? number_format((float) ($c->service_charges ?? $c->balance), 2) : '0.00';
+                },
+            ],
+
+            // Documents & Compliance
+            'documents_count' => [
+                'label'    => 'Total Uploaded Documents',
+                'category' => 'Documents & Compliance',
+                'resolver' => fn ($c) => (string) ($c->documents ? $c->documents->count() : 0),
+            ],
+            'documents_list' => [
+                'label'    => 'Document Names',
+                'category' => 'Documents & Compliance',
+                'resolver' => fn ($c) => $c->documents ? $c->documents->pluck('title')->filter()->implode(', ') : '',
+            ],
+            'work_permit_status' => [
+                'label'    => 'Work Permit Issued',
+                'category' => 'Documents & Compliance',
+                'resolver' => function ($c) {
+                    if (!$c->documents || $c->documents->isEmpty()) return 'No';
+                    $hasPermit = $c->documents->contains(function ($doc) {
+                        $t = strtolower(($doc->title ?? '') . ' ' . ($doc->document_type_name ?? ''));
+                        return str_contains($t, 'permit');
+                    });
+                    return $hasPermit ? 'Yes' : 'No';
+                },
+            ],
+        ];
+    }
+
+    // --------------------------------------------------------------------------
+    // Bulk Store / Preview — POST /candidates/bulk
+    // --------------------------------------------------------------------------
+
+    public function bulkStore(Request $request): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.create');
+
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
+        $isPreview = $request->input('action') === 'preview' || $request->boolean('preview');
+        $rawRows = [];
+
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $rawRows = $this->parseSpreadsheetFile($file);
+        } elseif ($request->has('candidates')) {
+            $rawRows = (array) $request->input('candidates', []);
+        } else {
+            return response()->json([
+                'message' => 'No file or candidates data provided for bulk upload.',
+            ], 422);
+        }
+
+        if (empty($rawRows)) {
+            return response()->json([
+                'message' => 'No candidate records found in the uploaded file or request.',
+            ], 422);
+        }
+
+        // Pre-extract all candidate passport numbers to batch-query existing database records in 1 query
+        $allPassportsToLookup = [];
+        foreach ($rawRows as $r) {
+            $p = strtoupper(trim((string) ($r['passportNumber'] ?? '')));
+            if (!empty($p)) {
+                $allPassportsToLookup[] = $p;
+            }
+        }
+        $allPassportsToLookup = array_values(array_unique($allPassportsToLookup));
+
+        $existingCandidatesMap = [];
+        if (!empty($allPassportsToLookup)) {
+            // 1. Direct passport_number lookup in chunks of 500
+            foreach (array_chunk($allPassportsToLookup, 500) as $chunk) {
+                $found = Candidate::whereIn(DB::raw('UPPER(passport_number)'), $chunk)
+                    ->get(['id', 'code', 'first_name', 'last_name', 'passport_number']);
+                foreach ($found as $cand) {
+                    $existingCandidatesMap[strtoupper($cand->passport_number)] = $cand;
+                }
+            }
+
+            // 2. Check historical passports if any remain unmatched
+            $unmatchedPassports = array_values(array_diff($allPassportsToLookup, array_keys($existingCandidatesMap)));
+            if (!empty($unmatchedPassports)) {
+                $historyCandidates = Candidate::whereNotNull('passport_history')
+                    ->where(function ($q) use ($unmatchedPassports): void {
+                        foreach (array_chunk($unmatchedPassports, 50) as $chunk) {
+                            $q->orWhere(function ($sq) use ($chunk): void {
+                                foreach ($chunk as $p) {
+                                    $sq->orWhereRaw("UPPER(passport_history::text) LIKE ?", ['%"' . $p . '"%']);
+                                }
+                            });
+                        }
+                    })->get(['id', 'code', 'first_name', 'last_name', 'passport_history']);
+
+                foreach ($historyCandidates as $cand) {
+                    $history = (array) ($cand->passport_history ?? []);
+                    foreach ($history as $hItem) {
+                        $histP = strtoupper(trim((string) ($hItem['passportNumber'] ?? '')));
+                        if (in_array($histP, $unmatchedPassports, true) && !isset($existingCandidatesMap[$histP])) {
+                            $existingCandidatesMap[$histP] = $cand;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Validate each candidate and check duplicates
+        $processedRows = [];
+        $batchPassports = [];
+        $validCandidatesToInsert = [];
+        $errorsCount = 0;
+
+        foreach ($rawRows as $index => $row) {
+            $rowNumber = $index + 2; // account for header row in spreadsheet
+            $candidateData = $this->sanitizeCandidateRow($row);
+            $errors = [];
+
+            // Required validations
+            if (empty($candidateData['passportNumber'])) {
+                $errors[] = 'Passport Number is required.';
+            } else {
+                $rawPassport = strtoupper(trim($candidateData['passportNumber']));
+                $candidateData['passportNumber'] = $rawPassport;
+
+                // Check duplicate within batch
+                if (in_array($rawPassport, $batchPassports, true)) {
+                    $errors[] = "Duplicate passport '{$rawPassport}' found within the uploaded file.";
+                } else {
+                    // Fast in-memory check against pre-fetched database records
+                    $existing = $existingCandidatesMap[$rawPassport] ?? null;
+
+                    if ($existing) {
+                        $errors[] = "Passport '{$rawPassport}' is already registered to candidate {$existing->first_name} {$existing->last_name} ({$existing->code}).";
+                    } else {
+                        $batchPassports[] = $rawPassport;
+                    }
+                }
+            }
+
+            $isValid = empty($errors);
+            if (!$isValid) {
+                $errorsCount++;
+            } else {
+                $validCandidatesToInsert[] = [
+                    'rowNumber' => $rowNumber,
+                    'data'      => $candidateData,
+                ];
+            }
+
+            $processedRows[] = [
+                'rowNumber' => $rowNumber,
+                'valid'     => $isValid,
+                'errors'    => $errors,
+                'data'      => $candidateData,
+            ];
+        }
+
+        // If preview mode, return validation report without database insertion
+        if ($isPreview) {
+            return response()->json([
+                'preview'      => true,
+                'totalCount'   => count($processedRows),
+                'validCount'   => count($validCandidatesToInsert),
+                'invalidCount' => $errorsCount,
+                'rows'         => $processedRows,
+            ]);
+        }
+
+        // If there are no valid candidates to insert
+        if (empty($validCandidatesToInsert)) {
+            return response()->json([
+                'message'      => 'No valid candidates could be imported. Please review the errors.',
+                'successCount' => 0,
+                'failedCount'  => count($processedRows),
+                'errors'       => array_values(array_filter($processedRows, fn ($r) => !$r['valid'])),
+                'imported'     => [],
+            ], 422);
+        }
+
+        // Perform Database insertion in transaction
+        $insertedCandidates = [];
+
+        DB::beginTransaction();
+        try {
+            // Find highest existing numeric code across all existing candidates
+            $maxExistingCodeNum = 1000;
+            $allCodes = Candidate::withTrashed()->pluck('code')->all();
+            foreach ($allCodes as $c) {
+                if ($c && preg_match('/CRG-(\d+)/i', $c, $m)) {
+                    $num = (int) $m[1];
+                    if ($num > $maxExistingCodeNum) {
+                        $maxExistingCodeNum = $num;
+                    }
+                }
+            }
+
+            $currentYear = now()->year;
+            $maxPsn = 0;
+            $allPsn = Candidate::withTrashed()
+                ->where('psn_code', 'LIKE', "PSN-{$currentYear}-%")
+                ->pluck('psn_code')
+                ->all();
+            foreach ($allPsn as $p) {
+                if ($p && preg_match('/PSN-\d+-(\d+)/i', $p, $m)) {
+                    $pNum = (int) $m[1];
+                    if ($pNum > $maxPsn) {
+                        $maxPsn = $pNum;
+                    }
+                }
+            }
+
+            $counter = $maxExistingCodeNum + 1;
+            $psnCounter = $maxPsn + 1;
+
+            foreach ($validCandidatesToInsert as $item) {
+                $cData = $item['data'];
+
+                while (Candidate::withTrashed()->where('code', 'CRG-' . str_pad((string) $counter, 4, '0', STR_PAD_LEFT))->exists()) {
+                    $counter++;
+                }
+                $code = 'CRG-' . str_pad((string) $counter, 4, '0', STR_PAD_LEFT);
+                $counter++;
+
+                while (Candidate::withTrashed()->where('psn_code', 'PSN-' . $currentYear . '-' . str_pad((string) $psnCounter, 4, '0', STR_PAD_LEFT))->exists()) {
+                    $psnCounter++;
+                }
+                $psnCode = 'PSN-' . $currentYear . '-' . str_pad((string) $psnCounter, 4, '0', STR_PAD_LEFT);
+                $psnCounter++;
+
+                $skills = $cData['skills'];
+                if (is_string($skills)) {
+                    $skills = array_values(array_filter(array_map('trim', explode(',', $skills))));
+                } elseif (!is_array($skills)) {
+                    $skills = [];
+                }
+
+                $newCandidate = Candidate::create([
+                    'code'                => $code,
+                    'psn_code'            => $psnCode,
+                    'first_name'          => $cData['firstName'] ?: null,
+                    'last_name'           => $cData['lastName'] ?: null,
+                    'email'               => !empty($cData['email']) ? $cData['email'] : null,
+                    'phone'               => !empty($cData['phone']) ? $cData['phone'] : null,
+                    'passport_number'     => $cData['passportNumber'],
+                    'passport_expiry'     => $cData['passportExpiry'] ?: null,
+                    'passport_issue_date' => $cData['passportIssueDate'] ?: null,
+                    'cnic_number'         => !empty($cData['cnicNumber']) ? $cData['cnicNumber'] : null,
+                    'nationality'         => $cData['nationality'] ?: null,
+                    'current_location'    => $cData['currentLocation'] ?: null,
+                    'target_country'      => $cData['targetCountry'] ?: null,
+                    'trade'               => $cData['trade'] ?: null,
+                    'experience_years'    => (int) ($cData['experienceYears'] ?? 0),
+                    'status'              => in_array($cData['status'] ?? '', ['placed', 'withdrawn'], true) ? $cData['status'] : 'processing',
+                    'recruitment_stage'   => 'registered',
+                    'skills'              => $skills,
+                    'service_charges'     => (float) ($cData['balance'] ?? 0),
+                    'father_name'         => $cData['fatherName'] ?: null,
+                    'mother_name'         => $cData['motherName'] ?: null,
+                    'place_of_birth'      => $cData['placeOfBirth'] ?: null,
+                    'date_of_birth'       => $cData['dateOfBirth'] ?: null,
+                    'age'                 => !empty($cData['age']) ? (int) $cData['age'] : (!empty($cData['dateOfBirth']) ? (function($dob) { try { return (new \DateTime($dob))->diff(new \DateTime())->y; } catch (\Throwable) { return null; } })($cData['dateOfBirth']) : null),
+                    'civil_status'        => $cData['civilStatus'] ?: null,
+                    'children_count'      => $cData['childrenCount'] ?: null,
+                    'care_of'             => $cData['careOf'] ?: null,
+                    'license'             => $cData['license'] ?: null,
+                    'current_job'         => $cData['currentJob'] ?: null,
+                    'qualification'       => $cData['qualification'] ?: null,
+                    'joined_date'         => $cData['joinedDate'] ?: null,
+                ]);
+
+                $this->syncCandidateStatus($newCandidate);
+                $insertedCandidates[] = $this->presentList($newCandidate->fresh());
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Database error while saving candidates: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        $invalidRowsReport = array_values(array_filter($processedRows, fn ($r) => !$r['valid']));
+
+        return response()->json([
+            'message'      => sprintf(
+                'Bulk upload completed successfully! %d candidate%s imported%s.',
+                count($insertedCandidates),
+                count($insertedCandidates) === 1 ? '' : 's',
+                count($invalidRowsReport) > 0 ? sprintf(', %d skipped due to errors', count($invalidRowsReport)) : ''
+            ),
+            'successCount' => count($insertedCandidates),
+            'failedCount'  => count($invalidRowsReport),
+            'imported'     => $insertedCandidates,
+            'errors'       => $invalidRowsReport,
+        ], 201);
+    }
+
+    /**
+     * Parse uploaded file (.xlsx, .xls, .csv) into structured candidate rows.
+     */
+    private function parseSpreadsheetFile($file): array
+    {
+        $extension = strtolower($file->getClientOriginalExtension());
+        $path = $file->getRealPath();
+        $rawRows = [];
+
+        if ($extension === 'csv' || $extension === 'txt') {
+            if (($handle = fopen($path, 'r')) !== false) {
+                // Strip UTF-8 BOM if present
+                $bom = fread($handle, 3);
+                if ($bom !== "\xEF\xBB\xBF") {
+                    rewind($handle);
+                }
+                while (($data = fgetcsv($handle, 5000, ',')) !== false) {
+                    $rawRows[] = $data;
+                }
+                fclose($handle);
+            }
+        } else {
+            // Excel file via PhpSpreadsheet (optimized for memory & speed)
+            $reader = IOFactory::createReaderForFile($path);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($path);
+            $sheet = $spreadsheet->getActiveSheet();
+            $rawRows = $sheet->toArray(null, true, false, false);
+        }
+
+        if (empty($rawRows)) {
+            return [];
+        }
+
+        // First row is headers
+        $headerRow = array_shift($rawRows);
+        $headerMap = $this->buildHeaderMap($headerRow);
+
+        $results = [];
+        foreach ($rawRows as $row) {
+            // Skip empty rows
+            $hasContent = false;
+            foreach ($row as $cell) {
+                if ($cell !== null && trim((string) $cell) !== '') {
+                    $hasContent = true;
+                    break;
+                }
+            }
+            if (!$hasContent) {
+                continue;
+            }
+
+            $mapped = [];
+            foreach ($headerMap as $field => $colIndex) {
+                $val = $row[$colIndex] ?? null;
+                $mapped[$field] = is_string($val) ? trim($val) : $val;
+            }
+            $results[] = $mapped;
+        }
+
+        return $results;
+    }
+
+    /**
+     * Build mapping between candidate attributes and column indices based on header names.
+     */
+    private function buildHeaderMap(array $headers): array
+    {
+        $aliasMap = [
+            'name'               => ['name', 'fullname', 'full_name', 'candidatename', 'candidate_name'],
+            'firstName'          => ['firstname', 'first_name', 'first', 'givenname', 'given_name', 'fname'],
+            'lastName'           => ['lastname', 'last_name', 'last', 'surname', 'familyname', 'family_name', 'lname'],
+            'fatherName'         => ['fathername', 'father_name', 'father'],
+            'passportNumber'     => ['passportno', 'passport_no', 'passportnumber', 'passport_number', 'passport', 'passno', 'pass_no'],
+            'careOf'             => ['co', 'c_o', 'careof', 'care_of'],
+            'phone'              => ['contactno', 'contact_no', 'contact', 'contactnumber', 'phone', 'phonenumber', 'phone_number', 'mobile', 'mobilenumber', 'mobile_no'],
+            'balance'            => ['servicecharges', 'service_charges', 'servicecharge', 'service_charge', 'service_fee', 'rate', 'package_rate', 'packagerate', 'contract_rate', 'contractrate', 'balance', 'fee'],
+            'dateOfBirth'        => ['dateofbirth', 'date_of_birth', 'dob', 'birthdate', 'birth_date'],
+            'age'                => ['age'],
+            'joinedDate'         => ['filereceivingdate', 'file_receiving_date', 'receivingdate', 'receiving_date', 'filedate', 'file_date', 'joineddate', 'joined_date'],
+            'motherName'         => ['mothername', 'mother_name', 'mother'],
+            'civilStatus'        => ['martialstatus', 'maritalstatus', 'martial_status', 'marital_status', 'civilstatus', 'civil_status'],
+            'childrenCount'      => ['kids', 'children', 'childrencount', 'children_count', 'kidscount', 'kids_count', 'no_of_kids'],
+            'license'            => ['license', 'licence', 'driving_license', 'drivinglicense'],
+            'currentJob'         => ['currentjob', 'current_job', 'present_job', 'occupation', 'job'],
+            'placeOfBirth'       => ['placeofbirth', 'place_of_birth', 'birthplace', 'birth_place', 'pob'],
+            'qualification'      => ['qualification', 'education', 'academic_qualification', 'degree'],
+            'status'             => ['status'],
+            'trade'              => ['trade', 'jobrole', 'job_role', 'role', 'position', 'designation', 'profession'],
+            'cnicNumber'         => ['cnicnumber', 'cnic_number', 'cnic', 'cnic_no', 'nationalid', 'national_id', 'idnumber', 'id_number'],
+            'email'              => ['email', 'emailaddress', 'email_address', 'e_mail'],
+            'nationality'        => ['nationality', 'country_of_origin', 'citizenship'],
+            'currentLocation'    => ['currentlocation', 'current_location', 'location', 'city', 'residence'],
+            'targetCountry'      => ['targetcountry', 'target_country', 'destination', 'destination_country'],
+            'experienceYears'    => ['experienceyears', 'experience_years', 'experience', 'experience_yrs', 'exp', 'years_of_experience'],
+            'skills'             => ['skills', 'skillset', 'skill'],
+            'passportExpiry'     => [
+                'passportexpiry', 'passport_expiry', 'passportexpiredate', 'passport_expire_date',
+                'passportexpire', 'passport_expire', 'expiredate', 'expire_date', 'expirydate',
+                'expiry_date', 'passportexpirydate', 'passport_expiry_date', 'expiry', 'expire',
+            ],
+            'passportIssueDate'  => ['passportissuedate', 'passport_issue_date', 'issuedate', 'issue_date', 'date_of_issue'],
+        ];
+
+        $map = [];
+        foreach ($headers as $index => $rawHeader) {
+            if ($rawHeader === null) {
+                continue;
+            }
+            $clean = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', (string) $rawHeader));
+            foreach ($aliasMap as $field => $aliases) {
+                if (in_array($clean, array_map(fn ($a) => preg_replace('/[^a-zA-Z0-9]/', '', $a), $aliases), true)) {
+                    if (!isset($map[$field])) {
+                        $map[$field] = $index;
+                    }
+                    break;
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * Sanitize and format row values into uniform candidate fields.
+     */
+    private function sanitizeCandidateRow(array $row): array
+    {
+        $firstName = trim((string) ($row['firstName'] ?? ''));
+        $lastName  = trim((string) ($row['lastName'] ?? ''));
+
+        // If firstName is empty but a full 'name' was provided, split it
+        if (empty($firstName) && !empty($row['name'])) {
+            $parts = preg_split('/\s+/', trim((string) $row['name']), 2);
+            $firstName = $parts[0] ?? '';
+            $lastName  = $parts[1] ?? '';
+        }
+
+        // Clean Service Charges / Rate / Balance: e.g. "4,000,000" -> 4000000.00
+        $balanceRaw = $row['service_charges'] ?? $row['serviceCharges'] ?? $row['balance'] ?? $row['rate'] ?? null;
+        $balance = 0.0;
+        if ($balanceRaw !== null && $balanceRaw !== '') {
+            if (is_numeric($balanceRaw)) {
+                $balance = (float) $balanceRaw;
+            } elseif (is_string($balanceRaw)) {
+                $cleaned = preg_replace('/[^\d.]/', '', $balanceRaw);
+                $balance = is_numeric($cleaned) ? (float) $cleaned : 0.0;
+            }
+        }
+
+        $dob = $this->formatCandidateDate($row['dateOfBirth'] ?? null);
+        $age = !empty($row['age']) ? (int) $row['age'] : null;
+        if ($age === null && !empty($dob)) {
+            try {
+                $age = (new \DateTime($dob))->diff(new \DateTime())->y;
+            } catch (\Throwable) {
+                $age = null;
+            }
+        }
+
+        $joinedDate = $this->formatCandidateDate($row['joinedDate'] ?? $row['fileReceivingDate'] ?? null);
+
+        $statusRaw = strtolower(trim((string) ($row['status'] ?? 'processing')));
+        $validStatuses = ['available', 'placed', 'processing', 'active', 'withdrawn', 'archived'];
+        $status = in_array($statusRaw, $validStatuses, true) ? $statusRaw : 'processing';
+
+        return [
+            'firstName'          => $firstName,
+            'lastName'           => $lastName ?: null,
+            'fatherName'         => $this->normalizePersonName(trim((string) ($row['fatherName'] ?? ''))) ?: null,
+            'passportNumber'     => strtoupper(trim((string) ($row['passportNumber'] ?? ''))),
+            'careOf'             => trim((string) ($row['careOf'] ?? '')) ?: null,
+            'phone'              => trim((string) ($row['phone'] ?? '')) ?: null,
+            'balance'            => max(0, $balance),
+            'dateOfBirth'        => $dob,
+            'age'                => $age,
+            'joinedDate'         => $joinedDate,
+            'motherName'         => trim((string) ($row['motherName'] ?? '')) ?: null,
+            'civilStatus'        => trim((string) ($row['civilStatus'] ?? '')) ?: null,
+            'childrenCount'      => trim((string) ($row['childrenCount'] ?? '')) ?: null,
+            'license'            => trim((string) ($row['license'] ?? '')) ?: null,
+            'currentJob'         => trim((string) ($row['currentJob'] ?? '')) ?: null,
+            'placeOfBirth'       => trim((string) ($row['placeOfBirth'] ?? '')) ?: null,
+            'qualification'      => trim((string) ($row['qualification'] ?? '')) ?: null,
+            'status'             => $status,
+            'trade'              => trim((string) ($row['trade'] ?? '')) ?: null,
+            'passportExpiry'     => $this->formatCandidateDate($row['passportExpiry'] ?? null),
+            'passportIssueDate'  => $this->formatCandidateDate($row['passportIssueDate'] ?? null),
+            'cnicNumber'         => trim((string) ($row['cnicNumber'] ?? '')) ?: null,
+            'email'              => trim((string) ($row['email'] ?? '')) ?: null,
+            'nationality'        => trim((string) ($row['nationality'] ?? '')) ?: null,
+            'currentLocation'    => trim((string) ($row['currentLocation'] ?? '')) ?: null,
+            'targetCountry'      => trim((string) ($row['targetCountry'] ?? '')) ?: null,
+            'experienceYears'    => max(0, (int) ($row['experienceYears'] ?? 0)),
+            'skills'             => $row['skills'] ?? '',
+        ];
+    }
+
+    /**
+     * Convert various spreadsheet date formats / numbers into YYYY-MM-DD.
+     */
+    private function formatCandidateDate($val): ?string
+    {
+        if ($val === null || $val === '') {
+            return null;
+        }
+
+        if ($val instanceof \DateTimeInterface) {
+            return $val->format('Y-m-d');
+        }
+
+        if (is_numeric($val)) {
+            $num = (float) $val;
+            if ($num > 20000 && $num < 80000) {
+                try {
+                    return ExcelDate::excelToDateTimeObject($num)->format('Y-m-d');
+                } catch (\Throwable) {
+                    // ignore and fallback
+                }
+            }
+        }
+
+        $str = trim((string) $val);
+
+        // Support YYYY-MM-DD or YYYY.MM.DD or YYYY/MM/DD
+        if (preg_match('/^(\d{4})[\.\/\-](\d{1,2})[\.\/\-](\d{1,2})$/', $str, $matches)) {
+            return sprintf('%04d-%02d-%02d', (int) $matches[1], (int) $matches[2], (int) $matches[3]);
+        }
+
+        // Support DD.MM.YYYY or DD/MM/YYYY or DD-MM-YYYY
+        if (preg_match('/^(\d{1,2})[\.\/\-](\d{1,2})[\.\/\-](\d{4})$/', $str, $matches)) {
+            return sprintf('%04d-%02d-%02d', (int) $matches[3], (int) $matches[2], (int) $matches[1]);
+        }
+
+        $time = strtotime($str);
+        if ($time !== false && $time > 0) {
+            return date('Y-m-d', $time);
+        }
+
+        return null;
+    }
+
+    public function update(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.update');
+        $data = $request->validate([
+            'firstName'        => ['nullable', 'string', 'max:100'],
+            'lastName'         => ['nullable', 'string', 'max:100'],
+            'gender'           => ['nullable', 'string', 'max:20'],
+            'email'            => ['nullable', 'email', 'max:255'],
+            'phone'            => ['nullable', 'string', 'max:50'],
+            'passportNumber'   => ['required', 'string', 'max:50'],
+            'passportExpiry'   => ['nullable', 'date'],
+            'passportIssueDate'=> ['nullable', 'date'],
+            'cnicNumber'       => ['nullable', 'string', 'max:20'],
+            'nationality'      => ['nullable', 'string', 'max:100'],
+            'currentLocation'  => ['nullable', 'string', 'max:200'],
+            'address'          => ['nullable', 'string', 'max:500'],
+            'targetCountry'    => ['nullable', 'string', 'max:200'],
+            'joinedDate'       => ['nullable', 'date'],
+            'trade'            => ['nullable', 'string', 'max:255'],
+            'experienceYears'  => ['nullable', 'integer', 'min:0'],
+            'balance'          => ['nullable', 'numeric', 'min:0'],
+            'serviceCharges'   => ['nullable', 'numeric', 'min:0'],
+            'service_charges'  => ['nullable', 'numeric', 'min:0'],
+            'country_service_charges' => ['nullable'],
+            'countryServiceCharges'   => ['nullable'],
+            'photo'            => ['nullable'],
+            'signature'        => ['nullable'],
+            'fatherName'       => ['nullable', 'string', 'max:150'],
+            'motherName'       => ['nullable', 'string', 'max:150'],
+            'placeOfBirth'     => ['nullable', 'string', 'max:150'],
+            'dateOfBirth'      => ['nullable', 'date'],
+            'civilStatus'      => ['nullable', 'string', 'max:50'],
+            'wifeDetails'      => ['nullable'],
+            'wife_details'     => ['nullable'],
+            'childrenCount'    => ['nullable', 'string', 'max:20'],
+            'childrenDetails'  => ['nullable'],
+            'passportSeries'   => ['nullable', 'string', 'max:50'],
+            'citizenship'      => ['nullable', 'string', 'max:100'],
+            'town'             => ['nullable', 'string', 'max:150'],
+            'country'          => ['nullable', 'string', 'max:100'],
+            'occupationField'  => ['nullable', 'string', 'max:255'],
+            'cvSummary'        => ['nullable', 'string'],
+            'cvData'           => ['nullable', 'array'],
+            'careOf'           => ['nullable', 'string', 'max:150'],
+            'age'              => ['nullable', 'integer', 'min:0', 'max:150'],
+            'license'          => ['nullable', 'string', 'max:150'],
+            'currentJob'       => ['nullable', 'string', 'max:150'],
+            'qualification'    => ['nullable', 'string', 'max:150'],
+            'notes'            => ['nullable', 'string'],
+            'embassyDetails'   => ['nullable'],
+            'embassy_details'  => ['nullable'],
+            'foreignVisit'     => ['nullable'],
+            'foreign_visit'    => ['nullable'],
+        ]);
+
+        // Enforce unique passport number across all candidates (active and history, excluding self)
+        $rawPassport = strtoupper(trim((string) $data['passportNumber']));
+        $existing = Candidate::whereRaw('UPPER(passport_number) = ?', [$rawPassport])
+            ->where('id', '!=', $candidate->id)
+            ->first();
+        if (!$existing) {
+            $existing = Candidate::where(function ($q) use ($data, $rawPassport) {
+                $q->whereJsonContains('passport_history', [['passportNumber' => $data['passportNumber']]])
+                  ->orWhereRaw("UPPER(passport_history::text) LIKE ?", ['%"PASSPORTNUMBER":"' . $rawPassport . '"%']);
+            })
+            ->where('id', '!=', $candidate->id)
+            ->first();
+        }
+        if ($existing) {
+            return response()->json([
+                'message' => "Passport number '{$data['passportNumber']}' is already registered to candidate {$existing->first_name} {$existing->last_name} ({$existing->code}). Each passport number can only be used once.",
+                'errors' => [
+                    'passportNumber' => ["Passport number is already registered to candidate {$existing->first_name} {$existing->last_name} ({$existing->code})."],
+                ],
+            ], 422);
+        }
+
+        $photoPath = $candidate->photo_path;
+        if ($request->hasFile('photo')) {
+            // Delete old photo
+            if ($photoPath) {
+                Storage::disk('public')->delete($photoPath);
+            }
+            $compPhoto = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('photo'),
+                'candidates/' . $candidate->id,
+                'public'
+            );
+            $photoPath = $compPhoto['path'];
+        } elseif ($request->filled('photo') && is_string($request->input('photo')) && str_starts_with($request->input('photo'), 'data:image')) {
+            if ($photoPath) {
+                Storage::disk('public')->delete($photoPath);
+            }
+            $photoPath = app(DocumentCompressionService::class)->storeBase64AndCompress(
+                $request->input('photo'),
+                'candidates/' . $candidate->id,
+                'public',
+                'photo_'
+            );
+        }
+
+        $signaturePath = $candidate->signature_path;
+        if ($request->hasFile('signature')) {
+            if ($signaturePath) {
+                Storage::disk('public')->delete($signaturePath);
+            }
+            $compSig = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('signature'),
+                'candidates/' . $candidate->id,
+                'public'
+            );
+            $signaturePath = $compSig['path'];
+        } elseif ($request->filled('signature') && is_string($request->input('signature')) && str_starts_with($request->input('signature'), 'data:image')) {
+            if ($signaturePath) {
+                Storage::disk('public')->delete($signaturePath);
+            }
+            $signaturePath = app(DocumentCompressionService::class)->storeBase64AndCompress(
+                $request->input('signature'),
+                'candidates/' . $candidate->id,
+                'public',
+                'sig_'
+            );
+        } elseif ($request->boolean('removeSignature')) {
+            if ($signaturePath) {
+                Storage::disk('public')->delete($signaturePath);
+            }
+            $signaturePath = null;
+        }
+
+        // Handle thumbprint / fingerprint upload directly inside candidate folder
+        $fingerprintPath = $candidate->fingerprint_path;
+        $fingerprintTemplate = $candidate->fingerprint_template;
+        $fingerprintQuality = $candidate->fingerprint_quality;
+        $fingerprintCapturedAt = $candidate->fingerprint_captured_at;
+
+        if ($request->hasFile('fingerprint')) {
+            if ($fingerprintPath) {
+                Storage::disk('public')->delete($fingerprintPath);
+            }
+            $compFp = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('fingerprint'),
+                'candidates/' . $candidate->id,
+                'public'
+            );
+            $fingerprintPath = $compFp['path'];
+            $fingerprintCapturedAt = now();
+        } elseif ($request->filled('fingerprint') && is_string($request->input('fingerprint')) && str_starts_with($request->input('fingerprint'), 'data:image')) {
+            if ($fingerprintPath) {
+                Storage::disk('public')->delete($fingerprintPath);
+            }
+            $fingerprintPath = app(DocumentCompressionService::class)->storeBase64AndCompress(
+                $request->input('fingerprint'),
+                'candidates/' . $candidate->id,
+                'public',
+                'fp_'
+            );
+            $fingerprintCapturedAt = now();
+        } elseif ($request->boolean('removeFingerprint')) {
+            if ($fingerprintPath) {
+                Storage::disk('public')->delete($fingerprintPath);
+            }
+            $fingerprintPath = null;
+            $fingerprintTemplate = null;
+            $fingerprintQuality = null;
+            $fingerprintCapturedAt = null;
+        }
+
+        if ($request->filled('fingerprint_template') || $request->filled('fingerprintTemplate')) {
+            $fingerprintTemplate = (string) ($request->input('fingerprint_template') ?? $request->input('fingerprintTemplate'));
+            $fingerprintCapturedAt = now();
+        }
+        if ($request->filled('fingerprint_quality') || $request->filled('fingerprintQuality')) {
+            $fingerprintQuality = (int) ($request->input('fingerprint_quality') ?? $request->input('fingerprintQuality'));
+        }
+
+        $skills = $request->input('skills');
+        if (is_string($skills)) {
+            $decoded = json_decode($skills, true);
+            $skills  = is_array($decoded) ? $decoded : [$skills];
+        }
+        $tradeValue = array_key_exists('trade', $data) ? $data['trade'] : $candidate->trade;
+        if ($skills === null && !empty($tradeValue)) {
+            $skills = array_values(array_filter(array_map('trim', explode(',', $tradeValue))));
+        }
+
+        $cvSummary = array_key_exists('cvSummary', $data) ? $data['cvSummary'] : $candidate->cv_summary;
+        $cvData    = array_key_exists('cvData', $data) ? $data['cvData'] : $candidate->cv_data;
+        $expYears  = (int) (array_key_exists('experienceYears', $data) ? $data['experienceYears'] : ($candidate->experience_years ?? 0));
+
+        if (!empty($cvSummary) && str_contains($cvSummary, 'with over 0 years')) {
+            if ($expYears > 0) {
+                $cvSummary = str_replace('with over 0 years', "with over {$expYears} " . ($expYears === 1 ? 'year' : 'years'), $cvSummary);
+            } else {
+                $cvSummary = str_replace('with over 0 years of hands-on expertise', 'with strong practical skills and proven capabilities', $cvSummary);
+            }
+            if (is_array($cvData)) {
+                $cvData['summary'] = $cvSummary;
+            }
+        }
+
+        $dob = array_key_exists('dateOfBirth', $data) ? $data['dateOfBirth'] : $candidate->date_of_birth;
+        $age = array_key_exists('age', $data) ? $data['age'] : null;
+        if ($age === null && !empty($dob)) {
+            try {
+                $age = \Carbon\Carbon::parse($dob)->age;
+            } catch (\Throwable) {
+                $age = $candidate->age;
+            }
+        }
+
+        $countryServiceCharges = $candidate->country_service_charges;
+        if ($request->has('countryServiceCharges') || $request->has('country_service_charges')) {
+            $rawCsc = $request->input('countryServiceCharges') ?? $request->input('country_service_charges');
+            if (is_string($rawCsc)) {
+                $decoded = json_decode($rawCsc, true);
+                $countryServiceCharges = is_array($decoded) ? $decoded : null;
+            } else {
+                $countryServiceCharges = $rawCsc;
+            }
+        }
+
+        $serviceCharges = array_key_exists('serviceCharges', $data)
+            ? $data['serviceCharges']
+            : (array_key_exists('service_charges', $data)
+                ? $data['service_charges']
+                : (array_key_exists('balance', $data)
+                    ? $data['balance']
+                    : null));
+
+        if (!empty($countryServiceCharges) && is_array($countryServiceCharges)) {
+            $sumCharges = 0;
+            $hasExplicit = false;
+            foreach ($countryServiceCharges as $csc) {
+                if (isset($csc['serviceCharges']) || isset($csc['service_charges'])) {
+                    $hasExplicit = true;
+                    $sumCharges += (float) ($csc['serviceCharges'] ?? $csc['service_charges'] ?? 0);
+                }
+            }
+            if ($hasExplicit || $serviceCharges === null) {
+                $serviceCharges = (float) $sumCharges;
+            }
+        }
+
+        if ($serviceCharges === null) {
+            $serviceCharges = (float) ($candidate->service_charges ?? 0);
+        } else {
+            $serviceCharges = (float) $serviceCharges;
+        }
+
+        $childrenDetails = $candidate->children_details;
+        if ($request->has('childrenDetails')) {
+            $rawChildren = $request->input('childrenDetails');
+            if (is_string($rawChildren)) {
+                $decoded = json_decode($rawChildren, true);
+                $childrenDetails = is_array($decoded) ? $decoded : null;
+            } else {
+                $childrenDetails = $rawChildren;
+            }
+        }
+
+        $wifeDetails = $candidate->wife_details;
+        if ($request->has('wifeDetails') || $request->has('wife_details')) {
+            $rawWife = $request->input('wifeDetails') ?? $request->input('wife_details');
+            if (is_string($rawWife)) {
+                $decoded = json_decode($rawWife, true);
+                $wifeDetails = is_array($decoded) ? $decoded : null;
+            } else {
+                $wifeDetails = $rawWife;
+            }
+        }
+
+        $embassyDetails = $candidate->embassy_details;
+        if ($request->has('embassyDetails') || $request->has('embassy_details')) {
+            $rawEmbassy = $request->input('embassyDetails') ?? $request->input('embassy_details');
+            if (is_string($rawEmbassy)) {
+                $decoded = json_decode($rawEmbassy, true);
+                $embassyDetails = is_array($decoded) ? $decoded : null;
+            } else {
+                $embassyDetails = $rawEmbassy;
+            }
+        }
+
+        $candidate->forceFill([
+            'first_name'         => array_key_exists('firstName', $data) ? ($data['firstName'] ?: null) : $candidate->first_name,
+            'last_name'          => array_key_exists('lastName', $data) ? $data['lastName'] : $candidate->last_name,
+            'gender'             => array_key_exists('gender', $data) ? ($data['gender'] ?: ($candidate->gender ?? 'Male')) : ($candidate->gender ?? 'Male'),
+            'email'              => $data['email'] ?? null,
+            'phone'              => $data['phone'] ?? null,
+            'passport_number'    => $data['passportNumber'],
+            'passport_expiry'    => $data['passportExpiry'] ?? null,
+            'passport_issue_date'=> array_key_exists('passportIssueDate', $data) ? $data['passportIssueDate'] : $candidate->passport_issue_date,
+            'cnic_number'        => $data['cnicNumber'] ?? null,
+            'nationality'        => $data['nationality'] ?? 'Pakistani',
+            'current_location'   => $data['currentLocation'] ?? 'Pakistan',
+            'address'            => array_key_exists('address', $data) ? $data['address'] : $candidate->address,
+            'target_country'     => $data['targetCountry'] ?? null,
+            'joined_date'        => array_key_exists('joinedDate', $data) ? $data['joinedDate'] : $candidate->joined_date,
+            'trade'              => $tradeValue,
+            'experience_years'   => $data['experienceYears'] ?? 0,
+            'service_charges'    => $serviceCharges ?? 0,
+            'country_service_charges' => $countryServiceCharges,
+            'skills'             => $skills ?? $candidate->skills,
+            'photo_path'         => $photoPath,
+            'signature_path'     => $signaturePath,
+            'fingerprint_path'        => $fingerprintPath,
+            'fingerprint_template'    => $fingerprintTemplate,
+            'fingerprint_quality'     => $fingerprintQuality,
+            'fingerprint_captured_at' => $fingerprintCapturedAt,
+            'father_name'        => array_key_exists('fatherName', $data) ? $this->normalizePersonName($data['fatherName'], $data['lastName'] ?? $candidate->last_name) : $candidate->father_name,
+            'mother_name'        => array_key_exists('motherName', $data) ? $data['motherName'] : $candidate->mother_name,
+            'place_of_birth'     => array_key_exists('placeOfBirth', $data) ? $data['placeOfBirth'] : $candidate->place_of_birth,
+            'date_of_birth'      => $dob,
+            'civil_status'       => array_key_exists('civilStatus', $data) ? $data['civilStatus'] : $candidate->civil_status,
+            'wife_details'       => $wifeDetails,
+            'children_count'     => array_key_exists('childrenCount', $data) ? $data['childrenCount'] : $candidate->children_count,
+            'children_details'   => $childrenDetails,
+            'passport_series'    => array_key_exists('passportSeries', $data) ? $data['passportSeries'] : $candidate->passport_series,
+            'citizenship'        => array_key_exists('citizenship', $data) ? $data['citizenship'] : $candidate->citizenship,
+            'town'               => array_key_exists('town', $data) ? $data['town'] : $candidate->town,
+            'country'            => array_key_exists('country', $data) ? $data['country'] : $candidate->country,
+            'occupation_field'   => array_key_exists('occupationField', $data) ? $data['occupationField'] : $candidate->occupation_field,
+            'cv_summary'         => $cvSummary,
+            'cv_data'            => $cvData,
+            'care_of'            => array_key_exists('careOf', $data) ? $data['careOf'] : $candidate->care_of,
+            'age'                => $age,
+            'license'            => array_key_exists('license', $data) ? $data['license'] : $candidate->license,
+            'current_job'        => array_key_exists('currentJob', $data) ? $data['currentJob'] : $candidate->current_job,
+            'qualification'      => array_key_exists('qualification', $data) ? $data['qualification'] : $candidate->qualification,
+            'notes'              => array_key_exists('notes', $data) ? $data['notes'] : $candidate->notes,
+            'embassy_details'    => $embassyDetails,
+            'foreign_visit'      => array_key_exists('foreignVisit', $data)
+                ? (is_array($data['foreignVisit']) ? json_encode($data['foreignVisit']) : $data['foreignVisit'])
+                : (array_key_exists('foreign_visit', $data)
+                    ? (is_array($data['foreign_visit']) ? json_encode($data['foreign_visit']) : $data['foreign_visit'])
+                    : $candidate->foreign_visit),
+        ]);
+        $candidate->saveOrFail();
+        $savedCandidate = Candidate::with(['company', 'documents', 'submissions', 'withdrawal'])
+            ->findOrFail($candidate->id);
+
+        return response()->json([
+            'candidate' => $this->presentDetail($savedCandidate),
+        ]);
+    }
+
+    /**
+     * PATCH /candidates/{candidate}/fields — updates only the fields sent (used to
+     * fill in details a document template needs). Unlike update(), fields that
+     * aren't in the request are left untouched.
+     */
+    public function updateFields(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.update');
+
+        $rules = [
+            'firstName'         => ['sometimes', 'nullable', 'string', 'max:100'],
+            'lastName'          => ['sometimes', 'nullable', 'string', 'max:100'],
+            'gender'            => ['sometimes', 'nullable', 'string', 'max:20'],
+            'email'             => ['sometimes', 'nullable', 'email', 'max:255'],
+            'phone'             => ['sometimes', 'nullable', 'string', 'max:50'],
+            'passportExpiry'    => ['sometimes', 'nullable', 'date'],
+            'passportIssueDate' => ['sometimes', 'nullable', 'date'],
+            'passportSeries'    => ['sometimes', 'nullable', 'string', 'max:50'],
+            'cnicNumber'        => ['sometimes', 'nullable', 'string', 'max:20'],
+            'nationality'       => ['sometimes', 'nullable', 'string', 'max:100'],
+            'citizenship'       => ['sometimes', 'nullable', 'string', 'max:100'],
+            'currentLocation'   => ['sometimes', 'nullable', 'string', 'max:200'],
+            'town'              => ['sometimes', 'nullable', 'string', 'max:150'],
+            'country'           => ['sometimes', 'nullable', 'string', 'max:100'],
+            'targetCountry'     => ['sometimes', 'nullable', 'string', 'max:200'],
+            'trade'             => ['sometimes', 'nullable', 'string', 'max:255'],
+            'occupationField'   => ['sometimes', 'nullable', 'string', 'max:255'],
+            'experienceYears'   => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'currentJob'        => ['sometimes', 'nullable', 'string', 'max:150'],
+            'qualification'     => ['sometimes', 'nullable', 'string', 'max:150'],
+            'fatherName'        => ['sometimes', 'nullable', 'string', 'max:150'],
+            'motherName'        => ['sometimes', 'nullable', 'string', 'max:150'],
+            'careOf'            => ['sometimes', 'nullable', 'string', 'max:150'],
+            'dateOfBirth'       => ['sometimes', 'nullable', 'date'],
+            'age'               => ['sometimes', 'nullable', 'integer', 'min:0', 'max:150'],
+            'placeOfBirth'      => ['sometimes', 'nullable', 'string', 'max:150'],
+            'civilStatus'       => ['sometimes', 'nullable', 'string', 'max:50'],
+            'childrenCount'     => ['sometimes', 'nullable', 'string', 'max:20'],
+            'wifeDetails'       => ['sometimes', 'nullable'],
+            'wife_details'      => ['sometimes', 'nullable'],
+            'childrenDetails'   => ['sometimes', 'nullable'],
+            'children_details'  => ['sometimes', 'nullable'],
+            'license'           => ['sometimes', 'nullable', 'string', 'max:150'],
+            'foreignVisit'      => ['sometimes', 'nullable'],
+            'foreign_visit'     => ['sometimes', 'nullable'],
+        ];
+        $data = $request->validate($rules);
+
+        $columns = [
+            'firstName' => 'first_name', 'lastName' => 'last_name', 'gender' => 'gender', 'email' => 'email', 'phone' => 'phone',
+            'passportExpiry' => 'passport_expiry', 'passportIssueDate' => 'passport_issue_date',
+            'passportSeries' => 'passport_series',
+            'cnicNumber' => 'cnic_number', 'nationality' => 'nationality', 'citizenship' => 'citizenship',
+            'currentLocation' => 'current_location', 'town' => 'town', 'country' => 'country',
+            'targetCountry' => 'target_country', 'trade' => 'trade',
+            'occupationField' => 'occupation_field', 'experienceYears' => 'experience_years',
+            'currentJob' => 'current_job', 'qualification' => 'qualification',
+            'fatherName' => 'father_name', 'motherName' => 'mother_name',
+            'careOf' => 'care_of', 'dateOfBirth' => 'date_of_birth', 'age' => 'age',
+            'placeOfBirth' => 'place_of_birth', 'civilStatus' => 'civil_status',
+            'childrenCount' => 'children_count', 'license' => 'license',
+            'foreignVisit' => 'foreign_visit', 'foreign_visit' => 'foreign_visit',
+        ];
+
+        $updates = [];
+        foreach ($data as $key => $value) {
+            if (isset($columns[$key])) {
+                $col = $columns[$key];
+                if ($col === 'foreign_visit' && is_array($value)) {
+                    $updates[$col] = json_encode($value);
+                } else {
+                    $updates[$col] = is_string($value) ? trim($value) : $value;
+                }
+            }
+        }
+
+        if ($request->has('wifeDetails') || $request->has('wife_details')) {
+            $rawWife = $request->input('wifeDetails') ?? $request->input('wife_details');
+            if (is_string($rawWife)) {
+                $decoded = json_decode($rawWife, true);
+                $updates['wife_details'] = is_array($decoded) ? $decoded : null;
+            } else {
+                $updates['wife_details'] = $rawWife;
+            }
+        }
+
+        if ($request->has('childrenDetails') || $request->has('children_details')) {
+            $rawChildren = $request->input('childrenDetails') ?? $request->input('children_details');
+            if (is_string($rawChildren)) {
+                $decoded = json_decode($rawChildren, true);
+                $updates['children_details'] = is_array($decoded) ? $decoded : null;
+            } else {
+                $updates['children_details'] = $rawChildren;
+            }
+        }
+
+        if ($updates) {
+            $candidate->forceFill($updates)->saveOrFail();
+        }
+
+        $saved = Candidate::with(['company', 'documents', 'submissions', 'withdrawal'])->findOrFail($candidate->id);
+
+        return response()->json([
+            'candidate' => $this->presentDetail($saved),
+        ]);
+    }
+
+    public function saveCv(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.update');
+
+        $data = $request->validate([
+            'cvData'           => ['required', 'array'],
+            'candidateFields'  => ['nullable', 'array'],
+        ]);
+
+        $cvData = $data['cvData'];
+        $fields = $data['candidateFields'] ?? [];
+
+        $expYears = (int) ($candidate->experience_years ?? 0);
+        $summary = $cvData['summary'] ?? $candidate->cv_summary;
+        if (!empty($summary) && str_contains($summary, 'with over 0 years')) {
+            if ($expYears > 0) {
+                $summary = str_replace('with over 0 years', "with over {$expYears} " . ($expYears === 1 ? 'year' : 'years'), $summary);
+            } else {
+                $summary = str_replace('with over 0 years of hands-on expertise', 'with strong practical skills and proven capabilities', $summary);
+            }
+            $cvData['summary'] = $summary;
+        }
+
+        $fillData = [
+            'cv_data'    => $cvData,
+            'cv_summary' => $summary,
+        ];
+
+        if (!empty($cvData['surname']) || !empty($fields['lastName'])) {
+            $fillData['last_name'] = $fields['lastName'] ?? $cvData['surname'] ?? $candidate->last_name;
+        }
+        if (!empty($cvData['givenName']) || !empty($fields['firstName'])) {
+            $fillData['first_name'] = $fields['firstName'] ?? $cvData['givenName'] ?? $candidate->first_name;
+        }
+        if (array_key_exists('fatherName', $cvData)) {
+            $fillData['father_name'] = $cvData['fatherName'];
+        }
+        if (array_key_exists('motherName', $cvData)) {
+            $fillData['mother_name'] = $cvData['motherName'];
+        }
+        if (array_key_exists('placeOfBirth', $cvData)) {
+            $fillData['place_of_birth'] = $cvData['placeOfBirth'];
+        }
+        if (!empty($cvData['dateOfBirth'])) {
+            $dob = $cvData['dateOfBirth'];
+            if (preg_match('/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})$/', $dob, $m)) {
+                $dob = "{$m[3]}-{$m[2]}-{$m[1]}";
+            }
+            try {
+                $fillData['date_of_birth'] = \Carbon\Carbon::parse($dob)->toDateString();
+            } catch (\Throwable) {}
+        }
+        if (array_key_exists('civilStatus', $cvData)) {
+            $fillData['civil_status'] = $cvData['civilStatus'];
+        }
+        if (array_key_exists('childrenCount', $cvData)) {
+            $fillData['children_count'] = $cvData['childrenCount'];
+        }
+        if (array_key_exists('citizenship', $cvData)) {
+            $fillData['citizenship'] = $cvData['citizenship'];
+        }
+        if (array_key_exists('nationality', $cvData)) {
+            $fillData['nationality'] = $cvData['nationality'];
+        }
+        if (array_key_exists('passportSeries', $cvData)) {
+            $fillData['passport_series'] = $cvData['passportSeries'];
+        }
+        if (array_key_exists('passportIssuedBy', $cvData)) {
+            $fillData['passport_issued_by'] = $cvData['passportIssuedBy'];
+        }
+        if (!empty($cvData['passportIssueDate'])) {
+            $pid = $cvData['passportIssueDate'];
+            if (preg_match('/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})$/', $pid, $m)) {
+                $pid = "{$m[3]}-{$m[2]}-{$m[1]}";
+            }
+            try {
+                $fillData['passport_issue_date'] = \Carbon\Carbon::parse($pid)->toDateString();
+            } catch (\Throwable) {}
+        }
+        if (!empty($cvData['passportExpiryDate'])) {
+            $ped = $cvData['passportExpiryDate'];
+            if (preg_match('/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})$/', $ped, $m)) {
+                $ped = "{$m[3]}-{$m[2]}-{$m[1]}";
+            }
+            try {
+                $fillData['passport_expiry'] = \Carbon\Carbon::parse($ped)->toDateString();
+            } catch (\Throwable) {}
+        }
+        if (!empty($cvData['passportNo']) && trim((string)$cvData['passportNo']) !== '') {
+            $fillData['passport_number'] = trim((string)$cvData['passportNo']);
+        }
+        if (array_key_exists('town', $cvData)) {
+            $fillData['town'] = $cvData['town'];
+        }
+        if (array_key_exists('country', $cvData)) {
+            $fillData['country'] = $cvData['country'];
+        }
+        if (array_key_exists('occupationField', $cvData)) {
+            $fillData['occupation_field'] = $cvData['occupationField'];
+        }
+        if (!empty($cvData['phone'])) {
+            $fillData['phone'] = $cvData['phone'];
+        }
+        if (!empty($cvData['email'])) {
+            $fillData['email'] = $cvData['email'];
+        }
+        if (!empty($cvData['cnic'])) {
+            $fillData['cnic_number'] = $cvData['cnic'];
+        }
+        if (!empty($cvData['location'])) {
+            $fillData['current_location'] = $cvData['location'];
+        }
+        if (!empty($cvData['skills']) && is_array($cvData['skills'])) {
+            $fillData['skills'] = $cvData['skills'];
+        }
+        if (array_key_exists('careOf', $fields) || array_key_exists('careOf', $cvData)) {
+            $fillData['care_of'] = $fields['careOf'] ?? $cvData['careOf'] ?? null;
+        }
+        if (array_key_exists('age', $fields) || array_key_exists('age', $cvData)) {
+            $fillData['age'] = $fields['age'] ?? $cvData['age'] ?? null;
+        }
+        if (array_key_exists('license', $fields) || array_key_exists('license', $cvData)) {
+            $fillData['license'] = $fields['license'] ?? $cvData['license'] ?? null;
+        }
+        if (array_key_exists('currentJob', $fields) || array_key_exists('currentJob', $cvData)) {
+            $fillData['current_job'] = $fields['currentJob'] ?? $cvData['currentJob'] ?? null;
+        }
+        if (array_key_exists('qualification', $fields) || array_key_exists('qualification', $cvData)) {
+            $fillData['qualification'] = $fields['qualification'] ?? $cvData['qualification'] ?? null;
+        }
+
+        $candidate->forceFill($fillData);
+        $candidate->saveOrFail();
+
+        $savedCandidate = Candidate::with(['company', 'documents', 'submissions', 'withdrawal'])
+            ->findOrFail($candidate->id);
+
+        return response()->json([
+            'message'   => 'CV and candidate details successfully saved to database.',
+            'candidate' => $this->presentDetail($savedCandidate),
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Destroy — DELETE /candidates/{candidate}
+    // --------------------------------------------------------------------------
+
+    public function destroy(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.delete');
+
+        // Soft delete candidate: keeps candidate, documents, and all records preserved in database & disk storage
+        $candidate->delete();
+
+        return response()->json(['message' => 'Candidate deleted successfully.']);
+    }
+
+    // --------------------------------------------------------------------------
+    // Destroy Batch — POST/DELETE /candidates/batch-delete
+    // --------------------------------------------------------------------------
+
+    public function destroyBatch(Request $request): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.delete');
+
+        $candidateIds = $request->input('candidate_ids', []);
+        if (is_string($candidateIds)) {
+            $candidateIds = array_values(array_filter(array_map('trim', explode(',', $candidateIds))));
+        }
+
+        if (empty($candidateIds) || !is_array($candidateIds)) {
+            return response()->json([
+                'message' => 'No candidates specified.',
+                'count'   => 0,
+            ], 422);
+        }
+
+        $candidates = Candidate::whereIn('id', $candidateIds)->get();
+        $deletedCount = 0;
+
+        DB::beginTransaction();
+        try {
+            foreach ($candidates as $candidate) {
+                // Soft delete candidate: keeps files and records preserved in DB & storage
+                $candidate->delete();
+                $deletedCount++;
+            }
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to delete candidates: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => "Successfully deleted {$deletedCount} candidate(s).",
+            'count'   => $deletedCount,
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Update Stage — PATCH /candidates/{candidate}/stage
+    // --------------------------------------------------------------------------
+
+    public function updateStage(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.update');
+        $data = $request->validate([
+            'stage' => ['required', 'in:inquiry,registered,docs_collection,processing,visa_applied,visa_stamped,ready_to_fly'],
+        ]);
+
+        $candidate->update(['recruitment_stage' => $data['stage']]);
+
+        return response()->json([
+            'candidate' => $this->presentDetail($candidate->fresh()->load(['company', 'documents', 'submissions', 'withdrawal'])),
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Update Status — PATCH /candidates/{candidate}/status
+    // --------------------------------------------------------------------------
+
+    public function updateStatus(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.update');
+        $data = $request->validate([
+            'status' => ['required', 'in:available,placed,processing,on_hold,withdrawn,archived'],
+        ]);
+
+        $candidate->update(['status' => $data['status']]);
+
+        return response()->json([
+            'candidate' => $this->presentDetail($candidate->fresh()->load(['company', 'documents', 'submissions', 'withdrawal'])),
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Shift to Company — POST /candidates/shift
+    // --------------------------------------------------------------------------
+
+    public function shiftToCompany(Request $request): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.shift');
+        $data = $request->validate([
+            'candidateIds'   => ['required', 'array', 'min:1'],
+            'candidateIds.*' => ['required', 'integer', 'exists:candidates,id'],
+            'companyId'      => ['required', 'integer', 'exists:companies,id'],
+            'note'           => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $company     = Company::findOrFail($data['companyId']);
+        $sharedToken = Str::random(32);
+        $shiftedAt   = now();
+        $shiftedBy   = $request->user()->name ?? 'System';
+
+        $candidates = Candidate::whereIn('id', $data['candidateIds'])->get();
+
+        // Only candidates never shifted to this company before add to its shared total
+        $previouslyShared = CandidateSubmission::where('company_id', $company->id)
+            ->whereIn('candidate_id', $candidates->pluck('id'))
+            ->pluck('candidate_id')
+            ->unique();
+        $newlyShared = $candidates->pluck('id')->diff($previouslyShared)->count();
+
+        foreach ($candidates as $candidate) {
+            $candidate->update([
+                'status'             => 'placed',
+                'current_company_id' => $company->id,
+            ]);
+
+            CandidateSubmission::create([
+                'candidate_id' => $candidate->id,
+                'company_id'   => $company->id,
+                'company_name' => $company->name,
+                'shifted_at'   => $shiftedAt,
+                'note'         => $data['note'] ?? null,
+                'shifted_by'   => $shiftedBy,
+                'share_token'  => $sharedToken . '-' . $candidate->id,
+            ]);
+        }
+
+        // Record the batch share for multi-candidate shareable view
+        CandidateShare::create([
+            'share_token'   => $sharedToken,
+            'title'         => 'Shifted to ' . $company->name,
+            'note'          => $data['note'] ?? null,
+            'company_id'    => $company->id,
+            'company_name'  => $company->name,
+            'candidate_ids' => $candidates->pluck('id')->values()->toArray(),
+            'created_by'    => $shiftedBy,
+        ]);
+
+        if ($newlyShared > 0) {
+            $company->increment('shared_candidates_count', $newlyShared);
+        }
+
+        $names = $candidates->map(fn (Candidate $c) => trim($c->first_name . ' ' . $c->last_name))->values();
+        CompanyLog::record(
+            $company->id,
+            'candidates_shifted',
+            $candidates->count() === 1
+                ? "Shifted {$names->first()} to the company"
+                : 'Shifted ' . $candidates->count() . ' candidates to the company',
+            [
+                'candidateIds'   => $candidates->pluck('id')->values(),
+                'candidateNames' => $names,
+                'note'           => $data['note'] ?? null,
+            ],
+            $request
+        );
+
+        Notifier::staff(
+            'CANDIDATES_SHIFTED',
+            "Candidates shifted to {$company->name}",
+            $candidates->count() === 1
+                ? "{$names->first()} was shifted to {$company->name}."
+                : $candidates->count() . " candidates were shifted to {$company->name}.",
+            ['companyId' => $company->id, 'count' => $candidates->count()],
+            "/dashboard/companies/{$company->id}",
+            $request
+        );
+
+        $frontendUrl  = rtrim(env('FRONTEND_URL', 'http://localhost:3000'), '/');
+        $shareableUrl = $frontendUrl . '/share/' . $sharedToken;
+
+        return response()->json([
+            'message'      => count($candidates) . ' candidate(s) shifted to ' . $company->name,
+            'shareableUrl' => $shareableUrl,
+            'sharedToken'  => $sharedToken,
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Share Candidates Batch — POST /candidates/share
+    // --------------------------------------------------------------------------
+
+    public function createShare(Request $request): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.view');
+        $data = $request->validate([
+            'candidateIds'   => ['required', 'array', 'min:1'],
+            'candidateIds.*' => ['required', 'integer', 'exists:candidates,id'],
+            'title'          => ['nullable', 'string', 'max:255'],
+            'note'           => ['nullable', 'string', 'max:1000'],
+            'companyId'      => ['nullable', 'integer', 'exists:companies,id'],
+        ]);
+
+        $companyName = null;
+        if (! empty($data['companyId'])) {
+            $company = Company::find($data['companyId']);
+            $companyName = $company?->name;
+        }
+
+        $sharedToken = Str::random(32);
+        $createdBy   = $request->user()->name ?? 'System';
+
+        CandidateShare::create([
+            'share_token'   => $sharedToken,
+            'title'         => $data['title'] ?? 'Candidate Profiles Package',
+            'note'          => $data['note'] ?? null,
+            'company_id'    => $data['companyId'] ?? null,
+            'company_name'  => $companyName,
+            'candidate_ids' => array_values($data['candidateIds']),
+            'created_by'    => $createdBy,
+        ]);
+
+        $frontendUrl  = rtrim(env('FRONTEND_URL', 'http://localhost:3000'), '/');
+        $shareableUrl = $frontendUrl . '/share/' . $sharedToken;
+
+        return response()->json([
+            'message'      => count($data['candidateIds']) . ' candidate(s) shareable link created',
+            'shareableUrl' => $shareableUrl,
+            'sharedToken'  => $sharedToken,
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Shared Candidate View — GET /candidates/share/{token}
+    // --------------------------------------------------------------------------
+
+    public function showShared(Request $request, string $token): JsonResponse
+    {
+        // 1. Check if token exists in candidate_shares
+        $share = CandidateShare::where('share_token', $token)->first();
+
+        if ($share) {
+            $candidateIds = $share->candidate_ids ?? [];
+            $candidates = Candidate::whereIn('id', $candidateIds)
+                ->with(['company', 'documents', 'submissions', 'withdrawal'])
+                ->get();
+
+            // Maintain order of candidateIds
+            $orderMap = array_flip($candidateIds);
+            $candidates = $candidates->sortBy(fn ($c) => $orderMap[$c->id] ?? 999999)->values();
+            $presentedCandidates = $candidates->map(fn ($c) => $this->presentDetail($c))->values();
+
+            $submissionSummary = null;
+            if ($share->company_name || $share->company_id) {
+                $submissionSummary = [
+                    'id'           => (string) $share->id,
+                    'candidateId'  => (string) ($candidateIds[0] ?? ''),
+                    'companyId'    => (string) ($share->company_id ?? ''),
+                    'companyName'  => $share->company_name ?? '',
+                    'shiftedAt'    => $share->created_at?->format('Y-m-d H:i'),
+                    'note'         => $share->note ?? '',
+                    'shiftedBy'    => $share->created_by ?? '',
+                    'shareableUrl' => rtrim(env('FRONTEND_URL', 'http://localhost:3000'), '/') . '/share/' . $share->share_token,
+                ];
+            }
+
+            return response()->json([
+                'token'           => $share->share_token,
+                'title'           => $share->title ?? 'Candidate Package',
+                'note'            => $share->note ?? '',
+                'companyName'     => $share->company_name ?? '',
+                'shiftedAt'       => $share->created_at?->format('Y-m-d H:i'),
+                'shiftedBy'       => $share->created_by ?? '',
+                'totalCandidates' => count($presentedCandidates),
+                'candidates'      => $presentedCandidates,
+                'candidate'       => $presentedCandidates[0] ?? null,
+                'submission'      => $submissionSummary,
+            ]);
+        }
+
+        // 2. Fallback to candidate_submissions for legacy links or prefix matches
+        $submissions = CandidateSubmission::where('share_token', $token)
+            ->orWhere('share_token', 'like', $token . '-%')
+            ->orWhere('share_token', 'like', $token . '%')
+            ->with(['candidate.company', 'candidate.documents', 'candidate.submissions', 'candidate.withdrawal', 'company'])
+            ->get();
+
+        if ($submissions->isEmpty()) {
+            return response()->json([
+                'message' => 'Candidate share link not found or expired.',
+            ], 404);
+        }
+
+        $candidates = $submissions->pluck('candidate')->filter()->unique('id')->values();
+        $presentedCandidates = $candidates->map(fn ($c) => $this->presentDetail($c))->values();
+        $firstSub = $submissions->first();
+
+        return response()->json([
+            'token'           => $token,
+            'title'           => $firstSub ? 'Shifted to ' . $firstSub->company_name : 'Shared Candidates',
+            'note'            => $firstSub?->note ?? '',
+            'companyName'     => $firstSub?->company_name ?? '',
+            'shiftedAt'       => $firstSub?->shifted_at?->format('Y-m-d H:i'),
+            'shiftedBy'       => $firstSub?->shifted_by ?? '',
+            'totalCandidates' => count($presentedCandidates),
+            'candidates'      => $presentedCandidates,
+            'candidate'       => $presentedCandidates[0] ?? null,
+            'submission'      => $firstSub ? $this->presentSubmission($firstSub) : null,
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Shared Candidate Export — GET/POST /candidates/share/{token}/export
+    // --------------------------------------------------------------------------
+
+    public function exportSharedExcel(Request $request, string $token): StreamedResponse
+    {
+        $share = CandidateShare::where('share_token', $token)->first();
+        $candidateIds = [];
+        $companyName = '';
+        $packageName = 'Candidate_Package';
+
+        if ($share) {
+            $candidateIds = $share->candidate_ids ?? [];
+            $companyName = $share->company_name ?? '';
+            $packageName = $share->title ?: ($companyName ? 'Shifted_to_' . $companyName : 'Candidate_Package');
+        } else {
+            $submissions = CandidateSubmission::where('share_token', $token)
+                ->orWhere('share_token', 'like', $token . '-%')
+                ->orWhere('share_token', 'like', $token . '%')
+                ->get();
+            $candidateIds = $submissions->pluck('candidate_id')->filter()->unique()->values()->all();
+            $firstSub = $submissions->first();
+            if ($firstSub) {
+                $companyName = $firstSub->company_name ?? '';
+                $packageName = $companyName ? 'Shifted_to_' . $companyName : 'Shared_Candidates';
+            }
+        }
+
+        if (empty($candidateIds)) {
+            abort(404, 'Shared package not found or contains no candidates.');
+        }
+
+        // Allow filtering by candidate_ids if specified from frontend
+        $reqCandidateIds = $request->input('candidate_ids', []);
+        if (is_string($reqCandidateIds)) {
+            $reqCandidateIds = array_values(array_filter(array_map('trim', explode(',', $reqCandidateIds))));
+        }
+        if (!empty($reqCandidateIds)) {
+            $candidateIds = array_values(array_intersect($candidateIds, $reqCandidateIds));
+        }
+
+        $query = Candidate::with(['company', 'documents', 'withdrawal'])
+            ->whereIn('id', $candidateIds);
+
+        // Maintain original share order if available
+        $orderMap = array_flip($candidateIds);
+        $candidates = $query->get()->sortBy(fn ($c) => $orderMap[$c->id] ?? 999999)->values();
+
+        $format = strtolower($request->input('format', 'xlsx'));
+        $fieldDefinitions = $this->getExportFieldDefinitions();
+
+        // Comprehensive detail fields for shared package
+        $selectedFields = [
+            'code',
+            'name',
+            'father_name',
+            'mother_name',
+            'date_of_birth',
+            'age',
+            'civil_status',
+            'nationality',
+            'citizenship',
+            'passport_number',
+            'passport_issue_date',
+            'passport_expiry',
+            'cnic_number',
+            'phone',
+            'email',
+            'trade',
+            'experience_years',
+            'current_location',
+            'target_country',
+            'status',
+            'recruitment_stage',
+            'company',
+            'documents_count',
+            'documents_list',
+        ];
+
+        $fieldsToExport = [];
+        foreach ($selectedFields as $f) {
+            $key = $this->normalizeFieldKey((string) $f);
+            if (isset($fieldDefinitions[$key])) {
+                $fieldsToExport[$key] = $fieldDefinitions[$key];
+            }
+        }
+        if (empty($fieldsToExport)) {
+            $fieldsToExport = $fieldDefinitions;
+        }
+
+        $headers = array_merge(['Sr #'], array_column(array_values($fieldsToExport), 'label'));
+        $cleanPackageName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $packageName) ?: 'candidates';
+        $timestamp = now()->format('Y-m-d');
+
+        if ($format === 'csv') {
+            $filename = "{$cleanPackageName}_candidates_{$timestamp}.csv";
+            return response()->streamDownload(function () use ($headers, $fieldsToExport, $candidates): void {
+                $file = fopen('php://output', 'w');
+                fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF)); // UTF-8 BOM
+                fputcsv($file, $headers);
+
+                $sr = 1;
+                foreach ($candidates as $cand) {
+                    $row = [$sr++];
+                    foreach ($fieldsToExport as $fieldDef) {
+                        $resolver = $fieldDef['resolver'];
+                        $row[] = (string) $resolver($cand);
+                    }
+                    fputcsv($file, $row);
+                }
+                fclose($file);
+            }, $filename, [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        }
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle(substr($packageName, 0, 31));
+
+        // Headers
+        $colIndex = 1;
+        foreach ($headers as $header) {
+            $sheet->setCellValueExplicit([$colIndex, 1], $header, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            $colLetter = Coordinate::stringFromColumnIndex($colIndex);
+            $sheet->getColumnDimension($colLetter)->setAutoSize(true);
+            $colIndex++;
+        }
+
+        $highestCol = Coordinate::stringFromColumnIndex(count($headers));
+        $headerRange = "A1:{$highestCol}1";
+        $sheet->getStyle($headerRange)->getFont()->setBold(true)->getColor()->setRGB('FFFFFF');
+        $sheet->getStyle($headerRange)->getFill()->setFillType(Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('107C41'); // Microsoft Excel Brand Green
+        $sheet->getRowDimension(1)->setRowHeight(28);
+
+        // Freeze top header row
+        $sheet->freezePane('A2');
+
+        // Rows
+        $rowNum = 2;
+        $sr = 1;
+        foreach ($candidates as $cand) {
+            $colNum = 1;
+            $sheet->setCellValueExplicit([$colNum++, $rowNum], (string) $sr++, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_NUMERIC);
+
+            foreach ($fieldsToExport as $fieldDef) {
+                $resolver = $fieldDef['resolver'];
+                $val = (string) $resolver($cand);
+                $sheet->setCellValueExplicit([$colNum++, $rowNum], $val, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+            }
+
+            // Zebra striping
+            if ($rowNum % 2 === 1) {
+                $rowRange = "A{$rowNum}:{$highestCol}{$rowNum}";
+                $sheet->getStyle($rowRange)->getFill()->setFillType(Fill::FILL_SOLID)
+                    ->getStartColor()->setRGB('F8FAFC');
+            }
+            $sheet->getRowDimension($rowNum)->setRowHeight(22);
+            $rowNum++;
+        }
+
+        $filename = "{$cleanPackageName}_candidates_{$timestamp}.xlsx";
+        $writer = new Xlsx($spreadsheet);
+
+        return response()->streamDownload(function () use ($writer): void {
+            $writer->save('php://output');
+        }, $filename, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Candidate Public Agreement View — GET /candidates/agreement/{token}
+    // --------------------------------------------------------------------------
+
+    public function showAgreement(Request $request, string $token): JsonResponse
+    {
+        $candidate = Candidate::where('agreement_token', $token)
+            ->orWhere(function ($q) use ($token) {
+                if (is_numeric($token)) {
+                    $q->where('id', $token);
+                }
+            })
+            ->first();
+
+        if (! $candidate) {
+            return response()->json([
+                'message' => 'Candidate agreement link not found or expired.',
+            ], 404);
+        }
+
+        $candidate->ensureAgreementToken();
+
+        return response()->json([
+            'candidate' => [
+                'id'              => (string) $candidate->id,
+                'code'            => $candidate->code,
+                'psnCode'         => $candidate->psn_code,
+                'firstName'       => $candidate->first_name,
+                'lastName'        => $candidate->last_name,
+                'phone'           => $candidate->phone ?? '',
+                'cnicNumber'      => $candidate->cnic_number ?? '',
+                'passportNumber'  => $candidate->passport_number ?? '',
+                'passportExpiry'  => $candidate->passport_expiry?->toDateString() ?? '',
+                'trade'           => $candidate->trade ?? '',
+                'targetCountry'   => $candidate->target_country ?? '',
+                'currentLocation' => $candidate->current_location ?? '',
+                'nationality'     => $candidate->nationality ?? 'Pakistani',
+                'careOf'          => $candidate->care_of ?? '',
+                'photoUrl'              => $candidate->photo_url,
+                'signatureUrl'          => $candidate->signature_url,
+                'fingerprintUrl'        => $candidate->fingerprint_url,
+                'fingerprintQuality'    => $candidate->fingerprint_quality,
+                'fingerprintCapturedAt' => $candidate->fingerprint_captured_at?->toIso8601String(),
+                'hasFingerprint'        => ! empty($candidate->fingerprint_path) || ! empty($candidate->fingerprint_template),
+                'agreementToken'        => $candidate->agreement_token,
+                'termsAgreedAt'         => $candidate->terms_agreed_at?->toIso8601String(),
+                'hasAgreed'             => ! empty($candidate->terms_agreed_at) || ! empty($candidate->signature_path) || ! empty($candidate->fingerprint_path),
+                'balance'               => (float) ($candidate->balance ?? 0),
+                'currency'              => 'PKR',
+                'countryServiceCharges' => $candidate->country_service_charges ?? [],
+                'country_service_charges' => $candidate->country_service_charges ?? [],
+                'createdAt'             => $candidate->created_at?->toIso8601String(),
+            ],
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Candidate Public Sign Agreement — POST /candidates/agreement/{token}/sign
+    // --------------------------------------------------------------------------
+
+    public function signAgreement(Request $request, string $token): JsonResponse
+    {
+        $candidate = Candidate::where('agreement_token', $token)
+            ->orWhere(function ($q) use ($token) {
+                if (is_numeric($token)) {
+                    $q->where('id', $token);
+                }
+            })
+            ->first();
+
+        if (! $candidate) {
+            return response()->json([
+                'message' => 'Candidate agreement link not found or expired.',
+            ], 404);
+        }
+
+        // Restrict public shareable link to one-time submission only
+        $isFromPortal = $request->boolean('from_portal');
+        if (! $isFromPortal && ($candidate->terms_agreed_at !== null || ! empty($candidate->signature_path))) {
+            return response()->json([
+                'message'           => 'یہ معاہدہ پہلے ہی جمع ہو چکا ہے اور دوبارہ جمع نہیں کیا جا سکتا۔ (This agreement has already been submitted and recorded.)',
+                'already_submitted' => true,
+            ], 400);
+        }
+
+        if (! $request->boolean('agreed')) {
+            return response()->json([
+                'message' => 'You must agree to the terms & refund policy before submitting agreement.',
+            ], 422);
+        }
+
+        $signaturePath = $candidate->signature_path;
+        $fingerprintPath = $candidate->fingerprint_path;
+        $fingerprintTemplate = $candidate->fingerprint_template;
+        $fingerprintQuality = $candidate->fingerprint_quality;
+        $fingerprintCapturedAt = $candidate->fingerprint_captured_at;
+
+        if ($request->hasFile('signature')) {
+            if ($signaturePath) {
+                Storage::disk('public')->delete($signaturePath);
+            }
+            $compSig = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('signature'),
+                'candidates/' . $candidate->id,
+                'public'
+            );
+            $signaturePath = $compSig['path'];
+        } elseif ($request->filled('signature') && is_string($request->input('signature')) && str_starts_with($request->input('signature'), 'data:image')) {
+            if ($signaturePath) {
+                Storage::disk('public')->delete($signaturePath);
+            }
+            $signaturePath = app(DocumentCompressionService::class)->storeBase64AndCompress(
+                $request->input('signature'),
+                'candidates/' . $candidate->id,
+                'public',
+                'sig_'
+            );
+        }
+
+        // Handle candidate fingerprint image
+        if ($request->hasFile('fingerprint')) {
+            if ($fingerprintPath) {
+                Storage::disk('public')->delete($fingerprintPath);
+            }
+            $compFp = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('fingerprint'),
+                'candidates/' . $candidate->id,
+                'public'
+            );
+            $fingerprintPath = $compFp['path'];
+            $fingerprintCapturedAt = now();
+        } elseif ($request->filled('fingerprint') && is_string($request->input('fingerprint')) && str_starts_with($request->input('fingerprint'), 'data:image')) {
+            if ($fingerprintPath) {
+                Storage::disk('public')->delete($fingerprintPath);
+            }
+            $fingerprintPath = app(DocumentCompressionService::class)->storeBase64AndCompress(
+                $request->input('fingerprint'),
+                'candidates/' . $candidate->id,
+                'public',
+                'fp_'
+            );
+            $fingerprintCapturedAt = now();
+        }
+
+        // Handle biometric ISO/ANSI minutiae template
+        if ($request->filled('fingerprint_template') || $request->filled('fingerprintTemplate')) {
+            $fingerprintTemplate = (string) ($request->input('fingerprint_template') ?? $request->input('fingerprintTemplate'));
+            $fingerprintCapturedAt = now();
+        }
+
+        if ($request->filled('fingerprint_quality') || $request->filled('fingerprintQuality')) {
+            $fingerprintQuality = (int) ($request->input('fingerprint_quality') ?? $request->input('fingerprintQuality'));
+        }
+
+        if (! $signaturePath && ! $fingerprintPath && ! $fingerprintTemplate) {
+            return response()->json([
+                'message' => 'Please provide a valid signature or fingerprint confirmation before submitting.',
+            ], 422);
+        }
+
+        $candidate->update([
+            'signature_path'          => $signaturePath,
+            'fingerprint_path'        => $fingerprintPath,
+            'fingerprint_template'    => $fingerprintTemplate,
+            'fingerprint_quality'     => $fingerprintQuality,
+            'fingerprint_captured_at' => $fingerprintCapturedAt,
+            'terms_agreed_at'         => now(),
+        ]);
+
+        return response()->json([
+            'message'   => 'Candidate agreement submitted successfully.',
+            'candidate' => [
+                'id'                    => (string) $candidate->id,
+                'firstName'             => $candidate->first_name,
+                'lastName'              => $candidate->last_name,
+                'signatureUrl'          => $candidate->signature_url,
+                'fingerprintUrl'        => $candidate->fingerprint_url,
+                'fingerprintQuality'    => $candidate->fingerprint_quality,
+                'fingerprintCapturedAt' => $candidate->fingerprint_captured_at?->toIso8601String(),
+                'hasFingerprint'        => ! empty($candidate->fingerprint_path) || ! empty($candidate->fingerprint_template),
+                'termsAgreedAt'         => $candidate->terms_agreed_at?->toIso8601String(),
+                'hasAgreed'             => true,
+                'agreementToken'        => $candidate->agreement_token,
+                'balance'               => (float) ($candidate->balance ?? 0),
+                'currency'              => 'PKR',
+            ],
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Return to Pool — PATCH /candidates/{candidate}/return
+    // --------------------------------------------------------------------------
+
+    public function returnToPool(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.update');
+        $this->logRejection($candidate, $request);
+        $candidate->update([
+            'status'             => 'processing',
+            'current_company_id' => null,
+        ]);
+        $this->syncCandidateStatus($candidate);
+
+        return response()->json([
+            'candidate' => $this->presentDetail($candidate->fresh()->load(['company', 'documents', 'submissions', 'withdrawal'])),
+            'message'   => 'Candidate returned to the pool.',
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Return Batch to Pool — POST /candidates/return-batch
+    // --------------------------------------------------------------------------
+
+    public function returnBatchToPool(Request $request): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.update');
+
+        $candidateIds = $request->input('candidate_ids', []);
+        if (is_string($candidateIds)) {
+            $candidateIds = array_values(array_filter(array_map('trim', explode(',', $candidateIds))));
+        }
+
+        if (empty($candidateIds) || !is_array($candidateIds)) {
+            return response()->json([
+                'message' => 'No candidates specified.',
+                'count'   => 0,
+            ], 422);
+        }
+
+        $candidates = Candidate::whereIn('id', $candidateIds)->get();
+        $updatedCount = 0;
+
+        DB::beginTransaction();
+        try {
+            foreach ($candidates as $candidate) {
+                $this->logRejection($candidate, $request);
+                $candidate->update([
+                    'status'             => 'processing',
+                    'current_company_id' => null,
+                ]);
+                $this->syncCandidateStatus($candidate);
+                $updatedCount++;
+            }
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to return candidates: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'count'   => $updatedCount,
+            'message' => "Successfully removed {$updatedCount} candidate(s) from company.",
+        ]);
+    }
+
+    /** Logs "rejected - moved to active" on the company the candidate is leaving. */
+    private function logRejection(Candidate $candidate, Request $request): void
+    {
+        if (! $candidate->current_company_id) {
+            return;
+        }
+
+        $name = trim($candidate->first_name . ' ' . $candidate->last_name);
+        CompanyLog::record(
+            (int) $candidate->current_company_id,
+            'candidate_rejected',
+            "{$name} rejected and moved back to Active",
+            ['candidateId' => $candidate->id, 'candidateName' => $name, 'candidateCode' => $candidate->code ?? null],
+            $request
+        );
+
+        $companyName = Company::find($candidate->current_company_id)?->name ?? 'the company';
+        Notifier::staff(
+            'CANDIDATE_REJECTED',
+            'Candidate rejected',
+            "{$name} ({$candidate->code}) was rejected by {$companyName} and moved back to Active.",
+            ['candidateId' => $candidate->id, 'candidateCode' => $candidate->code, 'companyId' => $candidate->current_company_id],
+            "/dashboard/candidates/{$candidate->id}",
+            $request
+        );
+    }
+
+    // --------------------------------------------------------------------------
+    // Withdraw — POST /candidates/{candidate}/withdraw
+    // --------------------------------------------------------------------------
+
+    public function withdraw(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.withdraw');
+        $data = $request->validate([
+            'stage'                  => ['required', 'string'],
+            'deductionPercentage'    => ['required', 'numeric', 'min:0', 'max:100'],
+            'totalPaidSoFar'         => ['required', 'numeric', 'min:0'],
+            'cancellationFee'        => ['required', 'numeric', 'min:0'],
+            'refundPayable'          => ['required', 'numeric', 'min:0'],
+            'reason'                 => ['nullable', 'string'],
+            'paymentMode'            => ['required', 'in:cheque,bank_transfer,cash'],
+            'chequeNumber'           => ['nullable', 'string', 'max:100'],
+            'chequeDate'             => ['nullable', 'date'],
+            'alertFinanceBeforeDays' => ['nullable', 'string'],
+        ]);
+
+        // Remove any existing withdrawal
+        $candidate->withdrawal()->delete();
+
+        CandidateWithdrawal::create([
+            'candidate_id'               => $candidate->id,
+            'stage'                      => $data['stage'],
+            'deduction_percentage'       => $data['deductionPercentage'],
+            'total_paid_so_far'          => $data['totalPaidSoFar'],
+            'cancellation_fee'           => $data['cancellationFee'],
+            'refund_payable'             => $data['refundPayable'],
+            'reason'                     => $data['reason'] ?? null,
+            'payment_mode'               => $data['paymentMode'],
+            'cheque_number'              => $data['chequeNumber'] ?? null,
+            'cheque_date'                => $data['chequeDate'] ?? null,
+            'alert_finance_before_days'  => $data['alertFinanceBeforeDays'] ?? null,
+            'status'                     => 'pending_hr_approval',
+            'withdrawn_at'               => now(),
+        ]);
+
+        $candidate->update(['status' => 'withdrawn']);
+
+        $name = trim("{$candidate->first_name} {$candidate->last_name}");
+        Notifier::staff(
+            'CANDIDATE_WITHDRAWN',
+            'Candidate withdrawn',
+            "{$name} ({$candidate->code}) withdrew" . (!empty($data['reason']) ? ": {$data['reason']}" : '.'),
+            ['candidateId' => $candidate->id, 'candidateCode' => $candidate->code, 'reason' => $data['reason'] ?? null],
+            "/dashboard/candidates/{$candidate->id}",
+            $request
+        );
+
+        return response()->json([
+            'candidate' => $this->presentDetail($candidate->fresh()->load(['company', 'documents', 'submissions', 'withdrawal'])),
+            'message'   => 'Candidate withdrawal recorded.',
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Reactivate / Re-enable — POST /candidates/{candidate}/reactivate
+    // --------------------------------------------------------------------------
+
+    public function reactivate(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.withdraw');
+
+        // Delete candidate withdrawal record if any
+        $candidate->withdrawal()?->delete();
+
+        // Restore candidate status with mandatory docs check
+        $candidate->update(['status' => 'processing']);
+        $this->syncCandidateStatus($candidate);
+
+        return response()->json([
+            'candidate' => $this->presentDetail($candidate->fresh()->load(['company', 'documents', 'submissions', 'withdrawal'])),
+            'message'   => 'Candidate re-enabled successfully.',
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Upload Document — POST /candidates/{candidate}/documents
+    // --------------------------------------------------------------------------
+
+    public function storeDocument(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'documents.create');
+        $data = $request->validate([
+            'title'            => ['required', 'string', 'max:255'],
+            'documentTypeId'   => ['nullable', 'string'],
+            'documentTypeName' => ['nullable', 'string', 'max:100'],
+            'documentNumber'   => ['nullable', 'string', 'max:255'],
+            'file'             => ['nullable', 'file', 'max:102400'], // 100 MB
+            'issueDate'        => ['nullable', 'date'],
+            'expiryDate'       => ['nullable', 'date'],
+            'notes'            => ['nullable', 'string'],
+            'address'          => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $docTypeId = $data['documentTypeId'] ?? null;
+        $docType = null;
+        if ($docTypeId) {
+            $docType = is_numeric($docTypeId) ? DocumentType::find($docTypeId) : DocumentType::where('code', $docTypeId)->first();
+        }
+
+        if ($docType && $docType->requires_expiry_date && empty($data['expiryDate'])) {
+            return response()->json([
+                'message' => "Expiry date is required for {$docType->name}.",
+                'errors'  => ['expiryDate' => ["Expiry date is required for {$docType->name}."]],
+            ], 422);
+        }
+
+        $filePath = null;
+        $fileName = null;
+        $fileSize = null;
+
+        if ($request->hasFile('file')) {
+            $compDoc  = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('file'),
+                'candidates/' . $candidate->id . '/documents',
+                'public'
+            );
+            $filePath = $compDoc['path'];
+            $fileName = $compDoc['file_name'];
+            $fileSize = $compDoc['file_size'];
+        }
+
+        // Determine document status based on expiry date
+        $status = 'pending';
+        if ($data['expiryDate'] ?? null) {
+            $expiry = \Carbon\Carbon::parse($data['expiryDate']);
+            $status = $expiry->isPast() ? 'expired' : 'pending';
+        }
+
+        $document = $candidate->documents()->create([
+            'title'              => $data['title'],
+            'document_type_id'   => $data['documentTypeId'] ?? 'doc-type-1',
+            'document_type_name' => $data['documentTypeName'] ?? 'Compliance Document',
+            'document_number'    => $data['documentNumber'] ?? null,
+            'file_path'          => $filePath,
+            'file_name'          => $fileName,
+            'file_size'          => $fileSize,
+            'issue_date'         => $data['issueDate'] ?? null,
+            'expiry_date'        => $data['expiryDate'] ?? null,
+            'status'             => $status,
+            'notes'              => $data['notes'] ?? null,
+        ]);
+
+        // Auto-advance stage to docs_collection on first document upload
+        if (in_array($candidate->recruitment_stage, ['inquiry', 'registered'])) {
+            $candidate->update(['recruitment_stage' => 'docs_collection']);
+        }
+
+        // If document is a work permit and issue date is provided, sync to candidate's embassy_details
+        $isPermitDoc = str_contains(strtolower($data['title'] ?? ''), 'permit')
+            || str_contains(strtolower($data['documentTypeName'] ?? ''), 'permit')
+            || ($docType && (str_contains(strtolower($docType->name ?? ''), 'permit') || str_contains(strtolower($docType->code ?? ''), 'permit')))
+            || (($data['documentTypeId'] ?? '') === '11');
+
+        if ($isPermitDoc && !empty($data['issueDate'])) {
+            $embassyDetails = is_array($candidate->embassy_details)
+                ? $candidate->embassy_details
+                : (json_decode($candidate->embassy_details ?? '{}', true) ?: []);
+            $embassyDetails['workPermitIssueDate'] = $data['issueDate'];
+            if (empty($embassyDetails['category'])) {
+                $embassyDetails['category'] = 'Work Permit';
+            }
+            $candidate->update(['embassy_details' => $embassyDetails]);
+        }
+
+        // If document is an FRC or wife/children/parent details are provided, sync to candidate table
+        $candidateUpdates = [];
+
+        if ($request->has('fatherName') || $request->has('father_name')) {
+            $fName = trim((string) ($request->input('fatherName') ?? $request->input('father_name') ?? ''));
+            if (!empty($fName) && (empty($candidate->father_name) || !empty($data['fatherName']) || !empty($data['father_name']))) {
+                $candidateUpdates['father_name'] = $fName;
+            }
+        }
+
+        if ($request->has('motherName') || $request->has('mother_name')) {
+            $mName = trim((string) ($request->input('motherName') ?? $request->input('mother_name') ?? ''));
+            if (!empty($mName) && (empty($candidate->mother_name) || !empty($data['motherName']) || !empty($data['mother_name']))) {
+                $candidateUpdates['mother_name'] = $mName;
+            }
+        }
+
+        if ($request->has('wifeDetails') || $request->has('wife_details')) {
+            $rawWife = $request->input('wifeDetails') ?? $request->input('wife_details');
+            if (is_string($rawWife)) {
+                $decoded = json_decode($rawWife, true);
+                $incomingWife = is_array($decoded) ? $decoded : null;
+            } else {
+                $incomingWife = is_array($rawWife) ? $rawWife : null;
+            }
+            if (!empty($incomingWife) && (!empty($incomingWife['name']) || !empty($incomingWife['surname']) || !empty($incomingWife['cnic']))) {
+                $existingWife = is_array($candidate->wife_details) ? $candidate->wife_details : [];
+                $candidateUpdates['wife_details'] = array_merge($existingWife, array_filter($incomingWife, fn($v) => $v !== null && $v !== ''));
+                $candidateUpdates['civil_status'] = 'Married';
+            }
+        }
+
+        if ($request->has('childrenDetails') || $request->has('children_details')) {
+            $rawChildren = $request->input('childrenDetails') ?? $request->input('children_details');
+            if (is_string($rawChildren)) {
+                $decoded = json_decode($rawChildren, true);
+                $incomingChildren = is_array($decoded) ? $decoded : [];
+            } else {
+                $incomingChildren = is_array($rawChildren) ? $rawChildren : [];
+            }
+
+            if (!empty($incomingChildren)) {
+                $existingChildren = is_array($candidate->children_details) ? $candidate->children_details : [];
+                $merged = $existingChildren;
+
+                foreach ($incomingChildren as $newChild) {
+                    $newName = strtolower(trim((string) ($newChild['name'] ?? '')));
+                    $newCnic = preg_replace('/\D/', '', (string) ($newChild['cnic'] ?? ''));
+                    $duplicate = false;
+
+                    foreach ($merged as $idx => $exChild) {
+                        $exName = strtolower(trim((string) ($exChild['name'] ?? '')));
+                        $exCnic = preg_replace('/\D/', '', (string) ($exChild['cnic'] ?? ''));
+
+                        if ((!empty($newCnic) && $newCnic === $exCnic) || (!empty($newName) && $newName === $exName)) {
+                            $merged[$idx] = array_merge($exChild, array_filter($newChild, fn($v) => $v !== null && $v !== ''));
+                            $duplicate = true;
+                            break;
+                        }
+                    }
+
+                    if (!$duplicate && (!empty($newName) || !empty($newCnic))) {
+                        $merged[] = $newChild;
+                    }
+                }
+
+                if (!empty($merged)) {
+                    $candidateUpdates['children_details'] = array_values($merged);
+                    $candidateUpdates['children_count'] = (string) count($merged);
+                    if (!isset($candidateUpdates['civil_status'])) {
+                        $candidateUpdates['civil_status'] = 'Married';
+                    }
+                }
+            }
+        }
+
+        if ($request->has('childrenCount') || $request->has('children_count')) {
+            $candidateUpdates['children_count'] = (string) ($request->input('childrenCount') ?? $request->input('children_count'));
+        } elseif (!empty($candidateUpdates['children_details']) && is_array($candidateUpdates['children_details'])) {
+            $candidateUpdates['children_count'] = (string) count($candidateUpdates['children_details']);
+        }
+
+        // If candidate address is provided and document is Character Certificate / Police Clearance, sync to candidate
+        $isCharacterCertDoc = str_contains(strtolower($data['title'] ?? ''), 'character')
+            || str_contains(strtolower($data['title'] ?? ''), 'police')
+            || str_contains(strtolower($data['title'] ?? ''), 'crecter')
+            || str_contains(strtolower($data['title'] ?? ''), 'clearance')
+            || str_contains(strtolower($data['documentTypeName'] ?? ''), 'character')
+            || str_contains(strtolower($data['documentTypeName'] ?? ''), 'police')
+            || str_contains(strtolower($data['documentTypeName'] ?? ''), 'crecter')
+            || str_contains(strtolower($data['documentTypeName'] ?? ''), 'clearance')
+            || ($docType && (
+                str_contains(strtolower($docType->name ?? ''), 'character')
+                || str_contains(strtolower($docType->name ?? ''), 'police')
+                || str_contains(strtolower($docType->name ?? ''), 'crecter')
+                || str_contains(strtolower($docType->name ?? ''), 'clearance')
+                || str_contains(strtolower($docType->code ?? ''), 'character')
+                || str_contains(strtolower($docType->code ?? ''), 'police')
+            ));
+
+        if ($isCharacterCertDoc && ($request->has('address') || $request->has('candidateAddress'))) {
+            $addr = trim((string) ($request->input('address') ?? $request->input('candidateAddress') ?? ''));
+            if (!empty($addr)) {
+                $candidateUpdates['address'] = $addr;
+            }
+        }
+
+        if (!empty($candidateUpdates)) {
+            $candidate->update($candidateUpdates);
+        }
+
+        $this->syncCandidateStatus($candidate);
+
+        return response()->json([
+            'document'  => $this->presentDocument($document),
+            'candidate' => $this->presentDetail($candidate->fresh()->load(['company', 'documents', 'submissions', 'withdrawal'])),
+        ], 201);
+    }
+
+    // --------------------------------------------------------------------------
+    // Update Document — PATCH /candidates/{candidate}/documents/{document}
+    // --------------------------------------------------------------------------
+
+    public function updateDocument(Request $request, Candidate $candidate, CandidateDocument $document): JsonResponse
+    {
+        $this->requirePermission($request, $request->input('status') ? 'documents.verify' : 'documents.update');
+        $data = $request->validate([
+            'title'            => ['sometimes', 'string', 'max:255'],
+            'documentTypeId'   => ['sometimes', 'string'],
+            'documentTypeName' => ['sometimes', 'string', 'max:100'],
+            'documentNumber'   => ['sometimes', 'nullable', 'string', 'max:255'],
+            'file'             => ['nullable', 'file', 'max:102400'], // 100 MB
+            'issueDate'        => ['nullable', 'date'],
+            'expiryDate'       => ['nullable', 'date'],
+            'notes'            => ['nullable', 'string'],
+            'status'           => ['sometimes', 'in:verified,expiring,expired,pending,rejected'],
+        ]);
+
+        if (isset($data['status']) && $data['status'] === 'verified') {
+            $effectiveExpiry = $data['expiryDate'] ?? $document->expiry_date?->toDateString();
+            $isExpired = ($document->status === 'expired') || ($effectiveExpiry && \Carbon\Carbon::parse($effectiveExpiry)->endOfDay()->isPast());
+            if ($isExpired) {
+                return response()->json([
+                    'message' => 'Expired documents cannot be verified.',
+                    'errors'  => ['status' => ['Expired documents cannot be verified.']],
+                ], 422);
+            }
+        }
+
+        $docTypeId = $data['documentTypeId'] ?? $document->document_type_id;
+        $docType = null;
+        if ($docTypeId) {
+            $docType = is_numeric($docTypeId) ? DocumentType::find($docTypeId) : DocumentType::where('code', $docTypeId)->first();
+        }
+
+        if (array_key_exists('expiryDate', $data) || array_key_exists('documentTypeId', $data)) {
+            $effectiveExpiry = array_key_exists('expiryDate', $data) ? $data['expiryDate'] : $document->expiry_date?->toDateString();
+            if ($docType && $docType->requires_expiry_date && empty($effectiveExpiry)) {
+                return response()->json([
+                    'message' => "Expiry date is required for {$docType->name}.",
+                    'errors'  => ['expiryDate' => ["Expiry date is required for {$docType->name}."]],
+                ], 422);
+            }
+        }
+
+        $filePath = $document->file_path;
+        $fileName = $document->file_name;
+        $fileSize = $document->file_size;
+
+        if ($request->hasFile('file')) {
+            // Delete old file
+            if ($filePath) {
+                Storage::disk('public')->delete($filePath);
+            }
+            $compDoc  = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('file'),
+                'candidates/' . $candidate->id . '/documents',
+                'public'
+            );
+            $filePath = $compDoc['path'];
+            $fileName = $compDoc['file_name'];
+            $fileSize = $compDoc['file_size'];
+        }
+
+        $updateData = array_filter([
+            'title'              => $data['title'] ?? null,
+            'document_type_id'   => $data['documentTypeId'] ?? null,
+            'document_type_name' => $data['documentTypeName'] ?? null,
+            'file_path'          => $filePath,
+            'file_name'          => $fileName,
+            'file_size'          => $fileSize,
+            'issue_date'         => $data['issueDate'] ?? null,
+            'expiry_date'        => $data['expiryDate'] ?? null,
+            'notes'              => $data['notes'] ?? null,
+            'status'             => $data['status'] ?? null,
+        ], fn ($v) => $v !== null);
+
+        if (array_key_exists('documentNumber', $data)) {
+            $updateData['document_number'] = $data['documentNumber'];
+        }
+
+        $document->update($updateData);
+
+        // If document is a work permit and issue date is provided/updated, sync to candidate's embassy_details
+        $isPermitDoc = str_contains(strtolower($document->title ?? ''), 'permit')
+            || str_contains(strtolower($data['title'] ?? ''), 'permit')
+            || str_contains(strtolower($document->document_type_name ?? ''), 'permit')
+            || str_contains(strtolower($data['documentTypeName'] ?? ''), 'permit')
+            || ($docType && (str_contains(strtolower($docType->name ?? ''), 'permit') || str_contains(strtolower($docType->code ?? ''), 'permit')));
+
+        $effectiveIssueDate = array_key_exists('issueDate', $data) ? $data['issueDate'] : $document->issue_date?->toDateString();
+        if ($isPermitDoc && !empty($effectiveIssueDate)) {
+            $embassyDetails = is_array($candidate->embassy_details)
+                ? $candidate->embassy_details
+                : (json_decode($candidate->embassy_details ?? '{}', true) ?: []);
+            $embassyDetails['workPermitIssueDate'] = $effectiveIssueDate;
+            if (empty($embassyDetails['category'])) {
+                $embassyDetails['category'] = 'Work Permit';
+            }
+            $candidate->update(['embassy_details' => $embassyDetails]);
+        }
+
+        return response()->json([
+            'document'  => $this->presentDocument($document->fresh()),
+            'candidate' => $this->presentDetail($candidate->fresh()->load(['company', 'documents', 'submissions', 'withdrawal'])),
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Delete Document — DELETE /candidates/{candidate}/documents/{document}
+    // --------------------------------------------------------------------------
+
+    public function destroyDocument(Request $request, Candidate $candidate, CandidateDocument $document): JsonResponse
+    {
+        $this->requirePermission($request, 'documents.delete');
+        if ($document->file_path) {
+            Storage::disk('public')->delete($document->file_path);
+        }
+
+        $document->delete();
+        $this->syncCandidateStatus($candidate);
+
+        return response()->json(['message' => 'Document deleted.']);
+    }
+
+    // --------------------------------------------------------------------------
+    // Batch Delete Documents — POST/DELETE /candidates/{candidate}/documents/batch-delete
+    // --------------------------------------------------------------------------
+
+    public function destroyDocumentsBatch(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'documents.delete');
+
+        $data = $request->validate([
+            'document_ids'   => ['nullable', 'array'],
+            'document_ids.*' => ['numeric'],
+            'all'            => ['nullable', 'boolean'],
+        ]);
+
+        $deleteAll = !empty($data['all']);
+        $documentIds = $data['document_ids'] ?? [];
+
+        if (!$deleteAll && empty($documentIds)) {
+            return response()->json(['message' => 'No documents specified for deletion.'], 422);
+        }
+
+        $query = $candidate->documents();
+        if (!$deleteAll) {
+            $query->whereIn('id', $documentIds);
+        }
+
+        $documents = $query->get();
+        $count = 0;
+
+        foreach ($documents as $doc) {
+            if ($doc->file_path) {
+                Storage::disk('public')->delete($doc->file_path);
+            }
+            $doc->delete();
+            $count++;
+        }
+
+        $this->syncCandidateStatus($candidate);
+
+        return response()->json([
+            'message' => $count > 0 ? "Successfully deleted {$count} document(s)." : "No documents deleted.",
+            'deleted_count' => $count,
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Renew Passport — POST /candidates/{candidate}/renew-passport
+    // --------------------------------------------------------------------------
+
+    public function renewPassport(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.update');
+        $data = $request->validate([
+            'passportNumber'    => ['required', 'string', 'max:50'],
+            'passportExpiry'    => ['required', 'date'],
+            'passportIssueDate' => ['nullable', 'date'],
+            'file'              => ['nullable', 'file', 'max:20480'],
+            'notes'             => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $newPassportNum = strtoupper(trim($data['passportNumber']));
+
+        // Check if new passport number is used by another candidate (active or history)
+        $existing = Candidate::whereRaw('UPPER(passport_number) = ?', [$newPassportNum])
+            ->where('id', '!=', $candidate->id)
+            ->first();
+
+        if (!$existing) {
+            $existing = Candidate::where(function ($q) use ($data, $newPassportNum) {
+                $q->whereJsonContains('passport_history', [['passportNumber' => $data['passportNumber']]])
+                  ->orWhereRaw("UPPER(passport_history::text) LIKE ?", ['%"PASSPORTNUMBER":"' . $newPassportNum . '"%']);
+            })
+            ->where('id', '!=', $candidate->id)
+            ->first();
+        }
+
+        if ($existing) {
+            return response()->json([
+                'message' => "Passport number '{$data['passportNumber']}' is already registered to candidate {$existing->first_name} {$existing->last_name} ({$existing->code}). Each passport number can only be used once.",
+                'errors' => [
+                    'passportNumber' => ["Passport number is already registered to candidate {$existing->first_name} {$existing->last_name} ({$existing->code})."],
+                ],
+            ], 422);
+        }
+
+        // 1. Locate previous passport document (if any) to link in history
+        $oldDoc = $candidate->documents()
+            ->where(function ($q) {
+                $q->where('document_type_name', 'like', '%Passport%')
+                  ->orWhere('title', 'like', '%Passport%');
+            })
+            ->where('status', '!=', 'expired')
+            ->latest()
+            ->first();
+
+        // 2. Archive current passport to history
+        $currentHistory = is_array($candidate->passport_history) ? $candidate->passport_history : [];
+        $historyEntry = [
+            'passportNumber' => $candidate->passport_number,
+            'issueDate'      => $candidate->passport_issue_date?->toDateString(),
+            'expiryDate'     => $candidate->passport_expiry?->toDateString(),
+            'documentId'     => $oldDoc ? (string) $oldDoc->id : null,
+            'documentUrl'    => $oldDoc && $oldDoc->file_url ? url($oldDoc->file_url) : null,
+            'archivedAt'     => now()->toDateTimeString(),
+            'notes'          => $data['notes'] ?? 'Renewed upon expiry / reissue',
+        ];
+        $currentHistory[] = $historyEntry;
+
+        // Mark old passport document as expired / superseded
+        if ($oldDoc) {
+            $oldDoc->update([
+                'status' => 'expired',
+                'title'  => "Passport (Previous - {$candidate->passport_number})",
+            ]);
+        }
+
+        // 3. Upload new passport document if file provided
+        if ($request->hasFile('file')) {
+            $compDoc  = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('file'),
+                'candidates/' . $candidate->id . '/documents',
+                'public'
+            );
+            $filePath = $compDoc['path'];
+            $fileName = $compDoc['file_name'];
+            $fileSize = $compDoc['file_size'];
+
+            $expiry = \Carbon\Carbon::parse($data['passportExpiry']);
+            $docStatus = $expiry->isPast() ? 'expired' : 'verified';
+
+            $candidate->documents()->create([
+                'title'              => "Passport (Active - {$data['passportNumber']})",
+                'document_type_id'   => 'doc-type-1',
+                'document_type_name' => 'Passport',
+                'file_path'          => $filePath,
+                'file_name'          => $fileName,
+                'file_size'          => $fileSize,
+                'issue_date'         => $data['passportIssueDate'] ?? null,
+                'expiry_date'        => $data['passportExpiry'],
+                'status'             => $docStatus,
+                'notes'              => "Current active passport. Replaced previous passport {$candidate->passport_number}.",
+            ]);
+        }
+
+        // 4. Update candidate with new active passport details & updated history
+        $newSeries = null;
+        if (preg_match('/^([A-Za-z]+)/', trim($data['passportNumber']), $pm)) {
+            $newSeries = strtoupper($pm[1]);
+        }
+
+        $candidate->update([
+            'passport_number'     => $data['passportNumber'],
+            'passport_series'     => $newSeries ?? $candidate->passport_series,
+            'passport_expiry'     => $data['passportExpiry'],
+            'passport_issue_date' => $data['passportIssueDate'] ?? null,
+            'passport_history'    => $currentHistory,
+        ]);
+
+        $this->syncCandidateStatus($candidate);
+        $candidate->load(['company', 'documents', 'submissions.company', 'withdrawal']);
+
+        return response()->json([
+            'message'   => "Passport renewed successfully! Previous passport {$historyEntry['passportNumber']} has been archived to history.",
+            'candidate' => $this->presentDetail($candidate->fresh()),
+        ]);
+    }
+
+    // --------------------------------------------------------------------------
+    // Update Candidate Signature — POST /candidates/{candidate}/signature
+    // --------------------------------------------------------------------------
+
+    public function updateSignature(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.update');
+
+        $signaturePath = $candidate->signature_path;
+        $fingerprintPath = $candidate->fingerprint_path;
+        $fingerprintTemplate = $candidate->fingerprint_template;
+        $fingerprintQuality = $candidate->fingerprint_quality;
+        $fingerprintCapturedAt = $candidate->fingerprint_captured_at;
+
+        // Signature handling
+        if ($request->hasFile('signature')) {
+            if ($signaturePath) {
+                Storage::disk('public')->delete($signaturePath);
+            }
+            $compSig = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('signature'),
+                'candidates/' . $candidate->id,
+                'public'
+            );
+            $signaturePath = $compSig['path'];
+        } elseif ($request->filled('signature') && is_string($request->input('signature')) && str_starts_with($request->input('signature'), 'data:image')) {
+            if ($signaturePath) {
+                Storage::disk('public')->delete($signaturePath);
+            }
+            $signaturePath = app(DocumentCompressionService::class)->storeBase64AndCompress(
+                $request->input('signature'),
+                'candidates/' . $candidate->id,
+                'public',
+                'sig_'
+            );
+        } elseif ($request->boolean('removeSignature')) {
+            if ($signaturePath) {
+                Storage::disk('public')->delete($signaturePath);
+            }
+            $signaturePath = null;
+        }
+
+        // Fingerprint image handling
+        if ($request->hasFile('fingerprint')) {
+            if ($fingerprintPath) {
+                Storage::disk('public')->delete($fingerprintPath);
+            }
+            $compFp = app(DocumentCompressionService::class)->storeAndCompress(
+                $request->file('fingerprint'),
+                'candidates/' . $candidate->id,
+                'public'
+            );
+            $fingerprintPath = $compFp['path'];
+            $fingerprintCapturedAt = now();
+        } elseif ($request->filled('fingerprint') && is_string($request->input('fingerprint')) && str_starts_with($request->input('fingerprint'), 'data:image')) {
+            if ($fingerprintPath) {
+                Storage::disk('public')->delete($fingerprintPath);
+            }
+            $fingerprintPath = app(DocumentCompressionService::class)->storeBase64AndCompress(
+                $request->input('fingerprint'),
+                'candidates/' . $candidate->id,
+                'public',
+                'fp_'
+            );
+            $fingerprintCapturedAt = now();
+        } elseif ($request->boolean('removeFingerprint')) {
+            if ($fingerprintPath) {
+                Storage::disk('public')->delete($fingerprintPath);
+            }
+            $fingerprintPath = null;
+            $fingerprintTemplate = null;
+            $fingerprintQuality = null;
+            $fingerprintCapturedAt = null;
+        }
+
+        // Fingerprint template & quality handling
+        if ($request->filled('fingerprint_template') || $request->filled('fingerprintTemplate')) {
+            $fingerprintTemplate = (string) ($request->input('fingerprint_template') ?? $request->input('fingerprintTemplate'));
+            $fingerprintCapturedAt = now();
+        }
+
+        if ($request->filled('fingerprint_quality') || $request->filled('fingerprintQuality')) {
+            $fingerprintQuality = (int) ($request->input('fingerprint_quality') ?? $request->input('fingerprintQuality'));
+        }
+
+        $candidate->update([
+            'signature_path'          => $signaturePath,
+            'fingerprint_path'        => $fingerprintPath,
+            'fingerprint_template'    => $fingerprintTemplate,
+            'fingerprint_quality'     => $fingerprintQuality,
+            'fingerprint_captured_at' => $fingerprintCapturedAt,
+        ]);
+        $candidate->load(['company', 'documents', 'submissions.company', 'withdrawal']);
+
+        return response()->json([
+            'message'   => 'Candidate biometrics and signature updated successfully.',
+            'candidate' => $this->presentDetail($candidate->fresh()),
+        ]);
+    }
+
+    /** Alias for updating candidate biometrics. */
+    public function updateBiometrics(Request $request, Candidate $candidate): JsonResponse
+    {
+        return $this->updateSignature($request, $candidate);
+    }
+
+    /**
+     * Verify live scanned template against a candidate's stored template (1:1 Matching).
+     */
+    public function verifyFingerprint(Request $request, Candidate $candidate): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.view');
+
+        if (empty($candidate->fingerprint_template)) {
+            return response()->json([
+                'matched' => false,
+                'score'   => 0,
+                'message' => "Candidate {$candidate->first_name} {$candidate->last_name} does not have a registered fingerprint template.",
+            ], 422);
+        }
+
+        $liveTemplate = (string) ($request->input('template') ?? $request->input('liveTemplate') ?? '');
+        $clientScore  = $request->has('score') ? (int) $request->input('score') : null;
+
+        if (empty($liveTemplate) && $clientScore === null) {
+            return response()->json([
+                'matched' => false,
+                'score'   => 0,
+                'message' => 'No live fingerprint scan or matching score provided.',
+            ], 422);
+        }
+
+        $score = $this->calculateTemplateSimilarity($candidate->fingerprint_template, $liveTemplate, $clientScore);
+        $isMatch = $score >= 60;
+
+        return response()->json([
+            'matched'   => $isMatch,
+            'score'     => $score,
+            'threshold' => 60,
+            'message'   => $isMatch
+                ? "Fingerprint verified successfully! Match score: {$score}% (تصدیق کامیاب)"
+                : "Fingerprint mismatch! Match score: {$score}% (فنگر پرنٹ مماثل نہیں ہے)",
+            'candidate' => $this->presentDetail($candidate),
+        ]);
+    }
+
+    /**
+     * Identify an unknown candidate by matching live template against all candidates (1:N Matching).
+     */
+    public function identifyByFingerprint(Request $request): JsonResponse
+    {
+        $this->requirePermission($request, 'candidates.view');
+
+        $liveTemplate = (string) ($request->input('template') ?? $request->input('liveTemplate') ?? '');
+        if (empty($liveTemplate)) {
+            return response()->json([
+                'matched' => false,
+                'score'   => 0,
+                'message' => 'No live fingerprint template provided for identification.',
+            ], 422);
+        }
+
+        $candidatesWithBiometrics = Candidate::whereNotNull('fingerprint_template')
+            ->where('fingerprint_template', '!=', '')
+            ->get();
+
+        if ($candidatesWithBiometrics->isEmpty()) {
+            return response()->json([
+                'matched' => false,
+                'score'   => 0,
+                'message' => 'No candidates in the database have registered fingerprint templates.',
+            ], 404);
+        }
+
+        $bestScore = 0;
+        $bestCandidate = null;
+
+        foreach ($candidatesWithBiometrics as $cand) {
+            $score = $this->calculateTemplateSimilarity($cand->fingerprint_template, $liveTemplate);
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestCandidate = $cand;
+            }
+        }
+
+        if ($bestCandidate && $bestScore >= 60) {
+            return response()->json([
+                'matched'   => true,
+                'score'     => $bestScore,
+                'threshold' => 60,
+                'message'   => "Candidate identified: {$bestCandidate->first_name} {$bestCandidate->last_name} ({$bestCandidate->code}) with {$bestScore}% match score.",
+                'candidate' => $this->presentDetail($bestCandidate),
+            ]);
+        }
+
+        return response()->json([
+            'matched'   => false,
+            'score'     => $bestScore,
+            'threshold' => 60,
+            'message'   => 'No candidate found matching this fingerprint scan (highest score: ' . $bestScore . '%).',
+        ]);
+    }
+
+    /**
+     * Compute biometric matching score (0-100) between two templates.
+     */
+    private function calculateTemplateSimilarity(string $t1, string $t2, ?int $clientScore = null): int
+    {
+        if ($clientScore !== null && $clientScore >= 0) {
+            return min(100, max(0, $clientScore));
+        }
+
+        $t1 = trim($t1);
+        $t2 = trim($t2);
+
+        if ($t1 === '' || $t2 === '') {
+            return 0;
+        }
+
+        if ($t1 === $t2) {
+            return 100;
+        }
+
+        // Try decoding base64 templates
+        $b1 = base64_decode($t1, true);
+        $b2 = base64_decode($t2, true);
+
+        if ($b1 === false || $b2 === false) {
+            similar_text($t1, $t2, $percent);
+            return (int) round($percent);
+        }
+
+        $len1 = strlen($b1);
+        $len2 = strlen($b2);
+        if ($len1 < 10 || $len2 < 10) {
+            return 0;
+        }
+
+        // Calculate byte-level n-gram Jaccard overlap on minutiae bytes
+        $chunkSize = 4;
+        $set1 = [];
+        for ($i = 0; $i <= $len1 - $chunkSize; $i += 2) {
+            $key = substr($b1, $i, $chunkSize);
+            $set1[$key] = ($set1[$key] ?? 0) + 1;
+        }
+
+        $set2 = [];
+        for ($i = 0; $i <= $len2 - $chunkSize; $i += 2) {
+            $key = substr($b2, $i, $chunkSize);
+            $set2[$key] = ($set2[$key] ?? 0) + 1;
+        }
+
+        $intersection = 0;
+        $union = 0;
+        $allKeys = array_unique(array_merge(array_keys($set1), array_keys($set2)));
+        foreach ($allKeys as $k) {
+            $c1 = $set1[$k] ?? 0;
+            $c2 = $set2[$k] ?? 0;
+            $intersection += min($c1, $c2);
+            $union += max($c1, $c2);
+        }
+
+        if ($union === 0) {
+            return 0;
+        }
+
+        $similarity = ($intersection / $union) * 100;
+        return (int) round($similarity);
+    }
+
+    // --------------------------------------------------------------------------
+    // Private presenters
+    // --------------------------------------------------------------------------
+
+    private function presentList(Candidate $candidate): array
+    {
+        return [
+            'id'                  => (string) $candidate->id,
+            'code'                => $candidate->code,
+            'psnCode'             => $candidate->psn_code,
+            'cnicNumber'          => $candidate->cnic_number,
+            'firstName'           => $candidate->first_name,
+            'lastName'            => $candidate->last_name,
+            'gender'              => $candidate->gender ?? 'Male',
+            'email'               => $candidate->email ?? '',
+            'phone'               => $candidate->phone ?? '',
+            'passportNumber'      => $candidate->passport_number,
+            'passportExpiry'      => $candidate->passport_expiry?->toDateString() ?? '',
+            'passportSeries'      => $candidate->passport_series,
+            'passportIssueDate'   => $candidate->passport_issue_date?->toDateString(),
+            'passportHistory'     => $candidate->passport_history ?? [],
+            'trade'               => $candidate->trade,
+            'experienceYears'     => $candidate->experience_years,
+            'status'              => $candidate->status,
+            'currentCompanyId'    => $candidate->current_company_id ? (string) $candidate->current_company_id : null,
+            'currentCompanyName'  => $candidate->company?->name,
+            'photoUrl'            => $candidate->photo_url,
+            'signatureUrl'        => $candidate->signature_url,
+            'fingerprintUrl'      => $candidate->fingerprint_url,
+            'hasFingerprint'      => ! empty($candidate->fingerprint_path) || ! empty($candidate->fingerprint_template),
+            'fingerprintQuality'  => $candidate->fingerprint_quality,
+            'fingerprintCapturedAt' => $candidate->fingerprint_captured_at?->toIso8601String(),
+            'agreementToken'      => $candidate->ensureAgreementToken(),
+            'termsAgreedAt'       => $candidate->terms_agreed_at?->toIso8601String(),
+            'nationality'         => $candidate->nationality,
+            'currentLocation'     => $candidate->current_location,
+            'address'             => $candidate->address,
+            'targetCountry'       => $candidate->target_country ?? '',
+            'fatherName'          => $candidate->father_name,
+            'motherName'          => $candidate->mother_name,
+            'placeOfBirth'        => $candidate->place_of_birth,
+            'dateOfBirth'         => $candidate->date_of_birth?->toDateString(),
+            'civilStatus'         => $candidate->civil_status,
+            'wifeDetails'         => $candidate->wife_details,
+            'childrenCount'       => $candidate->children_count,
+            'childrenDetails'     => $candidate->children_details ?? [],
+            'citizenship'         => $candidate->citizenship,
+            'town'                => $candidate->town,
+            'country'             => $candidate->country,
+            'occupationField'     => $candidate->occupation_field,
+            'careOf'              => $candidate->care_of,
+            'age'                 => $candidate->age,
+            'license'             => $candidate->license,
+            'currentJob'          => $candidate->current_job,
+            'qualification'       => $candidate->qualification,
+            'notes'               => $candidate->notes,
+            'embassyDetails'      => $candidate->embassy_details,
+            'foreignVisit'        => $candidate->foreign_visit,
+            'cvSummary'           => $candidate->cv_summary,
+            'cvData'              => $candidate->cv_data,
+            'balance'             => (float) ($candidate->service_charges ?? $candidate->balance ?? 0),
+            'serviceCharges'      => (float) ($candidate->service_charges ?? $candidate->balance ?? 0),
+            'countryServiceCharges' => $candidate->country_service_charges ?? [],
+            'country_service_charges' => $candidate->country_service_charges ?? [],
+            'joinedDate'          => $candidate->joined_date?->toDateString(),
+            'createdAt'           => $candidate->created_at?->toIso8601String(),
+            'updatedAt'           => $candidate->updated_at?->toIso8601String(),
+            'documents'           => $candidate->relationLoaded('documents') ? $candidate->documents->map(fn (CandidateDocument $d): array => $this->presentDocument($d))->values() : [],
+        ];
+    }
+
+    private function presentDetail(Candidate $candidate): array
+    {
+        return [
+            'id'                  => (string) $candidate->id,
+            'code'                => $candidate->code,
+            'psnCode'             => $candidate->psn_code,
+            'cnicNumber'          => $candidate->cnic_number,
+            'firstName'           => $candidate->first_name,
+            'lastName'            => $candidate->last_name,
+            'gender'              => $candidate->gender ?? 'Male',
+            'email'               => $candidate->email ?? '',
+            'phone'               => $candidate->phone ?? '',
+            'passportNumber'      => $candidate->passport_number,
+            'passportExpiry'      => $candidate->passport_expiry?->toDateString() ?? '',
+            'passportSeries'      => $candidate->passport_series,
+            'passportIssueDate'   => $candidate->passport_issue_date?->toDateString(),
+            'passportHistory'     => $candidate->passport_history ?? [],
+            'trade'               => $candidate->trade,
+            'experienceYears'     => $candidate->experience_years,
+            'nationality'         => $candidate->nationality,
+            'currentLocation'     => $candidate->current_location,
+            'address'             => $candidate->address,
+            'targetCountry'       => $candidate->target_country ?? '',
+            'status'              => $candidate->status,
+            'recruitmentStage'    => $candidate->recruitment_stage,
+            'currentCompanyId'    => $candidate->current_company_id ? (string) $candidate->current_company_id : null,
+            'currentCompanyName'  => $candidate->company?->name,
+            'joinedDate'          => $candidate->joined_date?->toDateString() ?? '',
+            'createdAt'           => $candidate->created_at?->toIso8601String(),
+            'updatedAt'           => $candidate->updated_at?->toIso8601String(),
+            'skills'              => $candidate->skills ?? [],
+            'photoUrl'            => $candidate->photo_url,
+            'signatureUrl'        => $candidate->signature_url,
+            'fingerprintUrl'      => $candidate->fingerprint_url,
+            'fingerprintTemplate' => $candidate->fingerprint_template,
+            'fingerprintQuality'  => $candidate->fingerprint_quality,
+            'fingerprintCapturedAt' => $candidate->fingerprint_captured_at?->toIso8601String(),
+            'hasFingerprint'      => ! empty($candidate->fingerprint_path) || ! empty($candidate->fingerprint_template),
+            'agreementToken'      => $candidate->ensureAgreementToken(),
+            'termsAgreedAt'       => $candidate->terms_agreed_at?->toIso8601String(),
+            'balance'             => (float) ($candidate->service_charges ?? $candidate->balance ?? 0),
+            'serviceCharges'      => (float) ($candidate->service_charges ?? $candidate->balance ?? 0),
+            'countryServiceCharges' => $candidate->country_service_charges ?? [],
+            'country_service_charges' => $candidate->country_service_charges ?? [],
+            'fatherName'          => $candidate->father_name,
+            'motherName'          => $candidate->mother_name,
+            'placeOfBirth'        => $candidate->place_of_birth,
+            'dateOfBirth'         => $candidate->date_of_birth?->toDateString(),
+            'civilStatus'         => $candidate->civil_status,
+            'wifeDetails'         => $candidate->wife_details,
+            'childrenCount'       => $candidate->children_count,
+            'childrenDetails'     => $candidate->children_details ?? [],
+            'citizenship'         => $candidate->citizenship,
+            'town'                => $candidate->town,
+            'country'             => $candidate->country,
+            'occupationField'     => $candidate->occupation_field,
+            'careOf'              => $candidate->care_of,
+            'age'                 => $candidate->age,
+            'license'             => $candidate->license,
+            'currentJob'          => $candidate->current_job,
+            'qualification'       => $candidate->qualification,
+            'notes'               => $candidate->notes,
+            'embassyDetails'      => $candidate->embassy_details,
+            'foreignVisit'        => $candidate->foreign_visit,
+            'cvSummary'           => $candidate->cv_summary,
+            'cvData'              => $candidate->cv_data,
+            'documents'           => $candidate->documents->map(fn (CandidateDocument $d): array => $this->presentDocument($d))->values(),
+            'submissionHistory'   => $candidate->submissions->map(fn (CandidateSubmission $s): array => $this->presentSubmission($s))->values(),
+            'withdrawalRecord'    => $candidate->withdrawal ? $this->presentWithdrawal($candidate->withdrawal) : null,
+        ];
+    }
+
+    private function presentDocument(CandidateDocument $doc): array
+    {
+        return [
+            'id'               => (string) $doc->id,
+            'candidateId'      => (string) $doc->candidate_id,
+            'title'            => $doc->title,
+            'documentTypeId'   => $doc->document_type_id,
+            'documentTypeName' => $doc->document_type_name,
+            'documentNumber'   => $doc->document_number ?? '',
+            'fileUrl'          => $doc->file_url ? url($doc->file_url) : '#',
+            'filePreviewUrl'   => $doc->file_url ? url($doc->file_url) : null,
+            'fileName'         => $doc->file_name ?? '',
+            'fileSize'         => $doc->file_size ?? '',
+            // True when the record exists but its file isn't on this server's disk
+            'fileMissing'      => !$doc->file_path || !Storage::disk('public')->exists($doc->file_path),
+            'issueDate'        => $doc->issue_date?->toDateString() ?? '',
+            'expiryDate'       => $doc->expiry_date?->toDateString() ?? '',
+            'status'           => $doc->status,
+            'verifiedBy'       => $doc->verified_by,
+            'notes'            => $doc->notes,
+        ];
+    }
+
+    private function presentSubmission(CandidateSubmission $sub): array
+    {
+        $frontendUrl = rtrim(env('FRONTEND_URL', 'http://localhost:3000'), '/');
+
+        return [
+            'id'           => (string) $sub->id,
+            'candidateId'  => (string) $sub->candidate_id,
+            'companyId'    => (string) $sub->company_id,
+            'companyName'  => $sub->company_name,
+            'shiftedAt'    => $sub->shifted_at?->format('Y-m-d H:i'),
+            'note'         => $sub->note ?? '',
+            'shiftedBy'    => $sub->shifted_by ?? '',
+            'shareableUrl' => $frontendUrl . '/share/' . $sub->share_token,
+        ];
+    }
+
+    private function presentWithdrawal(CandidateWithdrawal $w): array
+    {
+        return [
+            'stage'                  => $w->stage,
+            'deductionPercentage'    => (float) $w->deduction_percentage,
+            'totalPaidSoFar'         => (float) $w->total_paid_so_far,
+            'cancellationFee'        => (float) $w->cancellation_fee,
+            'refundPayable'          => (float) $w->refund_payable,
+            'reason'                 => $w->reason ?? '',
+            'paymentMode'            => $w->payment_mode,
+            'chequeNumber'           => $w->cheque_number,
+            'chequeDate'             => $w->cheque_date?->toDateString(),
+            'alertFinanceBeforeDays' => $w->alert_finance_before_days,
+            'status'                 => $w->status,
+            'withdrawnAt'            => $w->withdrawn_at?->toDateTimeString(),
+        ];
+    }
+
+    private function humanFileSize(int $bytes): string
+    {
+        if ($bytes >= 1024 * 1024) {
+            return round($bytes / (1024 * 1024), 1) . ' MB';
+        }
+
+        return round($bytes / 1024) . ' KB';
+    }
+
+    public function syncCandidateStatus(Candidate $candidate): void
+    {
+        if (in_array($candidate->status, ['placed', 'withdrawn'], true)) {
+            return;
+        }
+
+        $candidate->loadMissing('documents');
+        $hasAllMandatory = $this->candidateHasAllMandatoryDocuments($candidate);
+
+        $newStatus = $hasAllMandatory ? 'active' : 'processing';
+        if ($candidate->status !== $newStatus) {
+            $candidate->update(['status' => $newStatus]);
+        }
+    }
+
+    public function candidateHasAllMandatoryDocuments(Candidate $candidate): bool
+    {
+        $mandatoryDocTypes = DocumentType::where('is_mandatory', true)->get();
+        if ($mandatoryDocTypes->isEmpty()) {
+            return true;
+        }
+
+        $docs = $candidate->documents;
+        if ($docs->isEmpty()) {
+            return false;
+        }
+
+        foreach ($mandatoryDocTypes as $dt) {
+            $matched = $docs->contains(function (CandidateDocument $doc) use ($dt): bool {
+                $hasFile = !empty($doc->file_path) || !empty($doc->file_name);
+                if (!$hasFile) {
+                    return false;
+                }
+
+                $dtId = (string) $dt->id;
+                $dtCode = strtolower(trim((string) $dt->code));
+                $dtName = strtolower(trim((string) $dt->name));
+
+                $docTypeId = trim((string) $doc->document_type_id);
+                $docTypeIdLower = strtolower($docTypeId);
+                $docTypeName = strtolower(trim((string) $doc->document_type_name));
+                $docTitle = strtolower(trim((string) $doc->title));
+
+                if ($docTypeId === $dtId) return true;
+                if ($dtCode && $docTypeIdLower === $dtCode) return true;
+                if ($dtName && ($docTypeName === $dtName || $docTitle === $dtName)) return true;
+
+                // Aliases
+                if ($dtCode === 'passport' || str_contains($dtName, 'passport')) {
+                    if ($docTypeIdLower === 'doc-type-1' || $docTypeIdLower === 'passport' || str_contains($docTypeName, 'passport') || str_contains($docTitle, 'passport')) {
+                        return true;
+                    }
+                }
+                if ($dtCode === 'cnic' || str_contains($dtName, 'cnic') || str_contains($dtName, 'identity')) {
+                    if ($docTypeIdLower === 'cnic' || str_contains($docTypeName, 'cnic') || str_contains($docTypeName, 'identity') || str_contains($docTitle, 'cnic')) {
+                        return true;
+                    }
+                }
+                if ($dtCode === 'police_clearance' || str_contains($dtName, 'police') || str_contains($dtName, 'character')) {
+                    if ($docTypeIdLower === 'police_clearance' || str_contains($docTypeName, 'police') || str_contains($docTypeName, 'character') || str_contains($docTitle, 'police') || str_contains($docTitle, 'character')) {
+                        return true;
+                    }
+                }
+                if ($dtCode === 'medical_fitness' || str_contains($dtName, 'medical')) {
+                    if ($docTypeIdLower === 'medical_fitness' || str_contains($docTypeName, 'medical') || str_contains($docTitle, 'medical')) {
+                        return true;
+                    }
+                }
+                if ($dtCode === 'skill_cert' || str_contains($dtName, 'skill') || str_contains($dtName, 'trade')) {
+                    if ($docTypeIdLower === 'skill_cert' || str_contains($docTypeName, 'skill') || str_contains($docTitle, 'skill')) {
+                        return true;
+                    }
+                }
+                if ($dtCode === 'visa_stamp' || str_contains($dtName, 'visa')) {
+                    if ($docTypeIdLower === 'visa_stamp' || str_contains($docTypeName, 'visa') || str_contains($docTitle, 'visa')) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+
+            if (!$matched) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function generateUniqueCandidateCodes(): array
+    {
+        $maxNum = 1000;
+        $allCodes = Candidate::withTrashed()->pluck('code')->all();
+        foreach ($allCodes as $c) {
+            if ($c && preg_match('/CRG-(\d+)/i', $c, $m)) {
+                $num = (int) $m[1];
+                if ($num > $maxNum) {
+                    $maxNum = $num;
+                }
+            }
+        }
+
+        $nextNum = $maxNum + 1;
+        $code = 'CRG-' . str_pad((string) $nextNum, 4, '0', STR_PAD_LEFT);
+        while (Candidate::withTrashed()->where('code', $code)->exists()) {
+            $nextNum++;
+            $code = 'CRG-' . str_pad((string) $nextNum, 4, '0', STR_PAD_LEFT);
+        }
+
+        $year = now()->year;
+        $maxPsn = 0;
+        $allPsn = Candidate::withTrashed()
+            ->where('psn_code', 'LIKE', "PSN-{$year}-%")
+            ->pluck('psn_code')
+            ->all();
+
+        foreach ($allPsn as $p) {
+            if ($p && preg_match('/PSN-\d+-(\d+)/i', $p, $m)) {
+                $pNum = (int) $m[1];
+                if ($pNum > $maxPsn) {
+                    $maxPsn = $pNum;
+                }
+            }
+        }
+
+        $nextPsn = $maxPsn + 1;
+        $psnCode = 'PSN-' . $year . '-' . str_pad((string) $nextPsn, 4, '0', STR_PAD_LEFT);
+        while (Candidate::withTrashed()->where('psn_code', $psnCode)->exists()) {
+            $nextPsn++;
+            $psnCode = 'PSN-' . $year . '-' . str_pad((string) $nextPsn, 4, '0', STR_PAD_LEFT);
+        }
+
+        return [$code, $psnCode];
+    }
+
+    private function normalizePersonName(?string $name, ?string $candidateSurname = null): ?string
+    {
+        if ($name === null) {
+            return null;
+        }
+        $cleaned = trim(preg_replace('/\s+/', ' ', str_replace(["\r", "\n"], ' ', $name)));
+        if ($cleaned === '') {
+            return null;
+        }
+
+        // Strip leading/trailing PAK/PAKISTAN
+        $cleaned = preg_replace('/^PAK\s+/i', '', $cleaned);
+        $cleaned = preg_replace('/[,\\/\\-\\s]+\\b(PAK|PAKISTAN|PAKISTANI)\\b$/i', '', $cleaned);
+        $cleaned = trim($cleaned);
+
+        if ($cleaned === '') {
+            return null;
+        }
+
+        if (str_contains($cleaned, ',')) {
+            $parts = array_values(array_filter(
+                array_map('trim', explode(',', $cleaned)),
+                fn ($p) => $p !== '' && !preg_match('/^(PAK|PAKISTAN|PAKISTANI)$/i', $p)
+            ));
+
+            if (count($parts) === 2) {
+                return trim($parts[1] . ' ' . $parts[0]);
+            }
+            if (count($parts) === 1) {
+                return $parts[0];
+            }
+        }
+
+        // If no comma, check if second word matches candidate surname (e.g. "MEHMOOD ARSHAD" when candidate surname is "ARSHAD")
+        if (!empty($candidateSurname)) {
+            $sName = strtoupper(trim((string) $candidateSurname));
+            $words = array_values(array_filter(preg_split('/\s+/', $cleaned)));
+            if (count($words) === 2) {
+                $w1 = strtoupper($words[0]);
+                $w2 = strtoupper($words[1]);
+                if ($w2 === $sName && $w1 !== $sName) {
+                    return trim($words[1] . ' ' . $words[0]);
+                }
+            }
+        }
+
+        return $cleaned;
+    }
+}
