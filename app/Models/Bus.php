@@ -59,6 +59,14 @@ class Bus extends Model
     }
 
     /**
+     * Fuel fill-up records logged against this vehicle.
+     */
+    public function fuelLogs(): HasMany
+    {
+        return $this->hasMany(FuelLog::class);
+    }
+
+    /**
      * Display name of the assigned driver, falling back to the legacy operator field.
      */
     public function getDriverNameAttribute(): ?string

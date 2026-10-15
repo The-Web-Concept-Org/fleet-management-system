@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             DriverSeeder::class,
             BusSeeder::class,
             TripSeeder::class,
+            ShiftLogSeeder::class,
         ]);
     }
 }

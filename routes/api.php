@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DriverController;
+use App\Http\Controllers\FuelController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OcrController;
 use App\Http\Controllers\PasswordResetController;
@@ -65,4 +66,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     // when a vehicle leaves the depot and again when it returns.
     Route::post('shifts/start', [ShiftController::class, 'start']);
     Route::post('shifts/end', [ShiftController::class, 'end']);
+
+    // Fuel records captured from the app: receipt/pump image, liters, fuel type,
+    // price and the moment the fuel was added. Store only — no edit or delete.
+    Route::post('fuel', [FuelController::class, 'store']);
 });
