@@ -60,6 +60,12 @@ class AuthController extends Controller
             ]);
         }
 
+        if ($reason = $this->driverLoginBlockReason($user)) {
+            throw ValidationException::withMessages([
+                'email' => [$reason],
+            ]);
+        }
+
         $user->forceFill(['last_login_at' => now()])->save();
 
         return response()->json($this->tokenResponse($user));
@@ -85,6 +91,12 @@ class AuthController extends Controller
             return response()->json(['message' => 'This account is not approved.'], 403);
         }
 
+        if ($reason = $this->driverLoginBlockReason($user)) {
+            $token->delete();
+
+            return response()->json(['message' => $reason], 403);
+        }
+
         $token->delete();
 
         return response()->json($this->tokenResponse($user));
@@ -97,14 +109,92 @@ class AuthController extends Controller
         return response()->json(['message' => 'Logged out successfully.']);
     }
 
+    public function me(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        return response()->json([
+            'user' => $this->formatUser($user),
+        ]);
+    }
+
+    /**
+     * Explain why a user may not sign in to the driver API.
+     *
+     * Returns null when the user is allowed to sign in. Only drivers are
+     * permitted, and a driver must already have a vehicle assigned to them.
+     */
+    private function driverLoginBlockReason(User $user): ?string
+    {
+        if ($user->role !== 'driver') {
+            return 'Only drivers can sign in to this app. Please use the fleet web console instead.';
+        }
+
+        $driver = $user->driver;
+
+        if (!$driver || !$driver->bus()->exists()) {
+            return 'No vehicle is assigned to your account yet. Please contact dispatch to assign a vehicle before signing in.';
+        }
+
+        return null;
+    }
+
     private function tokenResponse(User $user): array
     {
         $user->tokens()->where('name', 'like', 'refresh-%')->delete();
 
         return [
-            'user' => $user,
+            'user' => $this->formatUser($user),
             'accessToken' => $user->createToken('access-' . $user->id)->plainTextToken,
             'refreshToken' => $user->createToken('refresh-' . $user->id)->plainTextToken,
         ];
+    }
+
+    private function formatUser(User $user): array
+    {
+        $data = [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+            'status' => $user->status,
+            'last_login_at' => $user->last_login_at?->toIso8601String(),
+        ];
+
+        if ($user->role === 'driver') {
+            $driver = $user->driver;
+            if ($driver) {
+                $bus = $driver->bus;
+
+                $data['driver'] = [
+                    'id' => $driver->id,
+                    'user_id' => $driver->user_id,
+                    'badge_id' => $driver->badge_id,
+                    'phone' => $driver->phone,
+                    'license_number' => $driver->license_number,
+                    'license_type' => $driver->license_type,
+                    'license_expiry' => $driver->license_expiry?->format('Y-m-d'),
+                    'assigned_bus' => $driver->assigned_bus,
+                    'bus' => $bus ? [
+                        'id' => $bus->id,
+                        'bus_number' => $bus->bus_number,
+                        'plate' => $bus->plate,
+                        'model' => $bus->model,
+                        'status' => $bus->status,
+                        'odometer' => $bus->odometer,
+                        'fuel_month_liters' => $bus->fuel_month_liters,
+                        'fuel_cost' => $bus->fuel_cost,
+                        'km_per_liter' => $bus->km_per_liter,
+                        'next_service_km' => $bus->next_service_km,
+                        'route' => $bus->route,
+                    ] : null,
+                    'duty_status' => $driver->duty_status,
+                    'experience_years' => $driver->experience_years,
+                    'notes' => $driver->notes,
+                ];
+            }
+        }
+
+        return $data;
     }
 }

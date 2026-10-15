@@ -19,21 +19,7 @@ class UserSeeder extends Seeder
                 'status' => 'active',
                 'permissions' => null,
             ],
-            [
-                'name' => 'salman',
-                'email' => 'salman@gmail.com',
-                'password' => Hash::make('12345678'),
-                'role' => 'recruiter',
-                'status' => 'active',
-                'permissions' => [
-                    'candidates.view',
-                    'candidates.update',
-                    'documents.view',
-                    'documents.create',
-                    'documents.update',
-                    'documents.verify',
-                ],
-            ],
+            
         ];
 
         foreach ($users as $userData) {

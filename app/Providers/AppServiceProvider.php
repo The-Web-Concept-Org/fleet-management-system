@@ -41,23 +41,14 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $observer = \App\Observers\ModelCacheObserver::class;
+        $models = [
+           
+        ];
 
-        \App\Models\Candidate::observe($observer);
-        \App\Models\CandidateDocument::observe($observer);
-        \App\Models\CandidateSubmission::observe($observer);
-        \App\Models\CandidateWithdrawal::observe($observer);
-        \App\Models\CandidateShare::observe($observer);
-        \App\Models\Company::observe($observer);
-        \App\Models\CompanyLog::observe($observer);
-        \App\Models\CompanyDocument::observe($observer);
-        \App\Models\CompanyDocumentTemplate::observe($observer);
-        \App\Models\DocumentType::observe($observer);
-        \App\Models\Country::observe($observer);
-        \App\Models\User::observe($observer);
-        \App\Models\DriveDocument::observe($observer);
-        \App\Models\LedgerEntry::observe($observer);
-        \App\Models\AppNotification::observe($observer);
-        \App\Models\FcmToken::observe($observer);
-        \App\Models\SystemSetting::observe($observer);
+        foreach ($models as $model) {
+            if (class_exists($model)) {
+                $model::observe($observer);
+            }
+        }
     }
 }
