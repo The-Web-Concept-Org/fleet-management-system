@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Support\UserPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -152,54 +153,7 @@ class AuthController extends Controller
 
     private function formatUser(User $user): array
     {
-        $data = [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $user->role,
-            'status' => $user->status,
-            'last_login_at' => $user->last_login_at?->toIso8601String(),
-        ];
-
-        if ($user->role !== 'driver') {
-            return $data;
-        }
-
-        $driver = $user->driver;
-
-        if (!$driver) {
-            return $data;
-        }
-
-        $data['driver'] = [
-            'id' => $driver->id,
-            'user_id' => $driver->user_id,
-            'badge_id' => $driver->badge_id,
-            'phone' => $driver->phone,
-            'license_number' => $driver->license_number,
-            'license_type' => $driver->license_type,
-            'license_expiry' => $driver->license_expiry?->format('Y-m-d'),
-            'duty_status' => $driver->duty_status,
-            'experience_years' => $driver->experience_years,
-            'notes' => $driver->notes,
-        ];
-
-        $bus = $driver->bus;
-
-        $data['bus'] = $bus ? [
-            'id' => $bus->id,
-            'bus_number' => $bus->bus_number,
-            'plate' => $bus->plate,
-            'model' => $bus->model,
-            'status' => $bus->status,
-            'odometer' => $bus->odometer,
-            'fuel_month_liters' => $bus->fuel_month_liters,
-            'fuel_cost' => $bus->fuel_cost,
-            'km_per_liter' => $bus->km_per_liter,
-            'next_service_km' => $bus->next_service_km,
-            'route' => $bus->route,
-        ] : null;
-
-        return $data;
+        return UserPresenter::format($user);
     }
+
 }
