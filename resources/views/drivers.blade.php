@@ -152,39 +152,12 @@
 
   <!-- Main Content Wrapper -->
   <div class="pl-64 flex flex-col min-h-screen">
-    <!-- Top Header -->
-    <header class="fixed top-0 left-64 right-0 h-16 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 px-space-lg flex items-center justify-between gap-space-md">
-      <div class="flex-1 max-w-md">
-        <div class="relative flex items-center w-full">
-          <span class="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none">search</span>
-          <input class="w-full pl-9 pr-space-md py-2 bg-surface-card rounded-lg text-on-surface placeholder:text-outline font-body-sm text-body-sm focus:outline-none focus:ring-2 focus:ring-primary-container shadow-sm" id="topNavSearch" placeholder="Search driver name, badge, email, or bus..." type="text"/>
-        </div>
-      </div>
-      <div class="flex items-center gap-space-lg">
-        <div class="hidden lg:flex items-center gap-2 px-space-md py-1.5 rounded-full bg-surface-card shadow-sm">
-          <span class="w-2 h-2 rounded-full bg-sync-active"></span>
-          <span class="font-body-sm text-body-sm font-semibold text-secondary">Depot Online</span>
-          <span class="text-outline text-xs">&bull;</span>
-          <span class="font-body-sm text-body-sm text-on-surface-variant">{{ $totalDrivers }} registered drivers</span>
-        </div>
-        <form method="POST" action="{{ route('logout') }}" class="inline">
-          @csrf
-          <button type="submit" class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-outline hover:text-danger-critical hover:bg-error-container/20 text-body-sm font-medium transition-colors" title="Log out">
-            <span class="material-symbols-outlined text-base">logout</span>
-            <span class="hidden sm:inline">Logout</span>
-          </button>
-        </form>
-        <div class="flex items-center gap-space-sm pl-space-sm">
-          <div class="w-8 h-8 rounded-full bg-primary-container text-on-primary font-bold flex items-center justify-center text-xs shadow-sm">
-            {{ strtoupper(substr(auth()->user()->name ?? 'A', 0, 2)) }}
-          </div>
-          <div class="hidden sm:flex flex-col text-left">
-            <span class="font-body-sm text-body-sm font-semibold text-on-surface leading-tight">{{ auth()->user()->name ?? 'Alex Turner' }}</span>
-            <span class="font-label-caps text-label-caps text-outline leading-tight">{{ ucfirst(auth()->user()->role ?? 'Admin') }}</span>
-          </div>
-        </div>
-      </div>
-    </header>
+    <!-- Top Header (shared partial) -->
+    @include('partials.topbar', [
+        'topbarSearchPlaceholder' => 'Search driver name, badge, email, or bus...',
+        'topbarSearchId' => 'topNavSearch',
+        'topbarStatus' => $totalDrivers . ' registered drivers',
+    ])
 
     <!-- Main View Content -->
     <main class="w-full pt-16 flex-1 px-space-lg py-space-lg bg-surface">

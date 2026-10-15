@@ -22,7 +22,9 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/buses/{bus}', [BusController::class, 'destroy'])->name('buses.destroy');
 
     Route::get('/shifts', function () {
-        return view('shifts');
+        return view('shifts', [
+            'activeBuses' => \App\Models\Bus::where('status', 'active')->count(),
+        ]);
     })->name('shifts');
 
     Route::get('/drivers', [\App\Http\Controllers\DriverController::class, 'index'])->name('drivers');
