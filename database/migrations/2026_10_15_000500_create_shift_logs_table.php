@@ -25,12 +25,6 @@ return new class extends Migration
             $table->integer('end_km')->nullable();
             $table->decimal('distance_km', 8, 2)->nullable();
 
-            // Fuel detail recorded at shift start and end (level + optional liters).
-            $table->string('start_fuel_level')->nullable();
-            $table->decimal('start_fuel_liters', 8, 2)->nullable();
-            $table->string('end_fuel_level')->nullable();
-            $table->decimal('end_fuel_liters', 8, 2)->nullable();
-
             // Stored meter reading photos (public disk paths).
             $table->string('start_meter_image')->nullable();
             $table->string('end_meter_image')->nullable();

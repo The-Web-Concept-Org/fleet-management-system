@@ -72,7 +72,7 @@ it('requires authentication to start a shift', function (): void {
     $this->postJson('/api/shifts/start', [])->assertUnauthorized();
 });
 
-it('starts a shift with a meter image, km, fuel and linked trip', function (): void {
+it('starts a shift with a meter image, km, start time and linked trip', function (): void {
     $driver = shiftDriver('Ali Raza');
     $bus = shiftBus($driver->id, 142760);
     $trip = shiftTrip($bus->id);
@@ -83,8 +83,7 @@ it('starts a shift with a meter image, km, fuel and linked trip', function (): v
         'bus_id' => $bus->id,
         'trip_id' => $trip->id,
         'meter_reading' => 142760,
-        'fuel_level' => 'full',
-        'fuel_liters' => 60,
+        'started_at' => '2026-10-15 06:30:00',
         'meter_image' => UploadedFile::fake()->image('start-meter.jpg'),
     ])
         ->assertOk()
@@ -92,8 +91,7 @@ it('starts a shift with a meter image, km, fuel and linked trip', function (): v
         ->assertJsonPath('shift.status', 'in_progress')
         ->assertJsonPath('shift.start_km', 142760)
         ->assertJsonPath('shift.vehicle.id', $bus->id)
-        ->assertJsonPath('shift.trip.id', $trip->id)
-        ->assertJsonPath('shift.start_fuel.level', 'full');
+        ->assertJsonPath('shift.trip.id', $trip->id);
 
     $log = ShiftLog::first();
 
@@ -103,7 +101,8 @@ it('starts a shift with a meter image, km, fuel and linked trip', function (): v
         ->and($log->driver_id)->toBe($driver->id)
         ->and($log->trip_id)->toBe($trip->id)
         ->and($log->end_km)->toBeNull()
-        ->and($log->start_meter_image)->not->toBeNull();
+        ->and($log->start_meter_image)->not->toBeNull()
+        ->and($log->started_at->format('Y-m-d H:i'))->toBe('2026-10-15 06:30');
 
     Storage::disk('public')->assertExists($log->start_meter_image);
     expect($driver->fresh()->duty_status)->toBe('on_route');
@@ -176,28 +175,26 @@ it('ends a shift by vehicle id, computes distance and completes the linked trip'
         'bus_id' => $bus->id,
         'trip_id' => $trip->id,
         'start_km' => 50000,
-        'fuel_level' => 'full',
         'meter_image' => UploadedFile::fake()->image('start.jpg'),
     ])->assertOk();
 
     $this->postJson('/api/shifts/end', [
         'bus_id' => $bus->id,
         'end_km' => 50137,
-        'fuel_level' => 'half',
-        'fuel_liters' => 30,
+        'ended_at' => '2026-10-15 18:45:00',
         'meter_image' => UploadedFile::fake()->image('end.jpg'),
     ])
         ->assertOk()
         ->assertJsonPath('success', true)
         ->assertJsonPath('shift.status', 'completed')
-        ->assertJsonPath('shift.distance_km', 137)
-        ->assertJsonPath('shift.end_fuel.level', 'half');
+        ->assertJsonPath('shift.distance_km', 137);
 
     $log = ShiftLog::first();
 
     expect($log->end_km)->toBe(50137)
         ->and((float) $log->distance_km)->toBe(137.0)
-        ->and($log->is_active)->toBeFalse();
+        ->and($log->is_active)->toBeFalse()
+        ->and($log->ended_at->format('Y-m-d H:i'))->toBe('2026-10-15 18:45');
 
     Storage::disk('public')->assertExists($log->end_meter_image);
     expect($bus->fresh()->odometer)->toBe(50137);

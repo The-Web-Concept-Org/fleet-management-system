@@ -20,8 +20,6 @@ class ShiftLog extends Model
 
     public const STATUSES = [self::STATUS_IN_PROGRESS, self::STATUS_COMPLETED];
 
-    public const FUEL_LEVELS = ['full', 'three_quarter', 'half', 'quarter', 'low', 'empty'];
-
     protected $fillable = [
         'shift_number',
         'bus_id',
@@ -30,10 +28,6 @@ class ShiftLog extends Model
         'start_km',
         'end_km',
         'distance_km',
-        'start_fuel_level',
-        'start_fuel_liters',
-        'end_fuel_level',
-        'end_fuel_liters',
         'start_meter_image',
         'end_meter_image',
         'start_notes',
@@ -47,8 +41,6 @@ class ShiftLog extends Model
         'start_km' => 'integer',
         'end_km' => 'integer',
         'distance_km' => 'decimal:2',
-        'start_fuel_liters' => 'decimal:2',
-        'end_fuel_liters' => 'decimal:2',
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
     ];
@@ -109,14 +101,6 @@ class ShiftLog extends Model
             'start_km' => $this->start_km,
             'end_km' => $this->end_km,
             'distance_km' => $this->distance_km !== null ? (float) $this->distance_km : null,
-            'start_fuel' => [
-                'level' => $this->start_fuel_level,
-                'liters' => $this->start_fuel_liters,
-            ],
-            'end_fuel' => [
-                'level' => $this->end_fuel_level,
-                'liters' => $this->end_fuel_liters,
-            ],
             'start_meter_image' => $this->formatImage($this->start_meter_image),
             'end_meter_image' => $this->formatImage($this->end_meter_image),
             'start_notes' => $this->start_notes,

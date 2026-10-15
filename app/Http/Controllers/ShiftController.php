@@ -3,15 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bus;
+use App\Models\Driver;
 use App\Models\ShiftLog;
 use App\Models\Trip;
 use App\Services\DocumentCompressionService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 
 class ShiftController extends Controller
 {
@@ -20,12 +23,101 @@ class ShiftController extends Controller
     }
 
     /**
+     * Shift audit board: the daily meter log roster plus the inspection desk
+     * detail for the shift currently in focus.
+     *
+     * GET /shifts
+     */
+    public function index(Request $request): View
+    {
+        $status = (string) $request->input('status', 'all');
+        $busId = $request->input('bus_id');
+        $driverId = $request->input('driver_id');
+
+        $query = ShiftLog::with(['bus', 'driver.user', 'trip']);
+
+        if (in_array($status, ShiftLog::STATUSES, true)) {
+            $query->where('status', $status);
+        } elseif ($status === 'flagged') {
+            // Completed logs that were never closed out with an end meter
+            // reading are the ones an auditor still has to look at.
+            $query->where('status', ShiftLog::STATUS_COMPLETED)->whereNull('end_km');
+        }
+
+        if ($busId !== null && $busId !== '') {
+            $query->where('bus_id', (int) $busId);
+        }
+
+        if ($driverId !== null && $driverId !== '') {
+            $query->where('driver_id', (int) $driverId);
+        }
+
+        $shifts = $query->orderByDesc('started_at')->orderByDesc('id')->get();
+
+        // The inspection desk always shows a shift: the first row of the
+        // current view, or the newest log overall when the filters empty it.
+        $selected = $shifts->first()
+            ?? ShiftLog::with(['bus', 'driver.user', 'trip'])->orderByDesc('id')->first();
+
+        $countAll = ShiftLog::count();
+        $countOpen = ShiftLog::where('status', ShiftLog::STATUS_IN_PROGRESS)->count();
+        $countCompleted = ShiftLog::where('status', ShiftLog::STATUS_COMPLETED)->count();
+        $countFlagged = ShiftLog::where('status', ShiftLog::STATUS_COMPLETED)->whereNull('end_km')->count();
+
+        $totalBuses = Bus::count();
+        $activeBuses = Bus::where('status', 'active')->count();
+        $dayMileage = (float) ShiftLog::whereDate('started_at', now()->toDateString())->sum('distance_km');
+
+        $buses = Bus::orderBy('bus_number')->get();
+        $drivers = Driver::with('user')->get()
+            ->sortBy(fn (Driver $driver) => $driver->user->name ?? '')
+            ->values();
+
+        return view('shifts', compact(
+            'shifts',
+            'selected',
+            'countAll',
+            'countOpen',
+            'countCompleted',
+            'countFlagged',
+            'totalBuses',
+            'activeBuses',
+            'dayMileage',
+            'buses',
+            'drivers',
+            'status',
+            'busId',
+            'driverId'
+        ));
+    }
+
+    /**
+     * Shift detail for the inspection desk. Returns the rendered detail panel
+     * so the board can swap it in without a full page reload.
+     *
+     * GET /shifts/{shift}
+     */
+    public function show(Request $request, ShiftLog $shift): HttpResponse|JsonResponse
+    {
+        $shift->load(['bus', 'driver.user', 'trip']);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'shift' => $shift->toApiArray(),
+            ]);
+        }
+
+        return response()->view('partials.shift-detail', ['shift' => $shift]);
+    }
+
+    /**
      * Start a shift for a vehicle: capture the meter photo, the starting meter
-     * reading (KM) and the fuel detail taken from the dashboard.
+     * reading (KM) and the start timestamp sent by the frontend.
      *
      * POST /api/shifts/start
      *  bus_id, trip_id, meter_image|image, start_km|meter_reading,
-     *  fuel_level, fuel_liters, notes
+     *  started_at|start_datetime, notes
      */
     public function start(Request $request): JsonResponse
     {
@@ -35,8 +127,7 @@ class ShiftController extends Controller
             'bus_id' => ['required', 'integer', 'exists:buses,id'],
             'trip_id' => ['nullable', 'integer', 'exists:trips,id'],
             'start_km' => ['required', 'integer', 'min:0', 'max:99999999'],
-            'fuel_level' => ['nullable', 'string', Rule::in(ShiftLog::FUEL_LEVELS)],
-            'fuel_liters' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+            'started_at' => ['nullable', 'date'],
             'start_notes' => ['nullable', 'string', 'max:1000'],
             'meter_image' => ['nullable', 'image', 'max:10240'],
             'image' => ['nullable', 'image', 'max:10240'],
@@ -88,12 +179,10 @@ class ShiftController extends Controller
                 'driver_id' => $bus->driver_id,
                 'trip_id' => $trip?->id,
                 'start_km' => $validated['start_km'],
-                'start_fuel_level' => $validated['fuel_level'] ?? null,
-                'start_fuel_liters' => $validated['fuel_liters'] ?? null,
                 'start_meter_image' => $imagePath,
                 'start_notes' => $validated['start_notes'] ?? null,
                 'status' => ShiftLog::STATUS_IN_PROGRESS,
-                'started_at' => now(),
+                'started_at' => !empty($validated['started_at']) ? Carbon::parse($validated['started_at']) : now(),
             ]);
 
             // Reflect that this vehicle is now out on the road.
@@ -124,13 +213,13 @@ class ShiftController extends Controller
 
     /**
      * End a vehicle's active shift: capture the closing meter photo, the ending
-     * meter reading (KM) and the closing fuel detail. The covered distance is
-     * calculated automatically, the vehicle odometer is updated and any linked
-     * trip is marked completed.
+     * meter reading (KM) and the end timestamp sent by the frontend. The covered
+     * distance is calculated automatically, the vehicle odometer is updated and
+     * any linked trip is marked completed.
      *
      * POST /api/shifts/end
      *  bus_id, trip_id, meter_image|image, end_km|meter_reading,
-     *  fuel_level, fuel_liters, notes
+     *  ended_at|end_datetime, notes
      */
     public function end(Request $request): JsonResponse
     {
@@ -140,8 +229,7 @@ class ShiftController extends Controller
             'bus_id' => ['required', 'integer', 'exists:buses,id'],
             'trip_id' => ['nullable', 'integer', 'exists:trips,id'],
             'end_km' => ['required', 'integer', 'min:0', 'max:99999999'],
-            'fuel_level' => ['nullable', 'string', Rule::in(ShiftLog::FUEL_LEVELS)],
-            'fuel_liters' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+            'ended_at' => ['nullable', 'date'],
             'end_notes' => ['nullable', 'string', 'max:1000'],
             'meter_image' => ['nullable', 'image', 'max:10240'],
             'image' => ['nullable', 'image', 'max:10240'],
@@ -182,12 +270,10 @@ class ShiftController extends Controller
                 'end_km' => $validated['end_km'],
                 'distance_km' => $distance,
                 'trip_id' => $tripId,
-                'end_fuel_level' => $validated['fuel_level'] ?? null,
-                'end_fuel_liters' => $validated['fuel_liters'] ?? null,
                 'end_meter_image' => $imagePath,
                 'end_notes' => $validated['end_notes'] ?? null,
                 'status' => ShiftLog::STATUS_COMPLETED,
-                'ended_at' => now(),
+                'ended_at' => !empty($validated['ended_at']) ? Carbon::parse($validated['ended_at']) : now(),
             ]);
 
             // Keep the vehicle's odometer in sync with the latest reading.
@@ -218,21 +304,20 @@ class ShiftController extends Controller
     }
 
     /**
-     * Accept the friendlier client field names (meter_reading and start_/end_
-     * prefixed fuel + notes) and normalise them onto the canonical field names
-     * used by validation and persistence.
+     * Accept the friendlier client field names (meter_reading, start_datetime /
+     * end_datetime) and normalise them onto the canonical field names used by
+     * validation and persistence.
      */
     private function mergeAliases(Request $request, bool $end = false): void
     {
         $kmKey = $end ? 'end_km' : 'start_km';
-        $fuelLevelKey = $end ? 'end_fuel_level' : 'start_fuel_level';
-        $fuelLitersKey = $end ? 'end_fuel_liters' : 'start_fuel_liters';
+        $timeKey = $end ? 'ended_at' : 'started_at';
+        $timeAlias = $end ? 'end_datetime' : 'start_datetime';
         $notesKey = $end ? 'end_notes' : 'start_notes';
 
         $request->merge([
             $kmKey => $request->input($kmKey, $request->input('meter_reading')),
-            'fuel_level' => $request->input('fuel_level', $request->input($fuelLevelKey)),
-            'fuel_liters' => $request->input('fuel_liters', $request->input($fuelLitersKey)),
+            $timeKey => $request->input($timeKey, $request->input($timeAlias)),
             $notesKey => $request->input($notesKey, $request->input('notes')),
         ]);
     }
