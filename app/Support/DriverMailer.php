@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Mail\BusAssignmentMail;
 use App\Mail\DriverCredentialsMail;
+use App\Mail\PasswordResetCodeMail;
 use App\Models\Bus;
 use App\Models\Driver;
 use Illuminate\Support\Facades\Log;
@@ -34,6 +35,16 @@ class DriverMailer
     {
         return self::attempt('bus_assignment', $driver, function () use ($bus, $driver): void {
             Mail::to($driver->user->email)->send(new BusAssignmentMail($bus, $driver));
+        });
+    }
+
+    /**
+     * Email a driver a one-time code to reset their password.
+     */
+    public static function sendPasswordResetCode(Driver $driver, string $code, int $expiresInMinutes): bool
+    {
+        return self::attempt('password_reset', $driver, function () use ($driver, $code, $expiresInMinutes): void {
+            Mail::to($driver->user->email)->send(new PasswordResetCodeMail($driver, $code, $expiresInMinutes));
         });
     }
 

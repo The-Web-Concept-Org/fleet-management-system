@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BusController;
+use App\Http\Controllers\TripController;
 use App\Http\Controllers\WebAuthController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -21,8 +22,15 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/buses/{bus}', [BusController::class, 'update'])->name('buses.update');
     Route::delete('/buses/{bus}', [BusController::class, 'destroy'])->name('buses.destroy');
 
+    Route::get('/trips', [TripController::class, 'index'])->name('trips');
+    Route::post('/trips', [TripController::class, 'store'])->name('trips.store');
+    Route::put('/trips/{trip}', [TripController::class, 'update'])->name('trips.update');
+    Route::delete('/trips/{trip}', [TripController::class, 'destroy'])->name('trips.destroy');
+
     Route::get('/shifts', function () {
-        return view('shifts');
+        return view('shifts', [
+            'activeBuses' => \App\Models\Bus::where('status', 'active')->count(),
+        ]);
     })->name('shifts');
 
     Route::get('/drivers', [\App\Http\Controllers\DriverController::class, 'index'])->name('drivers');
