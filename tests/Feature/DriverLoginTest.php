@@ -40,13 +40,17 @@ it('allows a driver with an assigned vehicle to log in', function (): void {
     ])
         ->assertOk()
         ->assertJsonStructure([
-            'user' => ['driver' => ['assigned_bus', 'bus' => ['id', 'bus_number', 'plate', 'status', 'route']]],
+            'user' => [
+                'driver' => ['id', 'badge_id', 'duty_status'],
+                'bus' => ['id', 'bus_number', 'plate', 'status', 'route'],
+            ],
             'accessToken',
             'refreshToken',
         ])
-        ->assertJsonPath('user.driver.assigned_bus', 'Bus #BUS-001')
-        ->assertJsonPath('user.driver.bus.bus_number', 'BUS-001')
-        ->assertJsonPath('user.driver.bus.plate', 'ABC-123');
+        ->assertJsonMissingPath('user.driver.bus')
+        ->assertJsonMissingPath('user.driver.assigned_bus')
+        ->assertJsonPath('user.bus.bus_number', 'BUS-001')
+        ->assertJsonPath('user.bus.plate', 'ABC-123');
 });
 
 it('blocks a driver who has no vehicle assigned', function (): void {
