@@ -1,0 +1,232 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Bus;
+use App\Models\Driver;
+use App\Support\DriverMailer;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\View\View;
+
+class BusController extends Controller
+{
+    /**
+     * Display a listing of buses with fleet stats and filters.
+     */
+    public function index(Request $request): View
+    {
+        $query = Bus::with('driver.user');
+
+        if ($request->filled('search')) {
+            $search = trim($request->input('search'));
+            $query->where(function ($q) use ($search): void {
+                $q->where('bus_number', 'like', "%{$search}%")
+                    ->orWhere('plate', 'like', "%{$search}%")
+                    ->orWhere('model', 'like', "%{$search}%")
+                    ->orWhere('operator', 'like', "%{$search}%")
+                    ->orWhere('route', 'like', "%{$search}%")
+                    ->orWhereHas('driver.user', function ($uq) use ($search): void {
+                        $uq->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($request->filled('status') && $request->input('status') !== 'all') {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('model') && $request->input('model') !== 'all') {
+            $query->where('model', $request->input('model'));
+        }
+
+        $buses = $query->orderByDesc('created_at')->orderByDesc('id')->get();
+
+        $totalBuses = Bus::count();
+        $activeBuses = Bus::where('status', 'active')->count();
+        $depotBuses = Bus::whereIn('status', ['depot', 'maintenance'])->count();
+        $outOfServiceBuses = Bus::where('status', 'out_of_service')->count();
+        $avgEfficiency = round((float) Bus::whereNotNull('km_per_liter')->avg('km_per_liter'), 1);
+
+        // Every driver plus their current bus, so the UI can show only the
+        // available ones (drivers with no bus) while still displaying the
+        // driver already assigned to a bus being edited.
+        $drivers = Driver::with(['user', 'bus'])->get()
+            ->sortBy(fn (Driver $driver) => $driver->user->name ?? '')
+            ->values();
+
+        return view('buses', compact(
+            'buses',
+            'totalBuses',
+            'activeBuses',
+            'depotBuses',
+            'outOfServiceBuses',
+            'avgEfficiency',
+            'drivers'
+        ));
+    }
+
+    /**
+     * Store a newly created bus in the fleet.
+     */
+    public function store(Request $request): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'bus_number' => ['required', 'string', 'max:50'],
+            'plate' => ['required', 'string', 'max:50', 'unique:buses,plate'],
+            'model' => ['nullable', 'string', 'max:100'],
+            'driver_id' => ['nullable', 'integer', 'exists:drivers,id', Rule::unique('buses', 'driver_id')],
+            'status' => ['required', 'string', 'in:active,standby,depot,maintenance,out_of_service'],
+            'odometer' => ['nullable', 'integer', 'min:0'],
+            'fuel_month_liters' => ['nullable', 'integer', 'min:0'],
+            'km_per_liter' => ['nullable', 'numeric', 'min:0', 'max:99.99'],
+            'next_service_km' => ['nullable', 'integer'],
+            'route' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        $busNumber = $this->normalizeBusNumber($validated['bus_number']);
+
+        if (Bus::where('bus_number', $busNumber)->exists()) {
+            return $this->duplicateBusResponse($request, $busNumber);
+        }
+
+        $bus = Bus::create([
+            'bus_number' => $busNumber,
+            'plate' => strtoupper(trim($validated['plate'])),
+            'model' => $validated['model'] ?? null,
+            'operator' => null,
+            'driver_id' => $validated['driver_id'] ?? null,
+            'status' => $validated['status'],
+            'odometer' => $validated['odometer'] ?? 0,
+            'fuel_month_liters' => $validated['fuel_month_liters'] ?? 0,
+            'fuel_cost' => 0,
+            'km_per_liter' => $validated['km_per_liter'] ?? null,
+            'next_service_km' => $validated['next_service_km'] ?? 10000,
+            'route' => $validated['route'] ?? null,
+        ]);
+
+        $this->notifyAssignment($bus, null);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Bus #{$bus->bus_number} added to the fleet successfully.",
+                'bus' => $bus,
+            ]);
+        }
+
+        return redirect()->route('buses')->with('success', "Bus #{$bus->bus_number} added to the fleet successfully.");
+    }
+
+    /**
+     * Update the specified bus.
+     */
+    public function update(Request $request, Bus $bus): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'bus_number' => ['required', 'string', 'max:50'],
+            'plate' => ['required', 'string', 'max:50', 'unique:buses,plate,' . $bus->id],
+            'model' => ['nullable', 'string', 'max:100'],
+            'driver_id' => ['nullable', 'integer', 'exists:drivers,id', Rule::unique('buses', 'driver_id')->ignore($bus->id)],
+            'status' => ['required', 'string', 'in:active,standby,depot,maintenance,out_of_service'],
+            'odometer' => ['nullable', 'integer', 'min:0'],
+            'fuel_month_liters' => ['nullable', 'integer', 'min:0'],
+            'km_per_liter' => ['nullable', 'numeric', 'min:0', 'max:99.99'],
+            'next_service_km' => ['nullable', 'integer'],
+            'route' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        $busNumber = $this->normalizeBusNumber($validated['bus_number']);
+
+        if (Bus::where('bus_number', $busNumber)->whereKeyNot($bus->id)->exists()) {
+            return $this->duplicateBusResponse($request, $busNumber);
+        }
+
+        $previousDriverId = $bus->driver_id;
+
+        $bus->update([
+            'bus_number' => $busNumber,
+            'plate' => strtoupper(trim($validated['plate'])),
+            'model' => $validated['model'] ?? null,
+            'operator' => null,
+            'driver_id' => $validated['driver_id'] ?? null,
+            'status' => $validated['status'],
+            'odometer' => $validated['odometer'] ?? 0,
+            'fuel_month_liters' => $validated['fuel_month_liters'] ?? 0,
+            'km_per_liter' => $validated['km_per_liter'] ?? null,
+            'next_service_km' => $validated['next_service_km'] ?? 10000,
+            'route' => $validated['route'] ?? null,
+        ]);
+
+        $this->notifyAssignment($bus, $previousDriverId);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Bus #{$bus->bus_number} updated successfully.",
+                'bus' => $bus->fresh(['driver.user']),
+            ]);
+        }
+
+        return redirect()->route('buses')->with('success', "Bus #{$bus->bus_number} updated successfully.");
+    }
+
+    /**
+     * Remove the specified bus from the fleet.
+     */
+    public function destroy(Request $request, Bus $bus): JsonResponse|RedirectResponse
+    {
+        $busNumber = $bus->bus_number;
+        $bus->delete();
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Bus #{$busNumber} removed from the fleet.",
+            ]);
+        }
+
+        return redirect()->route('buses')->with('success', "Bus #{$busNumber} removed from the fleet.");
+    }
+
+    /**
+     * Send the assignment email only when a driver is newly assigned to the bus.
+     */
+    private function notifyAssignment(Bus $bus, ?int $previousDriverId): void
+    {
+        if (!$bus->driver_id || $bus->driver_id === $previousDriverId) {
+            return;
+        }
+
+        $driver = Driver::with('user')->find($bus->driver_id);
+
+        if ($driver) {
+            DriverMailer::sendBusAssignment($bus, $driver);
+        }
+    }
+
+    private function duplicateBusResponse(Request $request, string $busNumber): JsonResponse|RedirectResponse
+    {
+        $message = "Bus #{$busNumber} already exists in the fleet.";
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json(['success' => false, 'message' => $message], 422);
+        }
+
+        return back()->withErrors(['bus_number' => $message])->withInput();
+    }
+
+    /**
+     * Strip a leading "Bus" prefix / "#" so identifiers stay consistent.
+     */
+    private function normalizeBusNumber(string $value): string
+    {
+        $value = trim($value);
+        $value = preg_replace('/^bus\s*#?\s*/i', '', $value) ?? $value;
+        $value = ltrim($value, '#');
+
+        return trim($value);
+    }
+}

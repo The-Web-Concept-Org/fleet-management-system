@@ -1,10 +1,34 @@
 <?php
 
+use App\Http\Controllers\BusController;
+use App\Http\Controllers\WebAuthController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
+});
+
+Route::get('/login', [WebAuthController::class, 'showLogin'])->name('login');
+Route::post('/login', [WebAuthController::class, 'login']);
+Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout');
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
+
+    Route::get('/buses', [BusController::class, 'index'])->name('buses');
+    Route::post('/buses', [BusController::class, 'store'])->name('buses.store');
+    Route::put('/buses/{bus}', [BusController::class, 'update'])->name('buses.update');
+    Route::delete('/buses/{bus}', [BusController::class, 'destroy'])->name('buses.destroy');
+
+    Route::get('/shifts', function () {
+        return view('shifts');
+    })->name('shifts');
+
+    Route::get('/drivers', [\App\Http\Controllers\DriverController::class, 'index'])->name('drivers');
+    Route::post('/drivers', [\App\Http\Controllers\DriverController::class, 'store'])->name('drivers.store');
+    Route::put('/drivers/{driver}', [\App\Http\Controllers\DriverController::class, 'update'])->name('drivers.update');
+    Route::delete('/drivers/{driver}', [\App\Http\Controllers\DriverController::class, 'destroy'])->name('drivers.destroy');
 });
 
 Route::get('/storage/{path}', function (string $path) {

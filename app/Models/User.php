@@ -52,4 +52,9 @@ class User extends Authenticatable
             'permissions' => 'array',
         ];
     }
+
+    public function driver(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(Driver::class);
+    }
 }

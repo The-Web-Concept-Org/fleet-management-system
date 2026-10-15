@@ -16,8 +16,8 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             UserSeeder::class,
-            CountrySeeder::class,
-            DocumentTypeSeeder::class,
+            DriverSeeder::class,
+            BusSeeder::class,
         ]);
     }
 }
