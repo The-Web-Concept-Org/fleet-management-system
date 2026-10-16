@@ -216,7 +216,7 @@ No time set
 <td class="py-4 px-space-md">
 @if($trip->bus?->driver?->user)
 <div class="flex items-center gap-2">
-<div class="w-7 h-7 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-bold text-xs">{{ strtoupper(substr($trip->bus->driver->user->name, 0, 2)) }}</div>
+{{-- <div class="w-7 h-7 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-bold text-xs">{{ strtoupper(substr($trip->bus->driver->user->name, 0, 2)) }}</div> --}}
 <div class="flex flex-col">
 <span class="font-body-md text-body-md font-semibold text-on-surface">{{ $trip->bus->driver->user->name }}</span>
 <span class="font-body-sm text-body-sm text-outline">{{ $trip->bus->driver->badge_id ?: 'Driver' }}</span>
