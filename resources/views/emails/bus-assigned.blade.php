@@ -13,7 +13,7 @@
                     <tr>
                         <td style="background-color:#BD1C23;padding:24px 32px;color:#ffffff;">
                             <h1 style="margin:0;font-size:20px;font-weight:700;">Bus Assignment</h1>
-                            <p style="margin:4px 0 0;font-size:13px;opacity:0.9;">Bus #{{ $busNumber }} assigned to you</p>
+                            <p style="margin:4px 0 0;font-size:13px;opacity:0.9;">{{ $busNumber }} assigned to you</p>
                         </td>
                     </tr>
                     <tr>
@@ -26,7 +26,7 @@
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f3ff;border-radius:12px;padding:20px;">
                                 <tr>
                                     <td style="padding:6px 0;font-size:13px;color:#424655;">Bus number</td>
-                                    <td style="padding:6px 0;font-size:14px;font-weight:700;text-align:right;">Bus #{{ $busNumber }}</td>
+                                    <td style="padding:6px 0;font-size:14px;font-weight:700;text-align:right;">{{ $busNumber }}</td>
                                 </tr>
                                 <tr>
                                     <td style="padding:6px 0;font-size:13px;color:#424655;">License plate</td>

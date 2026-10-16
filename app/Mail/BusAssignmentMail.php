@@ -28,7 +28,7 @@ class BusAssignmentMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Bus #' . $this->bus->bus_number . ' has been assigned to you',
+            subject: $this->bus->display_id . ' has been assigned to you',
         );
     }
 
@@ -40,7 +40,7 @@ class BusAssignmentMail extends Mailable
                 'driverName' => $this->driver->user?->name ?? 'Driver',
                 'loginEmail' => $this->driver->user?->email,
                 'loginUrl' => url('/login'),
-                'busNumber' => $this->bus->bus_number,
+                'busNumber' => $this->bus->display_id,
                 'busPlate' => $this->bus->plate,
                 'busModel' => $this->bus->model,
                 'busRoute' => $this->bus->route,

@@ -273,10 +273,10 @@
 <td class="py-4 px-space-md">
 <div class="flex items-center gap-3">
 <div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface font-headline-sm text-headline-sm">
-                    {{ str_pad($bus->bus_number, 2, '0', STR_PAD_LEFT) }}
+                    {{ $bus->display_number }}
                   </div>
 <div class="flex flex-col">
-<span class="font-headline-sm text-headline-sm text-on-surface font-bold">Bus #{{ $bus->bus_number }}</span>
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold">{{ $bus->display_id }}</span>
 <span class="font-body-sm text-body-sm text-outline">{{ $bus->model ?? 'Unspecified chassis' }}</span>
 </div>
 </div>
@@ -427,7 +427,7 @@
 <option value="">-- Assign Driver Later (Depot Standby) --</option>
 @foreach($drivers as $driver)
 @continue($driver->bus)
-<option value="{{ $driver->id }}">{{ $driver->user->name ?? 'Unnamed Driver' }}{{ $driver->badge_id ? ' (' . $driver->badge_id . ')' : '' }}</option>
+<option value="{{ $driver->id }}">{{ $driver->user->name ?? 'Unnamed Driver' }}{{ $driver->badge_id ? ' (' . $driver->display_id . ')' : '' }}</option>
 @endforeach
 </select>
 <p class="font-body-sm text-body-sm text-outline text-xs">Only drivers not assigned to another bus are listed.</p>
@@ -528,7 +528,7 @@
 <select class="px-3 py-2 bg-surface-container-low rounded-lg text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary-container" id="editBusDriver" name="driver_id">
 <option value="">-- Unassigned (Depot Standby) --</option>
 @foreach($drivers as $driver)
-<option value="{{ $driver->id }}" data-bus-id="{{ $driver->bus?->id }}">{{ $driver->user->name ?? 'Unnamed Driver' }}{{ $driver->badge_id ? ' (' . $driver->badge_id . ')' : '' }}</option>
+<option value="{{ $driver->id }}" data-bus-id="{{ $driver->bus?->id }}">{{ $driver->user->name ?? 'Unnamed Driver' }}{{ $driver->badge_id ? ' (' . $driver->display_id . ')' : '' }}</option>
 @endforeach
 </select>
 <p class="font-body-sm text-body-sm text-outline text-xs">Only available drivers and the driver currently on this bus are listed.</p>
@@ -723,7 +723,7 @@
       document.getElementById('editBusEfficiency').value = row.dataset.efficiency || '';
       document.getElementById('editBusNextService').value = row.dataset.nextService || 10000;
       document.getElementById('editBusRoute').value = row.dataset.route || '';
-      document.getElementById('editBusSubtitle').textContent = `Updating Bus #${row.dataset.busNumber} Ã‚Â· ${row.dataset.plate}`;
+      document.getElementById('editBusSubtitle').textContent = `Updating Bus #${String(row.dataset.busNumber).padStart(2, '0')} Ã‚Â· ${row.dataset.plate}`;
 
       document.getElementById('editBusForm').action = `/buses/${busId}`;
       toggleBusModal('editBusModal', true);
@@ -731,7 +731,7 @@
 
     // Open the modern delete confirmation
     function openDeleteBusModal(busId, busNumber, plate) {
-      document.getElementById('deleteBusNumber').textContent = `Bus #${busNumber}`;
+      document.getElementById('deleteBusNumber').textContent = `Bus #${String(busNumber).padStart(2, '0')}`;
       document.getElementById('deleteBusPlate').textContent = plate;
       document.getElementById('deleteBusForm').action = `/buses/${busId}`;
       toggleBusModal('deleteBusModal', true);

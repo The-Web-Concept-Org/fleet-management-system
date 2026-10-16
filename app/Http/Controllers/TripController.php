@@ -106,12 +106,12 @@ class TripController extends Controller
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => "Trip {$trip->trip_number} scheduled successfully.",
+                'message' => "{$trip->display_id} scheduled successfully.",
                 'trip' => $trip->load('bus.driver.user'),
             ]);
         }
 
-        return redirect()->route('trips')->with('success', "Trip {$trip->trip_number} scheduled successfully.");
+        return redirect()->route('trips')->with('success', "{$trip->display_id} scheduled successfully.");
     }
 
     /**
@@ -150,12 +150,12 @@ class TripController extends Controller
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => "Trip {$trip->trip_number} updated successfully.",
+                'message' => "{$trip->display_id} updated successfully.",
                 'trip' => $trip->fresh('bus.driver.user'),
             ]);
         }
 
-        return redirect()->route('trips')->with('success', "Trip {$trip->trip_number} updated successfully.");
+        return redirect()->route('trips')->with('success', "{$trip->display_id} updated successfully.");
     }
 
     /**
@@ -163,17 +163,17 @@ class TripController extends Controller
      */
     public function destroy(Request $request, Trip $trip): JsonResponse|RedirectResponse
     {
-        $tripNumber = $trip->trip_number;
+        $tripDisplayId = $trip->display_id;
         $trip->delete();
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => "Trip {$tripNumber} deleted successfully.",
+                'message' => "{$tripDisplayId} deleted successfully.",
             ]);
         }
 
-        return redirect()->route('trips')->with('success', "Trip {$tripNumber} deleted successfully.");
+        return redirect()->route('trips')->with('success', "{$tripDisplayId} deleted successfully.");
     }
 
     /**
@@ -203,9 +203,9 @@ class TripController extends Controller
         }
 
         $bus = $clash->bus;
-        $label = $bus ? 'Bus #' . $bus->bus_number : 'This bus';
+        $label = $bus ? $bus->display_id : 'This bus';
 
-        return "{$label} is already assigned to trip {$clash->trip_number} ({$this->formatTime($clash->departure_time)} - {$this->formatTime($clash->arrival_time)}) on that date.";
+        return "{$label} is already assigned to {$clash->display_id} ({$this->formatTime($clash->departure_time)} - {$this->formatTime($clash->arrival_time)}) on that date.";
     }
 
     private function formatTime(?string $time): string

@@ -188,6 +188,11 @@ class FuelController extends Controller
      */
     private function normalizeRequest(Request $request): void
     {
+        // Resolve the uploaded receipt image first, before anything reads (and
+        // caches) the file bag, so any accepted field name satisfies the
+        // "image" rule.
+        $this->aliasImage($request);
+
         $aliases = [];
 
         $type = $this->findInput($request, ['type', 'fuel_type', 'fuelType']);
@@ -227,15 +232,29 @@ class FuelController extends Controller
         }
 
         $request->merge($aliases);
+    }
 
-        $file = $request->file('image')
-            ?? $request->file('fuel_image')
-            ?? $request->file('receipt_image')
-            ?? $request->file('photo');
+    /**
+     * Copy an uploaded receipt image sent under any accepted field name onto the
+     * canonical "image" key. Request::file() memoises the converted file bag, so
+     * the cache is cleared after the copy to make the alias visible everywhere.
+     */
+    private function aliasImage(Request $request): void
+    {
+        $file = $request->file('image');
 
-        if ($file) {
-            $request->files->set('image', $file);
+        foreach (['fuel_image', 'fuelImage', 'receipt_image', 'receiptImage', 'photo'] as $alias) {
+            $file ??= $request->file($alias);
         }
+
+        if (!$file) {
+            return;
+        }
+
+        \Closure::bind(function () use ($file): void {
+            $this->files->set('image', $file);
+            $this->convertedFiles = null;
+        }, $request, $request)();
     }
 
     /**

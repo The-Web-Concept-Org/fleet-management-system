@@ -66,6 +66,23 @@ class ShiftLog extends Model
     }
 
     /**
+     * Canonical shift identifier shown on every screen, e.g. "Shift #0001".
+     * Stored references look like "SHF-0001"; only the sequence is displayed.
+     */
+    public function getDisplayIdAttribute(): string
+    {
+        $number = trim((string) $this->shift_number);
+
+        if ($number === '') {
+            return 'Shift #—';
+        }
+
+        $digits = preg_replace('/\D+/', '', $number);
+
+        return 'Shift #' . ($digits === '' ? $number : str_pad($digits, 3, '0', STR_PAD_LEFT));
+    }
+
+    /**
      * Serialize the shift into the shape returned by the shift start / end API.
      */
     public function toApiArray(): array

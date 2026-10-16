@@ -112,12 +112,12 @@ class BusController extends Controller
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => "Bus #{$bus->bus_number} added to the fleet successfully.",
+                'message' => "{$bus->display_id} added to the fleet successfully.",
                 'bus' => $bus,
             ]);
         }
 
-        return redirect()->route('buses')->with('success', "Bus #{$bus->bus_number} added to the fleet successfully.");
+        return redirect()->route('buses')->with('success', "{$bus->display_id} added to the fleet successfully.");
     }
 
     /**
@@ -165,12 +165,12 @@ class BusController extends Controller
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => "Bus #{$bus->bus_number} updated successfully.",
+                'message' => "{$bus->display_id} updated successfully.",
                 'bus' => $bus->fresh(['driver.user']),
             ]);
         }
 
-        return redirect()->route('buses')->with('success', "Bus #{$bus->bus_number} updated successfully.");
+        return redirect()->route('buses')->with('success', "{$bus->display_id} updated successfully.");
     }
 
     /**
@@ -178,17 +178,17 @@ class BusController extends Controller
      */
     public function destroy(Request $request, Bus $bus): JsonResponse|RedirectResponse
     {
-        $busNumber = $bus->bus_number;
+        $busDisplayId = $bus->display_id;
         $bus->delete();
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => "Bus #{$busNumber} removed from the fleet.",
+                'message' => "{$busDisplayId} removed from the fleet.",
             ]);
         }
 
-        return redirect()->route('buses')->with('success', "Bus #{$busNumber} removed from the fleet.");
+        return redirect()->route('buses')->with('success', "{$busDisplayId} removed from the fleet.");
     }
 
     /**
@@ -209,7 +209,7 @@ class BusController extends Controller
 
     private function duplicateBusResponse(Request $request, string $busNumber): JsonResponse|RedirectResponse
     {
-        $message = "Bus #{$busNumber} already exists in the fleet.";
+        $message = 'Bus #' . str_pad($busNumber, 2, '0', STR_PAD_LEFT) . ' already exists in the fleet.';
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json(['success' => false, 'message' => $message], 422);

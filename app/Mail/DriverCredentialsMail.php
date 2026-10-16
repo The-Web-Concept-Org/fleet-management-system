@@ -35,7 +35,7 @@ class DriverCredentialsMail extends Mailable
             view: 'emails.driver-credentials',
             with: [
                 'driverName' => $this->driver->user?->name ?? 'Driver',
-                'badgeId' => $this->driver->badge_id,
+                'badgeId' => $this->driver->display_id,
                 'loginEmail' => $this->driver->user?->email,
                 'loginPassword' => $this->plainPassword,
                 'loginUrl' => url('/login'),

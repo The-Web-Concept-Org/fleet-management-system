@@ -146,7 +146,7 @@ class ShiftController extends Controller
         if ($active) {
             return response()->json([
                 'success' => false,
-                'message' => "Bus #{$bus->bus_number} already has an active shift ({$active->shift_number}). End it before starting a new one.",
+                'message' => "{$bus->display_id} already has an active shift ({$active->display_id}). End it before starting a new one.",
                 'shift' => $active->toApiArray(),
             ], 422);
         }
@@ -158,14 +158,14 @@ class ShiftController extends Controller
             if (in_array($trip->status, ['completed', 'cancelled'], true)) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Trip {$trip->trip_number} is already {$trip->status} and cannot be started.",
+                    'message' => "{$trip->display_id} is already {$trip->status} and cannot be started.",
                 ], 422);
             }
 
             if ($trip->bus_id !== null && (int) $trip->bus_id !== (int) $bus->id) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Trip {$trip->trip_number} is assigned to a different vehicle (Bus #{$trip->bus->bus_number}).",
+                    'message' => "{$trip->display_id} is assigned to a different vehicle ({$trip->bus->display_id}).",
                 ], 422);
             }
         }
@@ -206,7 +206,7 @@ class ShiftController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Shift {$log->shift_number} started for Bus #{$bus->bus_number}.",
+            'message' => "{$log->display_id} started for {$bus->display_id}.",
             'shift' => $log->toApiArray(),
         ]);
     }
@@ -248,7 +248,7 @@ class ShiftController extends Controller
         if (!$log) {
             return response()->json([
                 'success' => false,
-                'message' => "No active shift found for Bus #{$bus->bus_number}. Start a shift before ending one.",
+                'message' => "No active shift found for {$bus->display_id}. Start a shift before ending one.",
             ], 422);
         }
 
@@ -298,7 +298,7 @@ class ShiftController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Shift {$log->shift_number} ended. Distance covered: {$log->distance_km} KM.",
+            'message' => "{$log->display_id} ended. Distance covered: {$log->distance_km} KM.",
             'shift' => $log->toApiArray(),
         ]);
     }

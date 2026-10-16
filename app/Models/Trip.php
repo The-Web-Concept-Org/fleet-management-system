@@ -62,4 +62,21 @@ class Trip extends Model
     {
         return $this->bus_id !== null;
     }
+
+    /**
+     * Canonical trip identifier shown on every screen, e.g. "Trip #0001".
+     * Stored references look like "TRP-0001"; only the sequence is displayed.
+     */
+    public function getDisplayIdAttribute(): string
+    {
+        $number = trim((string) $this->trip_number);
+
+        if ($number === '') {
+            return 'Trip #—';
+        }
+
+        $digits = preg_replace('/\D+/', '', $number);
+
+        return 'Trip #' . ($digits === '' ? $number : str_pad($digits, 3, '0', STR_PAD_LEFT));
+    }
 }

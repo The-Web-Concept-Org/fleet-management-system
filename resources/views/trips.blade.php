@@ -154,6 +154,7 @@ Cancelled
 <tr class="hover:bg-surface-container-low transition-colors trip-row"
     data-id="{{ $trip->id }}"
     data-trip-number="{{ $trip->trip_number }}"
+    data-trip-display="{{ $trip->display_id }}"
     data-origin="{{ $trip->origin }}"
     data-destination="{{ $trip->destination }}"
     data-date="{{ optional($trip->trip_date)->toDateString() }}"
@@ -170,7 +171,7 @@ Cancelled
 <span class="material-symbols-outlined text-lg">route</span>
 </div>
 <div class="flex flex-col">
-<span class="font-label-numeric text-body-lg text-on-surface font-bold">{{ $trip->trip_number }}</span>
+<span class="font-label-numeric text-body-lg text-on-surface font-bold">{{ $trip->display_id }}</span>
 @if($trip->status === 'scheduled')
 <span class="font-body-sm text-body-sm text-outline">Awaiting dispatch</span>
 @elseif($trip->is_assigned)
@@ -204,7 +205,7 @@ No time set
 <td class="py-4 px-space-md">
 @if($trip->bus)
 <div class="flex flex-col">
-<span class="font-body-md text-body-md font-semibold text-on-surface">Bus #{{ $trip->bus->bus_number }}</span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">{{ $trip->bus->display_id }}</span>
 <span class="font-body-sm text-body-sm text-outline">{{ $trip->bus->plate }}</span>
 </div>
 @else
@@ -219,7 +220,7 @@ No time set
 {{-- <div class="w-7 h-7 rounded-full bg-primary-container text-on-primary flex items-center justify-center font-bold text-xs">{{ strtoupper(substr($trip->bus->driver->user->name, 0, 2)) }}</div> --}}
 <div class="flex flex-col">
 <span class="font-body-md text-body-md font-semibold text-on-surface">{{ $trip->bus->driver->user->name }}</span>
-<span class="font-body-sm text-body-sm text-outline">{{ $trip->bus->driver->badge_id ?: 'Driver' }}</span>
+<span class="font-body-sm text-body-sm text-outline">{{ $trip->bus->driver->display_id }}</span>
 </div>
 </div>
 @elseif($trip->bus)
@@ -251,7 +252,7 @@ No time set
 <button class="p-1.5 rounded-lg text-outline hover:text-primary hover:bg-surface-card transition-colors" title="Edit / Assign Trip" onclick="openEditTripModal({{ $trip->id }})">
 <span class="material-symbols-outlined text-lg">edit</span>
 </button>
-<button class="p-1.5 rounded-lg text-outline hover:text-danger-critical hover:bg-error-container/20 transition-colors" title="Delete Trip" onclick="openDeleteTripModal({{ $trip->id }}, '{{ addslashes($trip->trip_number) }}', '{{ addslashes($trip->origin . ' -> ' . $trip->destination) }}')">
+<button class="p-1.5 rounded-lg text-outline hover:text-danger-critical hover:bg-error-container/20 transition-colors" title="Delete Trip" onclick="openDeleteTripModal({{ $trip->id }}, '{{ addslashes($trip->display_id) }}', '{{ addslashes($trip->origin . ' -> ' . $trip->destination) }}')">
 <span class="material-symbols-outlined text-lg">delete</span>
 </button>
 </div>
@@ -330,7 +331,7 @@ Showing <span class="font-semibold text-on-surface">{{ count($trips) }}</span> o
 <select class="px-3 py-2 bg-surface-container-low rounded-lg text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary-container" name="bus_id">
 <option value="">-- Assign Bus Later --</option>
 @foreach($buses as $bus)
-<option value="{{ $bus->id }}">Bus #{{ $bus->bus_number }} &middot; {{ $bus->plate }}{{ $bus->driver?->user ? ' - Driver: ' . $bus->driver->user->name : ' - No driver assigned' }}</option>
+<option value="{{ $bus->id }}">{{ $bus->display_id }} &middot; {{ $bus->plate }}{{ $bus->driver?->user ? ' - Driver: ' . $bus->driver->user->name : ' - No driver assigned' }}</option>
 @endforeach
 </select>
 <p class="font-body-sm text-body-sm text-outline text-xs">The driver comes from the bus. Assign a driver on the Buses page first.</p>
@@ -414,7 +415,7 @@ Showing <span class="font-semibold text-on-surface">{{ count($trips) }}</span> o
 <select class="px-3 py-2 bg-surface-container-low rounded-lg text-on-surface font-body-md text-body-md focus:outline-none focus:ring-2 focus:ring-primary-container" id="editTripBus" name="bus_id">
 <option value="">-- Unassigned --</option>
 @foreach($buses as $bus)
-<option value="{{ $bus->id }}">Bus #{{ $bus->bus_number }} &middot; {{ $bus->plate }}{{ $bus->driver?->user ? ' - Driver: ' . $bus->driver->user->name : ' - No driver assigned' }}</option>
+<option value="{{ $bus->id }}">{{ $bus->display_id }} &middot; {{ $bus->plate }}{{ $bus->driver?->user ? ' - Driver: ' . $bus->driver->user->name : ' - No driver assigned' }}</option>
 @endforeach
 </select>
 <p class="font-body-sm text-body-sm text-outline text-xs">The driver comes from the bus. Assign a driver on the Buses page first.</p>
@@ -584,7 +585,7 @@ Showing <span class="font-semibold text-on-surface">{{ count($trips) }}</span> o
       document.getElementById('editTripDistance').value = row.dataset.distance || '';
       document.getElementById('editTripStatus').value = row.dataset.status || 'scheduled';
       document.getElementById('editTripNotes').value = row.dataset.notes || '';
-      document.getElementById('editTripSubtitle').textContent = `Updating ${row.dataset.tripNumber} · ${row.dataset.origin} to ${row.dataset.destination}`;
+      document.getElementById('editTripSubtitle').textContent = `Updating ${row.dataset.tripDisplay} · ${row.dataset.origin} to ${row.dataset.destination}`;
 
       document.getElementById('editTripForm').action = `/trips/${tripId}`;
       toggleTripModal('editTripModal', true);
@@ -678,7 +679,7 @@ Showing <span class="font-semibold text-on-surface">{{ count($trips) }}</span> o
       let visible = 0;
       document.querySelectorAll('.trip-row').forEach(row => {
         const haystack = [
-          row.dataset.tripNumber, row.dataset.origin, row.dataset.destination,
+          row.dataset.tripNumber, row.dataset.tripDisplay, row.dataset.origin, row.dataset.destination,
           row.dataset.dateLabel, row.dataset.departure, row.dataset.arrival, row.dataset.status
         ].join(' ').toLowerCase();
 

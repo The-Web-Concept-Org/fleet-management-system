@@ -59,10 +59,10 @@
                 <span class="material-symbols-outlined text-sm">verified</span>
                 <span class="font-label-caps text-label-caps">INSPECTION DESK</span>
             </div>
-            <h2 class="font-headline-md text-headline-md text-on-surface">Meter Audit: Shift #{{ $shift->shift_number }}</h2>
+            <h2 class="font-headline-md text-headline-md text-on-surface">Meter Audit: {{ $shift->display_id }}</h2>
             <span class="font-body-sm text-body-sm text-outline">
-                {{ $driverName ?? 'Unassigned driver' }}@if($driver?->badge_id) (#{{ $driver->badge_id }})@endif
-                &bull; {{ $bus ? 'Bus #' . $bus->bus_number : 'No vehicle' }}
+                {{ $driverName ?? 'Unassigned driver' }}@if($driver?->badge_id) ({{ $driver->display_id }})@endif
+                &bull; {{ $bus ? $bus->display_id : 'No vehicle' }}
             </span>
         </div>
         <span class="px-2.5 py-1 rounded-md font-label-caps text-label-caps uppercase font-bold {{ $statusClasses }}">{{ $statusLabel }}</span>
@@ -74,7 +74,7 @@
             <span class="material-symbols-outlined text-secondary text-lg">satellite_alt</span>
             <span class="font-body-sm text-body-sm text-on-surface font-medium">
                 @if($trip)
-                    Trip {{ $trip->trip_number }}: {{ $trip->origin }} &rarr; {{ $trip->destination }}
+                    {{ $trip->display_id }}: {{ $trip->origin }} &rarr; {{ $trip->destination }}
                 @else
                     No scheduled trip linked to this shift
                 @endif
@@ -95,7 +95,7 @@
             </div>
             <div class="relative w-full h-44 rounded-lg overflow-hidden group shadow-inner">
                 @if($startImage)
-                    <img alt="Start shift meter photo for shift {{ $shift->shift_number }}" class="w-full h-full object-cover" src="{{ $startImage }}"/>
+                    <img alt="Start shift meter photo for {{ $shift->display_id }}" class="w-full h-full object-cover" src="{{ $startImage }}"/>
                     <div class="absolute inset-0 bg-gradient-to-t from-on-surface/80 via-transparent to-transparent flex items-end p-space-sm justify-between">
                         <span class="px-2 py-0.5 rounded bg-surface-card/90 text-on-surface font-label-numeric text-body-sm backdrop-blur">{{ number_format($shift->start_km) }} KM</span>
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary text-on-secondary font-label-caps text-label-caps">
@@ -122,7 +122,7 @@
             </div>
             <div class="relative w-full h-44 rounded-lg overflow-hidden group shadow-inner">
                 @if($endImage)
-                    <img alt="End shift meter photo for shift {{ $shift->shift_number }}" class="w-full h-full object-cover" src="{{ $endImage }}"/>
+                    <img alt="End shift meter photo for {{ $shift->display_id }}" class="w-full h-full object-cover" src="{{ $endImage }}"/>
                     <div class="absolute inset-0 bg-gradient-to-t from-on-surface/80 via-transparent to-transparent flex items-end p-space-sm justify-between">
                         <span class="px-2 py-0.5 rounded bg-surface-card/90 text-on-surface font-label-numeric text-body-sm backdrop-blur font-bold">{{ number_format($shift->end_km) }} KM</span>
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary text-on-secondary font-label-caps text-label-caps">
@@ -212,7 +212,7 @@
     <div class="flex items-center justify-between">
         <span class="font-label-caps text-label-caps text-outline uppercase">Linked Route</span>
         <span class="font-body-sm text-body-sm text-primary font-semibold">
-            {{ $trip?->route_label ?? ($bus ? 'Bus #' . $bus->bus_number . ' depot round' : 'Unassigned route') }}
+            {{ $trip?->route_label ?? ($bus ? $bus->display_id . ' depot round' : 'Unassigned route') }}
         </span>
     </div>
     <div class="w-full h-36 bg-surface-container-low rounded-lg relative overflow-hidden shadow-inner flex items-end p-space-sm">

@@ -17,7 +17,7 @@
         ['label' => 'Trips', 'icon' => 'route', 'route' => 'trips'],
         ['label' => 'Shifts', 'icon' => 'schedule', 'route' => 'shifts'],
         ['label' => 'Fuel', 'icon' => 'local_gas_station', 'route' => 'fuel'],
-        ['label' => 'Maintenance', 'icon' => 'build', 'route' => null],
+        ['label' => 'Maintenance', 'icon' => 'build', 'route' => 'maintenance'],
         ['label' => 'Drivers', 'icon' => 'badge', 'route' => 'drivers'],
         ['label' => 'Reports', 'icon' => 'bar_chart', 'route' => null],
     ];
