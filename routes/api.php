@@ -44,6 +44,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('me', [AuthController::class, 'me']);
 
     // Driver self-service profile (email is not editable)
+    Route::get('profile', [ProfileController::class, 'show']);
     Route::put('profile', [ProfileController::class, 'update']);
     Route::patch('profile', [ProfileController::class, 'update']);
 

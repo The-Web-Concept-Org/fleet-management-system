@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\StorageUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * A driver-logged shift: the meter (odometer) and fuel readings taken from a
@@ -118,7 +118,7 @@ class ShiftLog extends Model
 
         return [
             'path' => $path,
-            'url' => Storage::disk('public')->url($path),
+            'url' => StorageUrl::for($path),
         ];
     }
 }

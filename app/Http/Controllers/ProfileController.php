@@ -9,6 +9,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+
 /**
  * Lets an authenticated driver manage their own profile.
  *
@@ -17,6 +18,21 @@ use Illuminate\Validation\ValidationException;
  */
 class ProfileController extends Controller
 {
+    /**
+     * Return the authenticated user's profile details.
+     *
+     * This is the payload the app renders on the profile screen. Send the
+     * fields back to PUT/PATCH /api/profile to save changes.
+     */
+    public function show(Request $request): JsonResponse
+    {
+        $user = $request->user()->load('driver');
+
+        return response()->json([
+            'user' => UserPresenter::format($user, includeBus: false),
+        ]);
+    }
+
     /**
      * Update the authenticated driver's profile.
      */
@@ -89,7 +105,7 @@ class ProfileController extends Controller
 
         return response()->json([
             'message' => 'Profile updated successfully.',
-            'user' => UserPresenter::format($user->fresh(['driver.bus'])),
+            'user' => UserPresenter::format($user->fresh(['driver']), includeBus: false),
         ]);
     }
 }

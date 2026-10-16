@@ -152,7 +152,7 @@
                                 name="email"
                                 required
                                 autocomplete="username"
-                                value="{{ old('email', 'admin@gmail.com') }}"
+                                value="{{ old('email') }}"
                                 placeholder="name@company.com"
                                 class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-medium placeholder-slate-400 transition-all focus:outline-none focus:bg-white focus:border-brand-600 focus:ring-4 focus:ring-brand-600/10"
                             >

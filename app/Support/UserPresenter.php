@@ -13,7 +13,7 @@ use App\Models\User;
  */
 class UserPresenter
 {
-    public static function format(User $user): array
+    public static function format(User $user, bool $includeBus = true): array
     {
         $data = [
             'id' => $user->id,
@@ -48,6 +48,10 @@ class UserPresenter
         ];
 
         $bus = $driver->bus;
+
+        if (!$includeBus) {
+            return $data;
+        }
 
         $data['bus'] = $bus ? [
             'id' => $bus->id,
