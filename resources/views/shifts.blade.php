@@ -55,7 +55,7 @@
 <select class="appearance-none bg-surface-container-low font-body-md text-body-md text-on-surface pl-9 pr-9 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container transition-colors cursor-pointer shadow-sm" name="bus_id" onchange="this.form.submit()">
 <option value="">All Buses ({{ $totalBuses }} total)</option>
 @foreach($buses as $bus)
-<option value="{{ $bus->id }}" @selected((string) $busId === (string) $bus->id)>{{ $bus->model ?? 'Bus' }} #{{ $bus->bus_number }}</option>
+<option value="{{ $bus->id }}" @selected((string) $busId === (string) $bus->id)>{{ $bus->display_id }}{{ $bus->plate ? ' · ' . $bus->plate : '' }}</option>
 @endforeach
 </select>
 <span class="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none">directions_bus</span>
@@ -66,7 +66,7 @@
 <select class="appearance-none bg-surface-container-low font-body-md text-body-md text-on-surface pl-9 pr-9 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container transition-colors cursor-pointer shadow-sm" name="driver_id" onchange="this.form.submit()">
 <option value="">All Drivers ({{ $drivers->count() }})</option>
 @foreach($drivers as $driver)
-<option value="{{ $driver->id }}" @selected((string) $driverId === (string) $driver->id)>{{ $driver->user->name ?? 'Driver' }}@if($driver->badge_id) (#{{ $driver->badge_id }})@endif</option>
+<option value="{{ $driver->id }}" @selected((string) $driverId === (string) $driver->id)>{{ $driver->user->name ?? 'Driver' }}@if($driver->badge_id) ({{ $driver->display_id }})@endif</option>
 @endforeach
 </select>
 <span class="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none">badge</span>
@@ -193,14 +193,14 @@
 <div class="flex items-center gap-2">
 <span class="w-2 h-2 rounded-full {{ $dotClass }}{{ $rowOpen ? ' animate-pulse' : '' }}"></span>
 <div class="flex flex-col">
-<span class="font-label-numeric text-body-lg font-bold {{ $refClass }}">#{{ $shift->shift_number }}</span>
+<span class="font-label-numeric text-body-lg font-bold {{ $refClass }}">{{ $shift->display_id }}</span>
 <span class="font-body-sm text-body-sm text-outline">{{ optional($started)->format('M d') }} &bull; {{ optional($started)->format('h:i A') }}</span>
 </div>
 </div>
 </td>
 <td class="py-4 px-space-md align-middle">
 <div class="flex flex-col">
-<span class="font-headline-sm text-headline-sm text-on-surface font-bold">{{ $rowBus ? 'BUS-' . $rowBus->bus_number : 'Unassigned' }}</span>
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold">{{ $rowBus ? $rowBus->display_id : 'Unassigned' }}</span>
 <span class="font-body-sm text-body-sm text-on-surface-variant">{{ $rowBus->model ?? '—' }}</span>
 </div>
 </td>
@@ -209,7 +209,7 @@
 {{-- <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $avatarClass }}">{{ $driverInitials ?: '—' }}</div> --}}
 <div class="flex flex-col">
 <span class="font-body-md text-body-md font-semibold text-on-surface">{{ $driverFullName ?? 'Unassigned driver' }}</span>
-<span class="font-body-sm text-body-sm text-outline">ID: #{{ $rowDriver->badge_id ?? '—' }}</span>
+<span class="font-body-sm text-body-sm text-outline">{{ $rowDriver->display_id ?? 'Driver #—' }}</span>
 </div>
 </div>
 </td>

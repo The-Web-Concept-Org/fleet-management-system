@@ -67,6 +67,14 @@ class Bus extends Model
     }
 
     /**
+     * Maintenance records logged against this vehicle.
+     */
+    public function maintenanceLogs(): HasMany
+    {
+        return $this->hasMany(MaintenanceLog::class);
+    }
+
+    /**
      * Display name of the assigned driver, falling back to the legacy operator field.
      */
     public function getDriverNameAttribute(): ?string
@@ -77,6 +85,26 @@ class Bus extends Model
     public function getIsAssignedAttribute(): bool
     {
         return $this->driver_id !== null;
+    }
+
+    /**
+     * Zero-padded bus number used in badges and identifiers, e.g. "02".
+     */
+    public function getDisplayNumberAttribute(): string
+    {
+        return str_pad((string) $this->bus_number, 2, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * Canonical bus identifier shown on every screen, e.g. "Bus #02".
+     */
+    public function getDisplayIdAttribute(): string
+    {
+        if ($this->bus_number === null || $this->bus_number === '') {
+            return 'Unassigned';
+        }
+
+        return 'Bus #' . $this->display_number;
     }
 
     /**

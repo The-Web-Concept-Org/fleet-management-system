@@ -245,6 +245,22 @@ it('stores station and receipt details sent by the app', function (): void {
         ->and($log->receipt_number)->toBe('RCPT-00123');
 });
 
+it('accepts an aliased receipt image field name', function (): void {
+    $bus = fuelBus();
+
+    Sanctum::actingAs(fuelAdmin());
+
+    $this->postJson('/api/fuel', [
+        'bus_id' => $bus->id,
+        'type' => 'diesel',
+        'liters' => 15,
+        'price' => 4500,
+        'receipt_image' => UploadedFile::fake()->image('receipt.jpg'),
+    ])->assertCreated();
+
+    expect(FuelLog::first()->image)->not->toBeNull();
+});
+
 it('stores a fuel record without optional station details', function (): void {
     $bus = fuelBus();
 

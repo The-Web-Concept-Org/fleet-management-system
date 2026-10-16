@@ -334,7 +334,7 @@
                         <div class="flex flex-col">
                           <span class="font-headline-sm text-headline-sm font-bold text-on-surface leading-tight">{{ $driver->user->name ?? 'Unnamed Driver' }}</span>
                           <span class="font-body-sm text-body-sm text-outline flex items-center gap-1">
-                            <span>{{ $driver->badge_id ?? 'N/A' }}</span>
+                            <span>{{ $driver->display_id }}</span>
                           </span>
                         </div>
                       </div>
@@ -432,7 +432,7 @@
                         </button>
                         <button class="delete-driver-btn p-2 rounded-lg text-outline hover:text-danger-critical hover:bg-error-container/20 transition-colors"
                                 title="Delete Driver"
-                                onclick="openDeleteModal({{ $driver->id }}, '{{ addslashes($driver->user->name ?? 'Driver') }}', '{{ $driver->badge_id }}')">
+                                onclick="openDeleteModal({{ $driver->id }}, '{{ addslashes($driver->user->name ?? 'Driver') }}', '{{ $driver->display_id }}')">
                           <span class="material-symbols-outlined text-lg">delete</span>
                         </button>
                       </div>

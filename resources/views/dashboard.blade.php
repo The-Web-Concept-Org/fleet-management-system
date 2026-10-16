@@ -139,13 +139,13 @@
 <div class="flex flex-col">
 <div class="flex items-center gap-space-xs flex-wrap">
 <span class="px-2 py-0.5 rounded-full bg-danger-critical text-on-primary font-label-caps text-label-caps uppercase">{{ $primaryAlert->status === 'out_of_service' ? 'Out of Service' : 'Service Overdue' }}</span>
-<span class="font-label-numeric text-label-numeric text-on-surface">Bus #{{ $primaryAlert->bus_number }}</span>
+<span class="font-label-numeric text-label-numeric text-on-surface">{{ $primaryAlert->display_id }}</span>
 <span class="text-outline text-xs">&bull;</span>
 <span class="font-body-sm text-body-sm text-outline">{{ $primaryAlert->plate }}</span>
 </div>
 @if($primaryAlert->status === 'out_of_service')
 <p class="font-body-md text-body-md text-on-surface font-semibold mt-1">Vehicle flagged out of service</p>
-<p class="font-body-sm text-body-sm text-on-surface-variant">Bus #{{ $primaryAlert->bus_number }} requires dispatcher review before it can return to the roster.</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">{{ $primaryAlert->display_id }} requires dispatcher review before it can return to the roster.</p>
 @else
 <p class="font-body-md text-body-md text-on-surface font-semibold mt-1">Service interval exceeded by {{ number_format(abs($primaryAlert->next_service_km)) }} km</p>
 <p class="font-body-sm text-body-sm text-on-surface-variant">Current odometer reading is {{ number_format($primaryAlert->odometer) }} km.</p>
@@ -180,7 +180,7 @@
 </div>
 <div class="flex flex-col">
 <span class="font-label-caps text-label-caps text-sync-pending uppercase font-bold">Preventive Maintenance</span>
-<span class="font-headline-sm text-headline-sm text-on-surface mt-0.5">Bus #{{ $nextServiceBus->bus_number }} Notice</span>
+<span class="font-headline-sm text-headline-sm text-on-surface mt-0.5">{{ $nextServiceBus->display_id }} Notice</span>
 <p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Scheduled service due in <span class="font-bold text-on-surface">{{ number_format($nextServiceBus->next_service_km) }} km</span>.</p>
 </div>
 </div>
@@ -252,7 +252,7 @@
 <td class="py-3.5 px-space-md">
 <div class="flex items-center gap-space-xs">
 <span class="w-2 h-2 rounded-full {{ $st['dot'] }}"></span>
-<span class="font-headline-sm text-headline-sm font-bold text-on-surface">Bus #{{ $bus->bus_number }}</span>
+<span class="font-headline-sm text-headline-sm font-bold text-on-surface">{{ $bus->display_id }}</span>
 </div>
 <span class="font-body-sm text-body-sm text-outline">{{ $bus->model ?? 'Unspecified chassis' }}</span>
 </td>
@@ -262,7 +262,7 @@
 <div class="w-7 h-7 rounded-full bg-surface-container-high text-on-surface font-semibold flex items-center justify-center text-xs">{{ $initials }}</div>
 <div class="flex flex-col">
 <span class="font-semibold leading-tight">{{ $driverName }}</span>
-<span class="font-body-sm text-body-sm text-outline">Badge: {{ $bus->driver->badge_id ?? 'N/A' }}</span>
+<span class="font-body-sm text-body-sm text-outline">{{ $bus->driver->display_id ?? 'Driver #—' }}</span>
 </div>
 </div>
 @else
@@ -371,7 +371,7 @@
 </div>
 <div class="flex justify-between text-body-sm">
 <span class="text-outline">Driver:</span>
-<span class="text-on-surface font-medium">Marcus Vance (DRV-8802)</span>
+<span class="text-on-surface font-medium">Marcus Vance (Driver #8802)</span>
 </div>
 <div class="flex justify-between text-body-sm">
 <span class="text-outline">Shift Start Meter:</span>

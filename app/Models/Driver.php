@@ -61,9 +61,26 @@ class Driver extends Model
      */
     public function getAssignedBusAttribute(): ?string
     {
-        $bus = $this->bus;
+        return $this->bus?->display_id;
+    }
 
-        return $bus?->bus_number ? 'Bus #' . $bus->bus_number : null;
+    /**
+     * Canonical driver identifier shown on every screen, e.g. "Driver #8802".
+     * Stored badges look like "DRV-8802"; only the sequence is displayed.
+     */
+    public function getDisplayIdAttribute(): string
+    {
+        $badge = trim((string) $this->badge_id);
+
+        if ($badge === '') {
+            return 'Driver #—';
+        }
+
+        if (preg_match('/^(?:[A-Za-z]+[-\s_]*)?(\d+)$/', $badge, $matches)) {
+            return 'Driver #' . $matches[1];
+        }
+
+        return 'Driver #' . $badge;
     }
 
     public function getIsAvailableAttribute(): bool
