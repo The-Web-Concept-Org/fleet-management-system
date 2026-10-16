@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bus;
+use App\Models\Driver;
 use App\Models\FuelLog;
 use App\Services\DocumentCompressionService;
 use Illuminate\Http\JsonResponse;
@@ -10,11 +11,95 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 
 class FuelController extends Controller
 {
     public function __construct(private readonly DocumentCompressionService $compressor)
     {
+    }
+
+    /**
+     * Fuel audit board: every fill-up logged from the app, with fleet totals
+     * and the receipt/pump photo captured at the pump.
+     *
+     * GET /fuel
+     */
+    public function index(Request $request): View
+    {
+        $busId = $request->input('bus_id');
+        $driverId = $request->input('driver_id');
+        $type = (string) $request->input('type', '');
+        $from = $request->input('from');
+        $to = $request->input('to');
+
+        $query = FuelLog::with(['bus', 'driver.user', 'trip']);
+
+        if ($busId !== null && $busId !== '') {
+            $query->where('bus_id', (int) $busId);
+        }
+
+        if ($driverId !== null && $driverId !== '') {
+            $query->where('driver_id', (int) $driverId);
+        }
+
+        if ($type !== '' && in_array($type, FuelLog::TYPES, true)) {
+            $query->where('fuel_type', $type);
+        }
+
+        if ($from !== null && $from !== '') {
+            $query->whereDate('filled_at', '>=', $from);
+        }
+
+        if ($to !== null && $to !== '') {
+            $query->whereDate('filled_at', '<=', $to);
+        }
+
+        $fuelLogs = $query->orderByDesc('filled_at')->orderByDesc('id')->get();
+
+        // Totals reflect the current filter so the header always matches the
+        // rows on screen. Values are read from the collection because the board
+        // already loads every matching row.
+        $totalLogs = $fuelLogs->count();
+        $totalLiters = (float) $fuelLogs->sum(fn (FuelLog $log) => (float) $log->liters);
+        $totalCost = (float) $fuelLogs->sum(fn (FuelLog $log) => (float) $log->total_cost);
+        $averageUnitPrice = $totalLiters > 0 ? $totalCost / $totalLiters : 0.0;
+        $pendingCount = $fuelLogs->where('status', 'pending')->count();
+        $flaggedCount = $fuelLogs->filter(fn (FuelLog $log) => $log->flagged_reason !== null)->count();
+        $withReceiptCount = $fuelLogs->filter(fn (FuelLog $log) => $log->image !== null)->count();
+
+        $buses = Bus::orderBy('bus_number')->get();
+        $drivers = Driver::with('user')->get()
+            ->sortBy(fn (Driver $driver) => $driver->user->name ?? '')
+            ->values();
+
+        // Only offer fuel types that actually exist, so a filter can never
+        // return an empty board.
+        $types = FuelLog::query()
+            ->whereNotNull('fuel_type')
+            ->distinct()
+            ->orderBy('fuel_type')
+            ->pluck('fuel_type')
+            ->all();
+
+        return view('fuel', compact(
+            'fuelLogs',
+            'totalLogs',
+            'totalLiters',
+            'totalCost',
+            'averageUnitPrice',
+            'pendingCount',
+            'flaggedCount',
+            'withReceiptCount',
+            'buses',
+            'drivers',
+            'types',
+            'type',
+            'busId',
+            'driverId',
+            'from',
+            'to'
+        ));
     }
 
     /**
@@ -40,6 +125,10 @@ class FuelController extends Controller
                 }
             }],
             'image' => ['required', 'image', 'max:10240'],
+
+            // Where the fuel was pumped (station detail printed on the receipt).
+            'station' => ['nullable', 'string', 'max:255'],
+            'receipt_number' => ['nullable', 'string', 'max:64'],
         ]);
 
         // The vehicle may be sent explicitly or derived from the logged-in
@@ -67,6 +156,8 @@ class FuelController extends Controller
             'total_cost' => $validated['price'],
             'unit_price' => round((float) $validated['price'] / (float) $validated['liters'], 2),
             'image' => $imagePath,
+            'station' => $validated['station'] ?? null,
+            'receipt_number' => $validated['receipt_number'] ?? null,
             'status' => 'pending',
             // Use the datetime sent by the app; fall back to now() only when absent.
             'filled_at' => $filledAt ?? now(),
@@ -121,6 +212,18 @@ class FuelController extends Controller
         ]);
         if ($addedAt !== null) {
             $aliases['added_at'] = $addedAt;
+        }
+
+        $stationAliases = [
+            'station' => ['station', 'station_name', 'stationName', 'fuel_station', 'petrol_station', 'gas_station'],
+            'receipt_number' => ['receipt_number', 'receiptNumber', 'receipt_no', 'receipt', 'invoice_number', 'invoice_no'],
+        ];
+
+        foreach ($stationAliases as $canonical => $names) {
+            $value = $this->findInput($request, $names);
+            if ($value !== null) {
+                $aliases[$canonical] = $value;
+            }
         }
 
         $request->merge($aliases);

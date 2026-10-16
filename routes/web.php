@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BusController;
+use App\Http\Controllers\FuelController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\TripController;
 use App\Http\Controllers\WebAuthController;
@@ -32,6 +33,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/shifts/{shift}', [ShiftController::class, 'show'])
         ->whereNumber('shift')
         ->name('shifts.show');
+
+    Route::get('/fuel', [FuelController::class, 'index'])->name('fuel');
 
     Route::get('/drivers', [\App\Http\Controllers\DriverController::class, 'index'])->name('drivers');
     Route::post('/drivers', [\App\Http\Controllers\DriverController::class, 'store'])->name('drivers.store');

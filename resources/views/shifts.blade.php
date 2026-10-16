@@ -206,7 +206,7 @@
 </td>
 <td class="py-4 px-space-md align-middle">
 <div class="flex items-center gap-space-xs">
-<div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $avatarClass }}">{{ $driverInitials ?: '—' }}</div>
+{{-- <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $avatarClass }}">{{ $driverInitials ?: '—' }}</div> --}}
 <div class="flex flex-col">
 <span class="font-body-md text-body-md font-semibold text-on-surface">{{ $driverFullName ?? 'Unassigned driver' }}</span>
 <span class="font-body-sm text-body-sm text-outline">ID: #{{ $rowDriver->badge_id ?? '—' }}</span>

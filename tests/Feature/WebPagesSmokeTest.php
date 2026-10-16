@@ -24,5 +24,6 @@ it('renders every sidebar page for an authenticated user', function (string $pat
     ['/buses', 'Buses'],
     ['/trips', 'Trips'],
     ['/shifts', 'Shifts'],
+    ['/fuel', 'Fuel'],
     ['/drivers', 'Drivers'],
 ]);

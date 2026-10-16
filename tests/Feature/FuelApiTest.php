@@ -221,6 +221,47 @@ it('accepts a datetime key with a stray underscore', function (): void {
     expect(FuelLog::first()->filled_at->format('Y-m-d H:i:s'))->toBe('2026-10-16 12:10:00');
 });
 
+it('stores station and receipt details sent by the app', function (): void {
+    $bus = fuelBus();
+
+    Sanctum::actingAs(fuelAdmin());
+
+    $this->postJson('/api/fuel', [
+        'bus_id' => $bus->id,
+        'type' => 'diesel',
+        'liters' => 20,
+        'price' => 6000,
+        'added_at' => '2026-10-16 12:10:00',
+        'station_name' => 'PSO Motorway M2',
+        'receipt_no' => 'RCPT-00123',
+        'image' => UploadedFile::fake()->image('receipt.jpg'),
+    ])
+        ->assertCreated()
+        ->assertJsonPath('fuel.station', 'PSO Motorway M2')
+        ->assertJsonPath('fuel.receipt_number', 'RCPT-00123');
+
+    $log = FuelLog::first();
+    expect($log->station)->toBe('PSO Motorway M2')
+        ->and($log->receipt_number)->toBe('RCPT-00123');
+});
+
+it('stores a fuel record without optional station details', function (): void {
+    $bus = fuelBus();
+
+    Sanctum::actingAs(fuelAdmin());
+
+    $this->postJson('/api/fuel', [
+        'bus_id' => $bus->id,
+        'type' => 'diesel',
+        'liters' => 20,
+        'price' => 6000,
+        'image' => UploadedFile::fake()->image('pump.jpg'),
+    ])
+        ->assertCreated()
+        ->assertJsonPath('fuel.station', null)
+        ->assertJsonPath('fuel.receipt_number', null);
+});
+
 it('validates the required fuel fields', function (): void {
     Sanctum::actingAs(fuelAdmin());
 
