@@ -165,6 +165,62 @@ it('normalises an aliased fuel type and defaults added_at to now', function (): 
         ->and($log->created_at->toDateString())->toBe(now()->toDateString());
 });
 
+it('stores the added_at datetime exactly as sent by the app', function (): void {
+    $bus = fuelBus();
+
+    Sanctum::actingAs(fuelAdmin());
+
+    $this->postJson('/api/fuel', [
+        'bus_id' => $bus->id,
+        'liters' => '20',
+        'fuel_type' => 'petrol',
+        'total_cost' => '10000',
+        'added_at' => '2026-10-16 12:00:00',
+        'image' => UploadedFile::fake()->image('pump.png'),
+    ])
+        ->assertCreated()
+        ->assertJsonPath('fuel.added_at', '2026-10-16T12:00:00+00:00');
+
+    expect(FuelLog::first()->filled_at->format('Y-m-d H:i:s'))->toBe('2026-10-16 12:00:00');
+});
+
+it('accepts alternate datetime field names', function (): void {
+    $bus = fuelBus();
+
+    Sanctum::actingAs(fuelAdmin());
+
+    $this->postJson('/api/fuel', [
+        'bus_id' => $bus->id,
+        'type' => 'diesel',
+        'liters' => 10,
+        'price' => 3000,
+        'date_time' => '2026-10-16 12:00:00',
+        'image' => UploadedFile::fake()->image('pump.png'),
+    ])->assertCreated();
+
+    expect(FuelLog::first()->filled_at->format('Y-m-d H:i:s'))->toBe('2026-10-16 12:00:00');
+});
+
+it('accepts a datetime key with a stray underscore', function (): void {
+    $bus = fuelBus();
+
+    Sanctum::actingAs(fuelAdmin());
+
+    $this->postJson('/api/fuel', [
+        'bus_id' => $bus->id,
+        'type' => 'diesel',
+        'liters' => 10,
+        'price' => 3000,
+        'added_at_' => '2026-10-16 12:10:00',
+        'image' => UploadedFile::fake()->image('pump.png'),
+    ])
+        ->assertCreated()
+        ->assertJsonPath('fuel.added_at', '2026-10-16T12:10:00+00:00')
+        ->assertJsonMissingPath('warning');
+
+    expect(FuelLog::first()->filled_at->format('Y-m-d H:i:s'))->toBe('2026-10-16 12:10:00');
+});
+
 it('validates the required fuel fields', function (): void {
     Sanctum::actingAs(fuelAdmin());
 

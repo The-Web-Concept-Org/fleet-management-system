@@ -34,7 +34,11 @@ class FuelController extends Controller
             'type' => ['required', 'string', 'max:50', Rule::in(FuelLog::TYPES)],
             'liters' => ['required', 'numeric', 'gt:0', 'max:100000'],
             'price' => ['required', 'numeric', 'min:0', 'max:100000000'],
-            'added_at' => ['nullable', 'date'],
+            'added_at' => ['nullable', function (string $attribute, mixed $value, \Closure $fail): void {
+                if ($value !== null && $value !== '' && $this->parseDateTime($value) === null) {
+                    $fail('The added_at value is not a valid date/time.');
+                }
+            }],
             'image' => ['required', 'image', 'max:10240'],
         ]);
 
@@ -51,6 +55,8 @@ class FuelController extends Controller
         $bus = Bus::find($busId);
         $imagePath = $this->storeImage($request->file('image'), (int) $busId);
 
+        $filledAt = $this->parseDateTime($validated['added_at'] ?? null);
+
         $log = FuelLog::create([
             'reference' => $this->generateReference(),
             'bus_id' => $busId,
@@ -62,15 +68,26 @@ class FuelController extends Controller
             'unit_price' => round((float) $validated['price'] / (float) $validated['liters'], 2),
             'image' => $imagePath,
             'status' => 'pending',
-            // Falls back to "now" only when the app does not send its own time.
-            'filled_at' => $validated['added_at'] ?? now(),
+            // Use the datetime sent by the app; fall back to now() only when absent.
+            'filled_at' => $filledAt ?? now(),
         ]);
 
-        return response()->json([
+        $response = [
             'success' => true,
             'message' => 'Fuel record added successfully.',
             'fuel' => $log->load(['bus', 'driver.user', 'trip'])->toApiArray(),
-        ], 201);
+        ];
+
+        // Diagnostic: when the app did not send a usable datetime, surface the
+        // field names that actually arrived so a naming mismatch is obvious.
+        if ($filledAt === null) {
+            $received = array_keys($request->except(['image']));
+            $response['warning'] = 'No valid added_at date was received, so the current time was stored. '
+                . 'Received fields: ' . (empty($received) ? '(none)' : implode(', ', $received))
+                . '. Accepted names include added_at, added_datetime, datetime, date_time, date, filled_at.';
+        }
+
+        return response()->json($response, 201);
     }
 
     /**
@@ -82,23 +99,27 @@ class FuelController extends Controller
     {
         $aliases = [];
 
-        $type = $request->input('type', $request->input('fuel_type'));
-        if ($type !== null && $type !== '') {
+        $type = $this->findInput($request, ['type', 'fuel_type', 'fuelType']);
+        if ($type !== null) {
             $aliases['type'] = $this->normalizeType((string) $type);
         }
 
-        $liters = $request->input('liters', $request->input('litres', $request->input('quantity')));
-        if ($liters !== null && $liters !== '') {
+        $liters = $this->findInput($request, ['liters', 'litres', 'quantity', 'volume']);
+        if ($liters !== null) {
             $aliases['liters'] = $liters;
         }
 
-        $price = $request->input('price', $request->input('amount', $request->input('total_cost', $request->input('total_price'))));
-        if ($price !== null && $price !== '') {
+        $price = $this->findInput($request, ['price', 'amount', 'total_cost', 'totalCost', 'total_price', 'totalPrice', 'cost']);
+        if ($price !== null) {
             $aliases['price'] = $price;
         }
 
-        $addedAt = $request->input('added_at', $request->input('added_datetime', $request->input('datetime')));
-        if ($addedAt !== null && $addedAt !== '') {
+        $addedAt = $this->findInput($request, [
+            'added_at', 'addedAt', 'added_datetime', 'addedDatetime',
+            'datetime', 'date_time', 'date', 'filled_at', 'filledAt',
+            'fuel_date', 'fill_date', 'added_on', 'filled_on', 'timestamp',
+        ]);
+        if ($addedAt !== null) {
             $aliases['added_at'] = $addedAt;
         }
 
@@ -111,6 +132,66 @@ class FuelController extends Controller
 
         if ($file) {
             $request->files->set('image', $file);
+        }
+    }
+
+    /**
+     * Find an input value by any of the accepted key names. Matching is lenient:
+     * extra underscores, spaces or casing in the key (e.g. "added_at_") still
+     * match, which avoids silent fall-backs caused by a stray character.
+     */
+    private function findInput(Request $request, array $keys): mixed
+    {
+        foreach ($keys as $key) {
+            $value = $request->input($key);
+            if ($value !== null && $value !== '' && !is_array($value)) {
+                return $value;
+            }
+        }
+
+        $normalize = static fn ($key): string => preg_replace('/[^a-z0-9]/', '', strtolower((string) $key));
+        $targets = array_map($normalize, $keys);
+
+        foreach ($request->keys() as $key) {
+            if (!in_array($normalize($key), $targets, true)) {
+                continue;
+            }
+
+            $value = $request->input($key);
+            if ($value !== null && $value !== '' && !is_array($value)) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Parse the datetime sent by the app. Accepts plain dates, ISO strings with
+     * or without timezone, and unix timestamps in seconds or milliseconds. The
+     * value is kept as-is (no timezone shifting) so the app gets back exactly
+     * the moment it recorded.
+     */
+    private function parseDateTime(mixed $value): ?\Illuminate\Support\Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            if (is_numeric($value)) {
+                $number = (float) $value;
+                // Milliseconds since epoch are far larger than seconds.
+                if ($number > 9999999999) {
+                    $number /= 1000;
+                }
+
+                return \Illuminate\Support\Carbon::createFromTimestamp((int) $number);
+            }
+
+            return \Illuminate\Support\Carbon::parse((string) $value);
+        } catch (\Throwable) {
+            return null;
         }
     }
 
