@@ -26,9 +26,12 @@
         $statusClasses = 'bg-secondary-fixed/40 text-secondary';
     }
 
-    $disk = \Illuminate\Support\Facades\Storage::disk('public');
-    $startImage = $shift->start_meter_image ? $disk->url($shift->start_meter_image) : null;
-    $endImage = $shift->end_meter_image ? $disk->url($shift->end_meter_image) : null;
+    // Meter photos resolve through App\Support\StorageUrl, which follows the
+    // current request scheme + host instead of the static APP_URL env value, so
+    // the same markup works on local, staging and any production domain without
+    // reconfiguring APP_URL.
+    $startImage = \App\Support\StorageUrl::for($shift->start_meter_image);
+    $endImage = \App\Support\StorageUrl::for($shift->end_meter_image);
 
     $startTime = optional($shift->started_at)->format('h:i A');
     $endTime = optional($shift->ended_at)->format('h:i A');

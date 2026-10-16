@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
+use App\Support\StorageUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * A fuel fill-up received from the driver / fleet app: a receipt or pump photo,
@@ -157,7 +157,7 @@ class FuelLog extends Model
 
         return [
             'path' => $path,
-            'url' => Storage::disk('public')->url($path),
+            'url' => StorageUrl::for($path),
         ];
     }
 }

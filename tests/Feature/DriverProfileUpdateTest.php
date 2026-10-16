@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Bus;
 use App\Models\Driver;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,6 +25,30 @@ function makeProfileDriver(): Driver
         'duty_status' => 'available',
     ]);
 }
+
+it('returns the current user profile details', function (): void {
+    $driver = makeProfileDriver();
+
+    Bus::create([
+        'bus_number' => 'BUS-777',
+        'plate' => 'PRO-777',
+        'driver_id' => $driver->id,
+    ]);
+
+    Sanctum::actingAs($driver->user);
+
+    $this->getJson('/api/profile')
+        ->assertOk()
+        ->assertJsonPath('user.email', $driver->user->email)
+        ->assertJsonPath('user.driver.badge_id', $driver->badge_id)
+        ->assertJsonMissingPath('user.bus')
+        ->assertJsonStructure([
+            'user' => [
+                'id', 'name', 'email', 'role', 'status', 'last_login_at',
+                'driver' => ['id', 'user_id', 'badge_id', 'phone', 'duty_status', 'license_number', 'license_type', 'license_expiry', 'experience_years', 'notes'],
+            ],
+        ]);
+});
 
 it('updates the authenticated driver profile', function (): void {
     $driver = makeProfileDriver();
