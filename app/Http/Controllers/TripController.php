@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Bus;
+use App\Models\ShiftLog;
 use App\Models\Trip;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -235,5 +236,181 @@ class TripController extends Controller
         } while (Trip::where('trip_number', $candidate)->exists());
 
         return $candidate;
+    }
+
+    /**
+     * API list of trips for the authenticated driver's assigned bus.
+     *
+     * GET /api/trips
+     */
+    public function apiIndex(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $driver = $user->driver;
+        $bus = $driver?->bus;
+
+        $query = Trip::with(['bus.driver.user', 'shiftLogs']);
+
+        if ($bus) {
+            $query->where('bus_id', $bus->id);
+        }
+
+        if ($request->filled('date')) {
+            $query->whereDate('trip_date', $request->input('date'));
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        $trips = $query->orderByDesc('trip_date')
+            ->orderBy('departure_time')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $trips->map(fn (Trip $t) => $this->formatTripForApi($t))->values(),
+        ]);
+    }
+
+    /**
+     * Get the active in_progress trip for the authenticated driver's bus.
+     *
+     * GET /api/trips/current
+     */
+    public function currentTrip(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $driver = $user->driver;
+        $bus = $driver?->bus;
+
+        if (!$bus) {
+            return response()->json([
+                'success' => true,
+                'active' => false,
+                'trip' => null,
+            ]);
+        }
+
+        $active = Trip::where('bus_id', $bus->id)
+            ->where('status', 'in_progress')
+            ->latest('id')
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'active' => $active !== null,
+            'trip' => $active ? $this->formatTripForApi($active) : null,
+        ]);
+    }
+
+    /**
+     * Start a scheduled trip: marks it in_progress and links to the active shift.
+     *
+     * POST /api/trips/{trip}/start
+     */
+    public function startTrip(Request $request, Trip $trip): JsonResponse
+    {
+        if ($trip->status === 'in_progress') {
+            return response()->json([
+                'success' => true,
+                'message' => "{$trip->display_id} is already in progress.",
+                'trip' => $this->formatTripForApi($trip),
+            ]);
+        }
+
+        if ($trip->status === 'completed') {
+            return response()->json([
+                'success' => false,
+                'message' => "{$trip->display_id} has already been completed.",
+            ], 422);
+        }
+
+        $user = $request->user();
+        $bus = $user->driver?->bus ?? $trip->bus;
+
+        // Check if another trip on this bus is currently in_progress
+        if ($bus) {
+            $otherInProgress = Trip::where('bus_id', $bus->id)
+                ->where('status', 'in_progress')
+                ->where('id', '!=', $trip->id)
+                ->first();
+            if ($otherInProgress) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Another trip ({$otherInProgress->display_id}) is currently in progress. Complete it first.",
+                ], 422);
+            }
+        }
+
+        $trip->update([
+            'status' => 'in_progress',
+            'departure_time' => $trip->departure_time ?? now()->format('H:i'),
+            'bus_id' => $trip->bus_id ?? $bus?->id,
+        ]);
+
+        // Link to active shift if available
+        if ($bus) {
+            $activeShift = ShiftLog::where('bus_id', $bus->id)
+                ->where('status', ShiftLog::STATUS_IN_PROGRESS)
+                ->latest('id')
+                ->first();
+            if ($activeShift && !$activeShift->trip_id) {
+                $activeShift->update(['trip_id' => $trip->id]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$trip->display_id} started successfully. Drive safely!",
+            'trip' => $this->formatTripForApi($trip->fresh('bus')),
+        ]);
+    }
+
+    /**
+     * Complete an in-progress trip and record arrival time & final distance.
+     *
+     * POST /api/trips/{trip}/complete
+     */
+    public function completeTrip(Request $request, Trip $trip): JsonResponse
+    {
+        $validated = $request->validate([
+            'distance_km' => ['nullable', 'numeric', 'min:0'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $trip->update([
+            'status' => 'completed',
+            'arrival_time' => $trip->arrival_time ?? now()->format('H:i'),
+            'distance_km' => $validated['distance_km'] ?? $trip->distance_km,
+            'notes' => !empty($validated['notes']) ? trim($trip->notes . ' ' . $validated['notes']) : $trip->notes,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$trip->display_id} successfully marked as completed.",
+            'trip' => $this->formatTripForApi($trip->fresh('bus')),
+        ]);
+    }
+
+    private function formatTripForApi(Trip $trip): array
+    {
+        return [
+            'id' => $trip->id,
+            'trip_number' => $trip->trip_number,
+            'display_id' => $trip->display_id,
+            'origin' => $trip->origin,
+            'destination' => $trip->destination,
+            'route_label' => $trip->route_label,
+            'trip_date' => $trip->trip_date?->format('Y-m-d'),
+            'departure_time' => $trip->departure_time ? substr($trip->departure_time, 0, 5) : null,
+            'arrival_time' => $trip->arrival_time ? substr($trip->arrival_time, 0, 5) : null,
+            'distance_km' => (float) $trip->distance_km,
+            'status' => $trip->status,
+            'notes' => $trip->notes,
+            'bus_id' => $trip->bus_id,
+            'bus_number' => $trip->bus?->display_id,
+            'plate' => $trip->bus?->plate,
+        ];
     }
 }

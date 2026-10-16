@@ -17,8 +17,15 @@ class ShiftLog extends Model
 {
     public const STATUS_IN_PROGRESS = 'in_progress';
     public const STATUS_COMPLETED = 'completed';
+    public const STATUS_VERIFIED = 'verified';
+    public const STATUS_FLAGGED = 'flagged';
 
-    public const STATUSES = [self::STATUS_IN_PROGRESS, self::STATUS_COMPLETED];
+    public const STATUSES = [
+        self::STATUS_IN_PROGRESS,
+        self::STATUS_COMPLETED,
+        self::STATUS_VERIFIED,
+        self::STATUS_FLAGGED,
+    ];
 
     protected $fillable = [
         'shift_number',
@@ -65,6 +72,16 @@ class ShiftLog extends Model
         return $this->status === self::STATUS_IN_PROGRESS;
     }
 
+    public function getIsCompletedAttribute(): bool
+    {
+        return in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_VERIFIED], true);
+    }
+
+    public function getIsVerifiedAttribute(): bool
+    {
+        return $this->status === self::STATUS_VERIFIED;
+    }
+
     /**
      * Canonical shift identifier shown on every screen, e.g. "Shift #0001".
      * Stored references look like "SHF-0001"; only the sequence is displayed.
@@ -80,6 +97,16 @@ class ShiftLog extends Model
         $digits = preg_replace('/\D+/', '', $number);
 
         return 'Shift #' . ($digits === '' ? $number : str_pad($digits, 3, '0', STR_PAD_LEFT));
+    }
+
+    public function getStartMeterImageUrlAttribute(): ?string
+    {
+        return StorageUrl::for($this->start_meter_image);
+    }
+
+    public function getEndMeterImageUrlAttribute(): ?string
+    {
+        return StorageUrl::for($this->end_meter_image);
     }
 
     /**

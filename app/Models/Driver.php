@@ -19,6 +19,8 @@ class Driver extends Model
         'license_type',
         'license_expiry',
         'duty_status',
+        'shift',
+        'avatar',
         'experience_years',
         'notes',
     ];
@@ -49,6 +51,20 @@ class Driver extends Model
     public function getEmailAttribute(): ?string
     {
         return $this->user?->email;
+    }
+
+    public function getAvatarUrlAttribute(): ?string
+    {
+        $path = $this->avatar ?: $this->user?->avatar;
+        if (!$path) {
+            return null;
+        }
+
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+
+        return \App\Support\StorageUrl::for($path);
     }
 
     public function getStatusAttribute(): string

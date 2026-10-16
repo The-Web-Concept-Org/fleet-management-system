@@ -42,6 +42,16 @@ class BusController extends Controller
             $query->where('model', $request->input('model'));
         }
 
+        if ($request->filled('route') && $request->input('route') !== 'all') {
+            if ($request->input('route') === 'unassigned') {
+                $query->where(function ($q) {
+                    $q->whereNull('route')->orWhere('route', '');
+                });
+            } else {
+                $query->where('route', $request->input('route'));
+            }
+        }
+
         $buses = $query->orderByDesc('created_at')->orderByDesc('id')->get();
 
         $totalBuses = Bus::count();
@@ -49,6 +59,9 @@ class BusController extends Controller
         $depotBuses = Bus::whereIn('status', ['depot', 'maintenance'])->count();
         $outOfServiceBuses = Bus::where('status', 'out_of_service')->count();
         $avgEfficiency = round((float) Bus::whereNotNull('km_per_liter')->avg('km_per_liter'), 1);
+
+        // Distinct existing routes for filter & suggestions
+        $routes = Bus::query()->whereNotNull('route')->where('route', '!=', '')->distinct()->orderBy('route')->pluck('route')->all();
 
         // Every driver plus their current bus, so the UI can show only the
         // available ones (drivers with no bus) while still displaying the
@@ -64,7 +77,8 @@ class BusController extends Controller
             'depotBuses',
             'outOfServiceBuses',
             'avgEfficiency',
-            'drivers'
+            'drivers',
+            'routes'
         ));
     }
 
@@ -84,6 +98,7 @@ class BusController extends Controller
             'km_per_liter' => ['nullable', 'numeric', 'min:0', 'max:99.99'],
             'next_service_km' => ['nullable', 'integer'],
             'route' => ['nullable', 'string', 'max:150'],
+            'operator' => ['nullable', 'string', 'max:100'],
         ]);
 
         $busNumber = $this->normalizeBusNumber($validated['bus_number']);
@@ -96,7 +111,7 @@ class BusController extends Controller
             'bus_number' => $busNumber,
             'plate' => strtoupper(trim($validated['plate'])),
             'model' => $validated['model'] ?? null,
-            'operator' => null,
+            'operator' => $validated['operator'] ?? null,
             'driver_id' => $validated['driver_id'] ?? null,
             'status' => $validated['status'],
             'odometer' => $validated['odometer'] ?? 0,
@@ -136,6 +151,7 @@ class BusController extends Controller
             'km_per_liter' => ['nullable', 'numeric', 'min:0', 'max:99.99'],
             'next_service_km' => ['nullable', 'integer'],
             'route' => ['nullable', 'string', 'max:150'],
+            'operator' => ['nullable', 'string', 'max:100'],
         ]);
 
         $busNumber = $this->normalizeBusNumber($validated['bus_number']);
@@ -150,13 +166,13 @@ class BusController extends Controller
             'bus_number' => $busNumber,
             'plate' => strtoupper(trim($validated['plate'])),
             'model' => $validated['model'] ?? null,
-            'operator' => null,
+            'operator' => $validated['operator'] ?? $bus->operator,
             'driver_id' => $validated['driver_id'] ?? null,
             'status' => $validated['status'],
-            'odometer' => $validated['odometer'] ?? 0,
-            'fuel_month_liters' => $validated['fuel_month_liters'] ?? 0,
-            'km_per_liter' => $validated['km_per_liter'] ?? null,
-            'next_service_km' => $validated['next_service_km'] ?? 10000,
+            'odometer' => array_key_exists('odometer', $validated) && $validated['odometer'] !== null ? $validated['odometer'] : $bus->odometer,
+            'fuel_month_liters' => $validated['fuel_month_liters'] ?? $bus->fuel_month_liters,
+            'km_per_liter' => $validated['km_per_liter'] ?? $bus->km_per_liter,
+            'next_service_km' => array_key_exists('next_service_km', $validated) && $validated['next_service_km'] !== null ? $validated['next_service_km'] : $bus->next_service_km,
             'route' => $validated['route'] ?? null,
         ]);
 
@@ -216,6 +232,32 @@ class BusController extends Controller
         }
 
         return back()->withErrors(['bus_number' => $message])->withInput();
+    }
+
+    /**
+     * Fast update for assigning or modifying a bus service route.
+     *
+     * POST /buses/{bus}/route
+     */
+    public function updateRoute(Request $request, Bus $bus): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'route' => ['nullable', 'string', 'max:150'],
+        ]);
+
+        $bus->update([
+            'route' => !empty($validated['route']) ? trim($validated['route']) : null,
+        ]);
+
+        if ($request->expectsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => "Service route updated for {$bus->display_id}.",
+                'route' => $bus->route,
+            ]);
+        }
+
+        return redirect()->route('buses')->with('success', "Service route updated for {$bus->display_id}.");
     }
 
     /**

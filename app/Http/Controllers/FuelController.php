@@ -103,6 +103,42 @@ class FuelController extends Controller
     }
 
     /**
+     * API list of fuel records for the driver app or fleet dashboard.
+     *
+     * GET /api/fuel
+     */
+    public function apiIndex(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $busId = $request->input('bus_id') ?? $user?->driver?->bus?->id;
+        $driverId = $request->input('driver_id') ?? $user?->driver?->id;
+
+        $query = FuelLog::with(['bus', 'driver.user', 'trip']);
+
+        if ($busId && $user?->role === 'driver') {
+            $query->where('bus_id', $busId);
+        } elseif ($busId) {
+            $query->where('bus_id', (int) $busId);
+        }
+
+        if ($driverId && $user?->role === 'driver') {
+            $query->orWhere('driver_id', $driverId);
+        }
+
+        $logs = $query->orderByDesc('filled_at')->orderByDesc('id')->paginate((int) $request->input('limit', 20));
+
+        return response()->json([
+            'success' => true,
+            'data' => collect($logs->items())->map(fn (FuelLog $f) => $f->toApiArray())->values(),
+            'pagination' => [
+                'total' => $logs->total(),
+                'page' => $logs->currentPage(),
+                'last_page' => $logs->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
      * Store a fuel record sent from the app.
      *
      * POST /api/fuel
@@ -159,9 +195,23 @@ class FuelController extends Controller
             'station' => $validated['station'] ?? null,
             'receipt_number' => $validated['receipt_number'] ?? null,
             'status' => 'pending',
-            // Use the datetime sent by the app; fall back to now() only when absent.
             'filled_at' => $filledAt ?? now(),
         ]);
+
+        // Notify admins of new fuel record
+        $adminUserIds = \App\Models\User::whereIn('role', ['admin', 'super_admin'])->pluck('id')->all();
+        if (!empty($adminUserIds)) {
+            $driverName = $log->driver?->user?->name ?? 'Driver';
+            $busNum = $bus?->bus_number ?? (string) $busId;
+            \App\Support\Notifier::send(
+                $adminUserIds,
+                'fuel_logged',
+                'Fuel Dispensed — Review Required',
+                "{$driverName} recorded {$log->liters}L {$log->fuel_type} (\${$log->total_cost}) for Bus #{$busNum}.",
+                ['fuel_id' => $log->id, 'bus_id' => $busId],
+                route('fuel')
+            );
+        }
 
         $response = [
             'success' => true,
@@ -348,5 +398,33 @@ class FuelController extends Controller
         } while (FuelLog::where('reference', $candidate)->exists());
 
         return $candidate;
+    }
+
+    /**
+     * Update the status of a fuel log (e.g. pending, approved, flagged).
+     *
+     * POST /fuel/{fuelLog}/status
+     */
+    public function updateStatus(Request $request, FuelLog $fuelLog)
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'string', Rule::in(['approved', 'pending', 'flagged'])],
+            'flagged_reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $fuelLog->update([
+            'status' => $validated['status'],
+            'flagged_reason' => $validated['status'] === 'flagged' ? ($validated['flagged_reason'] ?? $fuelLog->flagged_reason) : null,
+        ]);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Fuel record status updated to ' . ucfirst($validated['status']),
+                'fuel' => $fuelLog->load(['bus', 'driver.user', 'trip'])->toApiArray(),
+            ]);
+        }
+
+        return back()->with('success', 'Fuel record status updated to ' . ucfirst($validated['status']));
     }
 }

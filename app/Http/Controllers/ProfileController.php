@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DocumentCompressionService;
 use App\Support\UserPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,6 +19,10 @@ use Illuminate\Validation\ValidationException;
  */
 class ProfileController extends Controller
 {
+    public function __construct(private readonly DocumentCompressionService $compressor)
+    {
+    }
+
     /**
      * Return the authenticated user's profile details.
      *
@@ -56,8 +61,12 @@ class ProfileController extends Controller
             'license_type' => ['sometimes', 'nullable', 'string', 'max:50'],
             'license_expiry' => ['sometimes', 'nullable', 'date'],
             'duty_status' => ['sometimes', 'required', 'string', 'in:available,on_route,off_duty,on_leave'],
+            'shift' => ['sometimes', 'nullable', 'string', 'max:100'],
             'experience_years' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:50'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'avatar' => ['sometimes', 'nullable'],
+            'avatar_image' => ['sometimes', 'nullable', 'image', 'max:10240'],
+            'image' => ['sometimes', 'nullable', 'image', 'max:10240'],
             'current_password' => ['required_with:password', 'string'],
             'password' => ['sometimes', 'nullable', 'string', 'min:6', 'confirmed'],
         ]);
@@ -68,7 +77,17 @@ class ProfileController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($user, $driver, $data): void {
+        $avatarPath = null;
+        $file = $request->file('avatar_image') ?? $request->file('avatar') ?? $request->file('image');
+        if ($file && $file->isValid()) {
+            $compressed = $this->compressor->storeAndCompress($file, "avatars/driver-{$driver->id}", 'public');
+            $avatarPath = $compressed['path'];
+        } elseif (is_string($request->input('avatar')) && !empty($request->input('avatar'))) {
+            // In case a path or relative URL is sent
+            $avatarPath = $request->input('avatar');
+        }
+
+        DB::transaction(function () use ($user, $driver, $data, $avatarPath): void {
             $userUpdates = [];
 
             if (array_key_exists('name', $data)) {
@@ -77,6 +96,10 @@ class ProfileController extends Controller
 
             if (!empty($data['password'])) {
                 $userUpdates['password'] = $data['password'];
+            }
+
+            if ($avatarPath !== null) {
+                $userUpdates['avatar'] = $avatarPath;
             }
 
             if ($userUpdates) {
@@ -93,6 +116,10 @@ class ProfileController extends Controller
                 'experience_years',
                 'notes',
             ]);
+
+            if ($avatarPath !== null) {
+                $driverUpdates['avatar'] = $avatarPath;
+            }
 
             if (array_key_exists('badge_id', $driverUpdates) && $driverUpdates['badge_id'] !== null) {
                 $driverUpdates['badge_id'] = strtoupper(trim($driverUpdates['badge_id']));

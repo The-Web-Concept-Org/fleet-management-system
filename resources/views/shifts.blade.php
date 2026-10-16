@@ -1,365 +1,1141 @@
 <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <meta name="csrf-token" content="{{ csrf_token() }}"/>
+    <title>Shift Management &amp; Meter Audits &bull; {{ config('app.name', 'Lancotri') }}</title>
+    @include('partials.brand-styles')
+    <link rel="icon" type="image/svg+xml" href="{{ asset('images/lancotri-mark.svg') }}">
+</head>
+<body class="bg-background text-foreground antialiased min-h-screen">
+    @include('partials.sidebar')
 
-<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><meta name="csrf-token" content="{{ csrf_token() }}"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Sora:wght@400;500;600;700&amp;family=Poppins:wght@600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><title>Shift Management &amp; Meter Audits &bull; Lancotri</title><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline-variant": "#D1D5DB", "on-surface": "#111827", "surface-variant": "#E1E5EC", "inverse-on-surface": "#F1F5F9", "on-primary": "#ffffff", "surface-container-high": "#E1E5EC", "on-secondary": "#ffffff", "secondary": "#0A81B4", "primary-fixed-dim": "#E9A0A2", "on-primary-container": "#ffffff", "background": "#F7F8FA", "error": "#ba1a1a", "border-strong": "#CBD5E1", "tertiary-fixed-dim": "#8FCBE5", "on-tertiary-container": "#E7F4FB", "tertiary-container": "#0A81B4", "tertiary-fixed": "#CFEAF7", "sync-active": "#10B981", "tertiary": "#0A6E99", "surface-container-low": "#F1F3F6", "surface": "#F7F8FA", "on-tertiary-fixed": "#052E42", "surface-tint": "#BD1C23", "on-surface-variant": "#4B5563", "on-secondary-fixed": "#052E42", "on-secondary-container": "#0A5473", "on-primary-fixed-variant": "#8E1418", "surface-card": "#FFFFFF", "on-secondary-fixed-variant": "#0A5C80", "inverse-surface": "#283044", "primary-container": "#BD1C23", "on-primary-fixed": "#3E0A0C", "surface-container-lowest": "#ffffff", "secondary-fixed": "#CFEAF7", "secondary-fixed-dim": "#8FCBE5", "surface-bright": "#F7F8FA", "on-error": "#ffffff", "primary-fixed": "#F7D2D3", "on-tertiary-fixed-variant": "#0A5C80", "surface-dim": "#D2D9E3", "primary": "#A11217", "inverse-primary": "#F2A7A9", "on-error-container": "#93000a", "surface-container": "#E9ECF1", "danger-critical": "#EF4444", "surface-container-highest": "#D8DEE7", "on-tertiary": "#ffffff", "error-container": "#ffdad6", "secondary-container": "#CFEAF7", "sync-pending": "#F59E0B", "on-background": "#111827", "sync-offline": "#64748B", "canvas-base": "#F8FAFC", "outline": "#6B7280" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "space-xl": "2.25rem", "space-lg": "1.5rem", "space-md": "1rem", "space-sm": "0.5rem", "gutter-tablet": "1.5rem", "gutter": "1rem", "space-xs": "0.25rem", "margin": "1rem", "margin-tablet": "2rem" }, "fontFamily": { "label-action": [ "Plus Jakarta Sans" ], "headline-sm": [ "Sora" ], "headline-md": [ "Sora" ], "headline-lg": [ "Sora" ], "body-sm": [ "Plus Jakarta Sans" ], "body-lg": [ "Plus Jakarta Sans" ], "label-numeric": [ "Sora" ], "display-odometer": [ "Sora" ], "label-caps": [ "Sora" ], "body-md": [ "Plus Jakarta Sans" ] }, "fontSize": { "label-action": [ "18px", { "lineHeight": "24px", "fontWeight": "600" } ], "headline-sm": [ "18px", { "lineHeight": "24px", "fontWeight": "600" } ], "headline-md": [ "22px", { "lineHeight": "28px", "fontWeight": "600" } ], "headline-lg": [ "30px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700" } ], "body-sm": [ "13px", { "lineHeight": "18px", "fontWeight": "400" } ], "body-lg": [ "17px", { "lineHeight": "24px", "fontWeight": "500" } ], "label-numeric": [ "20px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700" } ], "display-odometer": [ "44px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" } ], "label-caps": [ "12px", { "lineHeight": "16px", "letterSpacing": "0.08em", "fontWeight": "700" } ], "body-md": [ "15px", { "lineHeight": "22px", "fontWeight": "400" } ] } } } };</script>@include('partials.brand-styles')
-  <link rel="icon" type="image/svg+xml" href="{{ asset('images/lancotri-mark.svg') }}">
-</head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen">@include('partials.sidebar')<div class="pl-64 flex flex-col min-h-screen">@include('partials.topbar', ['topbarStatus' => $activeBuses . ' active vehicles'])<main class="w-full pt-16 flex-1 px-space-lg py-space-lg bg-surface"><div class="flex flex-col w-full gap-space-lg">
-<!-- Page Header & Operational Pulse Summary -->
-<div class="flex flex-col xl:flex-row xl:items-end justify-between gap-space-md">
-<div class="flex flex-col gap-1 max-w-2xl">
-<div class="flex items-center gap-space-xs text-primary font-label-caps text-label-caps">
-<span class="material-symbols-outlined text-base">verified_user</span>
-<span>TELEMETRY &amp; AUDIT PIPELINE</span>
-</div>
-<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Shift Management &amp; Meter Audits</h1>
-<p class="font-body-md text-body-md text-on-surface-variant">Verify driver start and end shift meter photos, calculate mileage discrepancies, and approve daily logs across regional depot routes.</p>
-</div>
-<!-- Quick Stat Pill Array -->
-<div class="flex flex-wrap items-center gap-space-sm bg-surface-card p-2 rounded-xl shadow-sm">
-<div class="flex items-center gap-space-sm px-space-md py-1.5 bg-surface-container-low rounded-lg">
-<span class="w-2.5 h-2.5 rounded-full bg-sync-active"></span>
-<div class="flex flex-col">
-<span class="font-label-caps text-label-caps text-outline leading-tight">ACTIVE FLEET</span>
-<span class="font-headline-sm text-headline-sm text-on-surface leading-tight">{{ $activeBuses }} <span class="font-body-sm text-body-sm text-outline">/ {{ $totalBuses }}</span></span>
-</div>
-</div>
-<div class="flex items-center gap-space-sm px-space-md py-1.5 bg-surface-container-low rounded-lg">
-<span class="w-2.5 h-2.5 rounded-full bg-danger-critical animate-pulse"></span>
-<div class="flex flex-col">
-<span class="font-label-caps text-label-caps text-outline leading-tight">FLAGGED AUDITS</span>
-<span class="font-headline-sm text-headline-sm text-danger-critical leading-tight">{{ $countFlagged }} {{ \Illuminate\Support\Str::plural('Log', $countFlagged) }}</span>
-</div>
-</div>
-<div class="flex items-center gap-space-sm px-space-md py-1.5 bg-surface-container-low rounded-lg">
-<span class="material-symbols-outlined text-tertiary-container text-xl">speed</span>
-<div class="flex flex-col">
-<span class="font-label-caps text-label-caps text-outline leading-tight">DAY MILEAGE</span>
-<span class="font-headline-sm text-headline-sm text-on-surface leading-tight">{{ number_format($dayMileage, 0) }} <span class="font-body-sm text-body-sm text-outline">KM</span></span>
-</div>
-</div>
-</div>
-</div>
-<!-- Filter & Control Toolbar -->
-<div class="bg-surface-card rounded-xl p-space-md shadow-sm flex flex-col gap-space-md">
-<!-- Top Filter Row -->
-<div class="flex flex-wrap items-center justify-between gap-space-md">
-<form action="{{ route('shifts') }}" class="flex flex-wrap items-center gap-space-sm flex-1" method="GET">
-<input name="status" type="hidden" value="{{ $status }}"/>
-<!-- Date Range Label -->
-<div class="flex items-center gap-space-xs px-space-md py-2.5 bg-surface-container-low rounded-lg text-on-surface shadow-sm">
-<span class="material-symbols-outlined text-outline text-lg">calendar_month</span>
-<span class="font-body-md text-body-md font-medium">All logged shifts</span>
-</div>
-<!-- Bus Filter Dropdown -->
-<div class="relative flex items-center">
-<select class="appearance-none bg-surface-container-low font-body-md text-body-md text-on-surface pl-9 pr-9 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container transition-colors cursor-pointer shadow-sm" name="bus_id" onchange="this.form.submit()">
-<option value="">All Buses ({{ $totalBuses }} total)</option>
-@foreach($buses as $bus)
-<option value="{{ $bus->id }}" @selected((string) $busId === (string) $bus->id)>{{ $bus->display_id }}{{ $bus->plate ? ' · ' . $bus->plate : '' }}</option>
-@endforeach
-</select>
-<span class="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none">directions_bus</span>
-<span class="material-symbols-outlined absolute right-2.5 text-outline text-sm pointer-events-none">expand_more</span>
-</div>
-<!-- Driver Filter Dropdown -->
-<div class="relative flex items-center">
-<select class="appearance-none bg-surface-container-low font-body-md text-body-md text-on-surface pl-9 pr-9 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container transition-colors cursor-pointer shadow-sm" name="driver_id" onchange="this.form.submit()">
-<option value="">All Drivers ({{ $drivers->count() }})</option>
-@foreach($drivers as $driver)
-<option value="{{ $driver->id }}" @selected((string) $driverId === (string) $driver->id)>{{ $driver->user->name ?? 'Driver' }}@if($driver->badge_id) ({{ $driver->display_id }})@endif</option>
-@endforeach
-</select>
-<span class="material-symbols-outlined absolute left-3 text-outline text-lg pointer-events-none">badge</span>
-<span class="material-symbols-outlined absolute right-2.5 text-outline text-sm pointer-events-none">expand_more</span>
-</div>
-<!-- Quick Reset Filter Button -->
-<a class="px-space-sm py-2 text-outline hover:text-on-surface text-body-sm font-body-sm flex items-center gap-1 transition-colors" href="{{ route('shifts') }}">
-<span class="material-symbols-outlined text-base">restart_alt</span>
-<span>Reset</span>
-</a>
-</form>
-<!-- Action Button Group -->
-<div class="flex items-center gap-space-sm">
-<button class="flex items-center gap-space-xs px-space-md py-2.5 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md hover:bg-surface-container transition-colors shadow-sm">
-<span class="material-symbols-outlined text-lg">download</span>
-<span>Export CSV / PDF</span>
-</button>
-<button class="flex items-center gap-space-xs px-space-md py-2.5 rounded-lg bg-primary-container text-on-primary font-label-action text-label-action hover:opacity-95 transition-opacity shadow-sm">
-<span class="material-symbols-outlined text-xl">document_scanner</span>
-<span>Batch OCR Audit</span>
-</button>
-</div>
-</div>
-<!-- Status Filter Tabs -->
-<div class="flex items-center gap-2 overflow-x-auto pt-2">
-@php
-    $statusTabs = [
-        ['key' => 'all', 'label' => 'All Shifts', 'count' => $countAll],
-        ['key' => 'in_progress', 'label' => 'Active / Open', 'count' => $countOpen],
-        ['key' => 'completed', 'label' => 'Completed', 'count' => $countCompleted],
-        ['key' => 'flagged', 'label' => 'Flagged / Needs Review', 'count' => $countFlagged],
-    ];
-@endphp
-@foreach($statusTabs as $tab)
-@php $tabActive = $status === $tab['key']; @endphp
-<a class="px-space-md py-2 rounded-lg font-body-md text-body-md whitespace-nowrap flex items-center gap-1 {{ $tabActive ? 'bg-primary text-on-primary font-semibold shadow-sm' : ($tab['key'] === 'flagged' ? 'text-danger-critical hover:bg-error-container/40 transition-colors' : 'text-on-surface-variant hover:bg-surface-container-low transition-colors') }}" href="{{ route('shifts', ['status' => $tab['key']]) }}">
-<span>{{ $tab['label'] }}</span>
-@if($tab['key'] === 'flagged')
-<span class="ml-1 px-2 py-0.5 rounded-full bg-danger-critical text-on-error text-body-sm font-bold">{{ $tab['count'] }}</span>
-@elseif($tab['key'] === 'in_progress')
-<span class="ml-1 px-2 py-0.5 rounded-full bg-surface-variant text-primary font-body-sm font-semibold">{{ $tab['count'] }}</span>
-@elseif($tab['key'] === 'completed')
-<span class="ml-1 px-2 py-0.5 rounded-full {{ $tabActive ? 'bg-on-primary/20 text-on-primary text-body-sm font-bold' : 'bg-surface-container-high text-on-surface text-body-sm font-semibold' }}">{{ $tab['count'] }}</span>
-@else
-<span class="ml-1 px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface text-body-sm font-semibold">{{ $tab['count'] }}</span>
-@endif
-</a>
-@endforeach
-</div>
-</div>
-<!-- Primary Workspace: Split Layout (Master Shift Roster & Side Inspection Panel) -->
-<div class="grid grid-cols-1 2xl:grid-cols-12 gap-space-lg items-start">
-<!-- Left Column: Master Shifts Table (8 cols on 2xl) -->
-<div class="2xl:col-span-8 flex flex-col gap-space-md">
-<div class="bg-surface-card rounded-xl shadow-sm overflow-hidden flex flex-col">
-<!-- Table Control Strip -->
-<div class="px-space-lg py-space-md bg-surface-container-lowest flex items-center justify-between">
-<div class="flex items-center gap-space-sm">
-<span class="font-headline-sm text-headline-sm text-on-surface">Daily Log Records</span>
-<span class="text-outline text-sm">&bull;</span>
-<span class="font-body-sm text-body-sm text-on-surface-variant">Latest verified &amp; active driver logs</span>
-</div>
-<div class="flex items-center gap-2">
-<span class="font-label-caps text-label-caps text-secondary-container bg-secondary px-2.5 py-1 rounded-md">LIVE TELEMETRY SYNC</span>
-</div>
-</div>
-<!-- Table Viewport -->
-<div class="overflow-x-auto w-full">
-<table class="w-full text-left border-collapse">
-<thead>
-<tr class="bg-surface-container-low text-on-surface-variant font-label-caps text-label-caps uppercase tracking-wider">
-<th class="py-3.5 px-space-md">Shift Ref</th>
-<th class="py-3.5 px-space-md">Vehicle</th>
-<th class="py-3.5 px-space-md">Driver</th>
-<th class="py-3.5 px-space-md">Start Meter</th>
-<th class="py-3.5 px-space-md">End Meter</th>
-<th class="py-3.5 px-space-md">Distance</th>
-<th class="py-3.5 px-space-md">Status</th>
-<th class="py-3.5 px-space-md text-right">Actions</th>
-</tr>
-</thead>
-<tbody class="divide-y-0">
-@forelse($shifts as $shift)
-@php
-    $rowBus = $shift->bus;
-    $rowDriver = $shift->driver;
-    $rowOpen = $shift->status === \App\Models\ShiftLog::STATUS_IN_PROGRESS;
-    $rowFlagged = $shift->status === \App\Models\ShiftLog::STATUS_COMPLETED && $shift->end_km === null;
-    $rowSelected = $selected !== null && $selected->id === $shift->id;
+    <div class="pl-64 flex flex-col min-h-screen">
+        @include('partials.topbar', [
+            'topbarSearchPlaceholder' => 'Search shift #, driver, or vehicle...',
+            'topbarSearchId' => 'shiftNavSearch',
+            'topbarStatus' => $activeBuses . ' active vehicles',
+        ])
 
-    $dotClass = $rowFlagged ? 'bg-danger-critical' : ($rowOpen ? 'bg-primary-container' : 'bg-sync-active');
-    $refClass = $rowFlagged ? 'text-danger-critical' : ($rowSelected ? 'text-primary' : 'text-on-surface');
-    $rowClass = $rowSelected ? 'bg-surface-container-high' : ($rowFlagged ? 'bg-error-container/20' : '');
+        <main class="w-full pt-16 flex-1 px-8 py-8 bg-background">
+            <div class="flex flex-col w-full gap-6 max-w-7xl mx-auto">
 
-    $driverFullName = $rowDriver?->user?->name;
-    $driverInitials = collect(explode(' ', (string) $driverFullName))->filter()->map(fn ($p) => strtoupper(substr($p, 0, 1)))->take(2)->implode('');
-    $avatarClass = $rowFlagged ? 'bg-danger-critical text-on-error' : ($rowSelected ? 'bg-primary-container text-on-primary' : 'bg-surface-container-high text-on-surface');
+                <!-- Page Header: Title + Controls -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b">
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center gap-2 text-xs text-muted-foreground font-mono">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted border">
+                                <i data-lucide="shield-check" class="w-3.5 h-3.5 text-primary"></i>
+                                <span>TELEMETRY &amp; AUDIT PIPELINE</span>
+                            </span>
+                            <span>&bull;</span>
+                            <span class="inline-flex items-center gap-1.5 text-emerald-600 font-medium">
+                                <span class="relative flex h-2 w-2">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                Daily Meter Roster
+                            </span>
+                        </div>
+                        <div>
+                            <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Shift Management &amp; Meter Audits</h1>
+                            <p class="text-xs text-muted-foreground mt-2 leading-relaxed max-w-2xl">
+                                Verify driver start and end shift meter photos, audit mileage accuracy, and approve logs in real time without reloading.
+                            </p>
+                        </div>
+                    </div>
 
-    $started = $shift->started_at;
-    $ended = $shift->ended_at;
-    $rowDistance = $shift->distance_km !== null ? (float) $shift->distance_km : null;
-    $rowDuration = null;
-    if ($started && $ended) {
-        $minutes = $started->diffInMinutes($ended);
-        $rowDuration = intdiv($minutes, 60) . 'h ' . ($minutes % 60) . 'm duration';
-    }
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <div class="relative w-64">
+                            <i data-lucide="search" class="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                            <input id="shiftSearch"
+                                   data-shadcn-table-search="shiftsTable"
+                                   placeholder="Search shift #, bus, driver..."
+                                   class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
+                        </div>
 
-    if ($rowFlagged) {
-        $statusLabel = 'Needs Review';
-        $statusClass = 'bg-danger-critical text-on-error font-bold shadow-sm';
-        $statusIcon = 'warning';
-    } elseif ($rowOpen) {
-        $statusLabel = 'In Progress';
-        $statusClass = 'bg-surface-container-high text-primary font-semibold';
-        $statusIcon = null;
-    } else {
-        $statusLabel = 'Approved';
-        $statusClass = 'bg-secondary-fixed/40 text-secondary font-semibold';
-        $statusIcon = 'check_circle';
-    }
-@endphp
-<tr class="shift-row cursor-pointer transition-colors hover:bg-surface-container-low {{ $rowClass }}" data-shift-id="{{ $shift->id }}" onclick="loadShiftDetail({{ $shift->id }})">
-<td class="py-4 px-space-md align-middle">
-<div class="flex items-center gap-2">
-<span class="w-2 h-2 rounded-full {{ $dotClass }}{{ $rowOpen ? ' animate-pulse' : '' }}"></span>
-<div class="flex flex-col">
-<span class="font-label-numeric text-body-lg font-bold {{ $refClass }}">{{ $shift->display_id }}</span>
-<span class="font-body-sm text-body-sm text-outline">{{ optional($started)->format('M d') }} &bull; {{ optional($started)->format('h:i A') }}</span>
-</div>
-</div>
-</td>
-<td class="py-4 px-space-md align-middle">
-<div class="flex flex-col">
-<span class="font-headline-sm text-headline-sm text-on-surface font-bold">{{ $rowBus ? $rowBus->display_id : 'Unassigned' }}</span>
-<span class="font-body-sm text-body-sm text-on-surface-variant">{{ $rowBus->model ?? '—' }}</span>
-</div>
-</td>
-<td class="py-4 px-space-md align-middle">
-<div class="flex items-center gap-space-xs">
-{{-- <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs {{ $avatarClass }}">{{ $driverInitials ?: '—' }}</div> --}}
-<div class="flex flex-col">
-<span class="font-body-md text-body-md font-semibold text-on-surface">{{ $driverFullName ?? 'Unassigned driver' }}</span>
-<span class="font-body-sm text-body-sm text-outline">{{ $rowDriver->display_id ?? 'Driver #—' }}</span>
-</div>
-</div>
-</td>
-<td class="py-4 px-space-md align-middle">
-<div class="flex flex-col">
-<span class="font-label-numeric text-body-md text-on-surface">{{ number_format($shift->start_km) }} <span class="text-xs text-outline font-normal">km</span></span>
-<span class="font-body-sm text-body-sm text-outline flex items-center gap-0.5">
-<span class="material-symbols-outlined text-xs">photo_camera</span>
-<span>{{ optional($started)->format('h:i A') ?? '—' }}</span>
-</span>
-</div>
-</td>
-<td class="py-4 px-space-md align-middle">
-<div class="flex flex-col">
-@if($shift->end_km !== null)
-<span class="font-label-numeric text-body-md {{ $rowFlagged ? 'text-danger-critical font-bold' : 'text-on-surface' }}">{{ number_format($shift->end_km) }} <span class="text-xs text-outline font-normal">km</span></span>
-<span class="font-body-sm text-body-sm {{ $rowFlagged ? 'text-danger-critical font-bold' : 'text-outline' }} flex items-center gap-0.5">
-<span class="material-symbols-outlined text-xs">{{ $rowFlagged ? 'error' : 'verified' }}</span>
-<span>{{ $rowFlagged ? 'Needs photo' : (optional($ended)->format('h:i A') ?? 'Verified') }}</span>
-</span>
-@elseif($rowOpen)
-<div class="flex items-center gap-1.5 text-outline">
-<span class="material-symbols-outlined text-sm animate-spin">timelapse</span>
-<span class="font-body-sm text-body-sm italic">In Route (Open)</span>
-</div>
-@else
-<span class="font-label-numeric text-body-md text-outline">—</span>
-@endif
-</div>
-</td>
-<td class="py-4 px-space-md align-middle">
-<div class="flex flex-col">
-@if($rowDistance !== null)
-<span class="font-label-numeric text-headline-sm font-bold {{ $rowFlagged ? 'text-danger-critical' : 'text-secondary' }}">+{{ number_format($rowDistance, 0) }} KM</span>
-@if($rowDuration)<span class="font-body-sm text-body-sm text-outline">{{ $rowDuration }}</span>@endif
-@elseif($rowOpen)
-<span class="font-label-numeric text-body-lg text-outline">Tracking...</span>
-<span class="font-body-sm text-body-sm text-outline">Shift still open</span>
-@else
-<span class="font-label-numeric text-headline-sm font-bold text-outline">—</span>
-@endif
-</div>
-</td>
-<td class="py-4 px-space-md align-middle">
-<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-body-sm text-body-sm {{ $statusClass }}">
-@if($statusIcon)
-<span class="material-symbols-outlined text-xs">{{ $statusIcon }}</span>
-@else
-<span class="w-2 h-2 rounded-full bg-sync-active"></span>
-@endif
-<span>{{ $statusLabel }}</span>
-</span>
-</td>
-<td class="py-4 px-space-md align-middle text-right">
-<div class="inline-flex items-center gap-1">
-@if($rowFlagged)
-<button class="px-3 py-1.5 rounded-lg bg-danger-critical text-on-error font-body-sm text-body-sm font-semibold hover:opacity-90 shadow-sm transition-opacity" type="button">Resolve</button>
-@elseif($rowOpen)
-<button class="px-3 py-1.5 rounded-lg bg-surface-container-low text-on-surface font-body-sm text-body-sm font-medium hover:bg-surface-container transition-colors" type="button">Track</button>
-@else
-<button class="px-3 py-1.5 rounded-lg bg-primary-container text-on-primary font-body-sm text-body-sm font-semibold hover:opacity-90 shadow-sm transition-opacity" type="button">View</button>
-@endif
-<button class="p-1.5 text-on-surface-variant hover:text-on-surface hover:bg-surface-container rounded-lg transition-colors" onclick="event.stopPropagation()" type="button">
-<span class="material-symbols-outlined text-xl">more_vert</span>
-</button>
-</div>
-</td>
-</tr>
-@empty
-<tr>
-<td class="py-10 px-space-md text-center font-body-md text-body-md text-on-surface-variant" colspan="8">No shift logs match the selected filters.</td>
-</tr>
-@endforelse
-</tbody>
+                        <button type="button" onclick="window.toast?.success('Shift Report Exported', 'CSV/PDF meter audit log generated successfully.')"
+                                class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 gap-2">
+                            <i data-lucide="download" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                            <span>Export Logs</span>
+                        </button>
+                    </div>
+                </div>
 
-</table>
-</div>
-<!-- Table Pagination Footer -->
-<div class="p-space-md bg-surface-container-low flex flex-col sm:flex-row items-center justify-between gap-space-sm">
-<span class="font-body-sm text-body-sm text-on-surface-variant">Showing {{ $shifts->count() }} of {{ $countAll }} shift logs logged within the selected period</span>
-<div class="flex items-center gap-1">
-<span class="font-body-sm text-body-sm text-outline">{{ $activeBuses }} vehicles active now</span>
-</div>
-</div>
-</div>
-<!-- Route Discrepancy & Fleet Variance Analytics Tile -->
-<div class="bg-surface-card rounded-xl p-space-lg shadow-sm flex flex-col md:flex-row items-center justify-between gap-space-lg">
-<div class="flex items-center gap-space-md">
-<div class="w-14 h-14 rounded-xl bg-surface-variant flex items-center justify-center text-primary-container">
-<span class="material-symbols-outlined text-3xl">analytics</span>
-</div>
-<div class="flex flex-col">
-<h2 class="font-headline-sm text-headline-sm text-on-surface">Route Distance Variance (Automated Audit)</h2>
-<p class="font-body-sm text-body-sm text-on-surface-variant">System flags shifts where manual meter difference deviates &gt; 5% from GPS route breadcrumbs.</p>
-</div>
-</div>
-<div class="flex items-center gap-space-md">
-<div class="text-right">
-<span class="font-headline-md text-headline-md text-secondary font-bold">97.8%</span>
-<span class="font-body-sm text-body-sm text-outline block">Depot Match Rate</span>
-</div>
-<!-- Sparkline Mini Chart (Inline SVG) -->
-<svg class="w-24 h-10 text-secondary" fill="none" viewbox="0 0 100 40">
-<path d="M0 32 L18 28 L36 30 L54 18 L72 22 L90 8 L100 12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path>
-<path d="M0 32 L18 28 L36 30 L54 18 L72 22 L90 8 L100 12 V 40 H 0 Z" fill="currentColor" fill-opacity="0.1"></path>
-</svg>
-</div>
-</div>
-</div>
-<!-- Right Column: Meter Audit Inspection Detail Panel for #SH-9042 (4 cols on 2xl) -->
-<div class="2xl:col-span-4 flex flex-col gap-space-md">
-<div id="shiftDetailPanel" class="flex flex-col gap-space-md transition-opacity">
-@if($selected)
-@include('partials.shift-detail', ['shift' => $selected])
-@else
-<div class="bg-surface-card rounded-xl p-space-lg shadow-md text-center font-body-md text-body-md text-on-surface-variant">No shift logs available yet.</div>
-@endif
-</div>
-</div>
-</div></main></div>
-<script>
-    const shiftDetailPanel = document.getElementById('shiftDetailPanel');
-    let shiftDetailController = null;
+                <!-- 5 Stat Cards (shadcn Card default) -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                    <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono uppercase text-muted-foreground">Active Shifts</span>
+                            <i data-lucide="clock" class="w-4 h-4 text-amber-500"></i>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-2xl font-bold font-mono text-amber-500" id="statCountOpen">{{ $countOpen }}</div>
+                            <span class="text-xs text-muted-foreground">En route now</span>
+                        </div>
+                    </div>
 
-    // Load the inspection desk detail for a shift and swap it into the panel.
-    async function loadShiftDetail(shiftId) {
-      if (!shiftDetailPanel) return;
+                    <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono uppercase text-muted-foreground">Pending Audit</span>
+                            <i data-lucide="inbox" class="w-4 h-4 text-blue-500"></i>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-2xl font-bold font-mono text-blue-600" id="statCountCompleted">{{ $countCompleted }}</div>
+                            <span class="text-xs text-muted-foreground">Awaiting approval</span>
+                        </div>
+                    </div>
 
-      document.querySelectorAll('.shift-row').forEach((row) => {
-        row.classList.toggle('bg-surface-container-high', row.dataset.shiftId === String(shiftId));
-      });
+                    <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono uppercase text-muted-foreground">Verified Shifts</span>
+                            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-2xl font-bold font-mono text-emerald-600" id="statCountVerified">{{ $countVerified }}</div>
+                            <span class="text-xs text-muted-foreground">Approved by desk</span>
+                        </div>
+                    </div>
 
-      shiftDetailController?.abort();
-      shiftDetailController = new AbortController();
+                    <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono uppercase text-destructive">Flagged Audits</span>
+                            <i data-lucide="alert-triangle" class="w-4 h-4 text-destructive"></i>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-2xl font-bold font-mono text-destructive" id="statCountFlagged">{{ $countFlagged }}</div>
+                            <span class="text-xs text-muted-foreground">Needs review</span>
+                        </div>
+                    </div>
 
-      shiftDetailPanel.classList.add('opacity-60');
-      try {
-        const response = await fetch(`/shifts/${shiftId}`, {
-          headers: { 'Accept': 'text/html' },
-          signal: shiftDetailController.signal,
-        });
-        if (!response.ok) throw new Error('Request failed');
-        shiftDetailPanel.innerHTML = await response.text();
-      } catch (error) {
-        if (error.name !== 'AbortError') {
-          shiftDetailPanel.innerHTML = '<div class="bg-surface-card rounded-xl p-space-lg shadow-md text-center font-body-md text-body-md text-danger-critical">Unable to load this shift. Please try again.</div>';
+                    <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between col-span-2 sm:col-span-1">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono uppercase text-muted-foreground">Day Distance</span>
+                            <i data-lucide="gauge" class="w-4 h-4 text-primary"></i>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-2xl font-bold font-mono">{{ number_format($dayMileage, 0) }} <span class="text-xs font-normal text-muted-foreground">KM</span></div>
+                            <span class="text-xs text-muted-foreground">Logged today</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Controls (shadcn Card) -->
+                <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <form action="{{ route('shifts') }}" method="GET" class="flex flex-wrap items-center gap-2">
+                            <!-- Bus Filter -->
+                            <div class="w-48">
+                                <select name="bus_id" onchange="this.form.submit()"
+                                        class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
+                                    <option value="">All Buses ({{ $totalBuses }})</option>
+                                    @foreach($buses as $bus)
+                                        <option value="{{ $bus->id }}" @selected((string) request('bus_id') === (string) $bus->id)>
+                                            {{ $bus->display_id }}{{ $bus->plate ? ' · ' . $bus->plate : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <!-- Driver Filter -->
+                            <div class="w-48">
+                                <select name="driver_id" onchange="this.form.submit()"
+                                        class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
+                                    <option value="">All Drivers ({{ $drivers->count() }})</option>
+                                    @foreach($drivers as $driver)
+                                        <option value="{{ $driver->id }}" @selected((string) request('driver_id') === (string) $driver->id)>
+                                            {{ $driver->user->name ?? 'Driver' }} ({{ $driver->display_id }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <!-- Reset Button -->
+                            @if(request('bus_id') || request('driver_id'))
+                                <a href="{{ route('shifts') }}"
+                                   class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3 gap-1.5 text-muted-foreground">
+                                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                                    <span>Reset Filters</span>
+                                </a>
+                            @endif
+                        </form>
+
+                        <!-- Instant Client-Side Status Filter Tabs (NO page reload) -->
+                        <div class="flex items-center gap-1.5 p-1 rounded-lg bg-muted/60 border border-border/50 text-xs overflow-x-auto" data-shadcn-filter-group="shiftsTable">
+                            <button type="button" data-filter="all"
+                                    class="px-3 py-1.5 rounded-md text-xs font-semibold bg-foreground text-background shadow-xs transition-all cursor-pointer">
+                                All ({{ $countAll }})
+                            </button>
+                            <button type="button" data-filter="in_progress"
+                                    class="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer">
+                                Active ({{ $countOpen }})
+                            </button>
+                            <button type="button" data-filter="completed"
+                                    class="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer">
+                                Pending Audit ({{ $countCompleted }})
+                            </button>
+                            <button type="button" data-filter="verified"
+                                    class="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer">
+                                Verified ({{ $countVerified }})
+                            </button>
+                            <button type="button" data-filter="flagged"
+                                    class="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer">
+                                Flagged ({{ $countFlagged }})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grid Layout: Shifts Table (2/3) + Detail Inspection Desk (1/3) -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+                    <!-- Shifts DataTable (2/3) -->
+                    <div class="lg:col-span-2 rounded-xl border bg-card text-card-foreground shadow-xs overflow-hidden">
+                        <div class="w-full overflow-x-auto">
+                            <table id="shiftsTable" class="w-full caption-bottom text-sm select-none">
+                                <thead>
+                                    <tr class="border-b bg-muted/50 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                                        <th class="h-10 px-4 text-left align-middle font-medium">Shift #</th>
+                                        <th class="h-10 px-4 text-left align-middle font-medium">Vehicle / Driver</th>
+                                        <th class="h-10 px-4 text-left align-middle font-medium">Started At</th>
+                                        <th class="h-10 px-4 text-left align-middle font-medium">Odometer</th>
+                                        <th class="h-10 px-4 text-left align-middle font-medium">Distance</th>
+                                        <th class="h-10 px-4 text-left align-middle font-medium">Status</th>
+                                        <th class="h-10 px-4 text-right align-middle font-medium">Inspect</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y text-foreground" id="shiftsTableBody">
+                                    @forelse($shifts as $shift)
+                                        @php
+                                            $isSelected = $selected && $selected->id === $shift->id;
+                                            $driverUser = $shift->driver?->user;
+                                            $filterStatus = match($shift->status) {
+                                                'verified' => 'verified',
+                                                'in_progress' => 'in_progress',
+                                                'completed' => ($shift->end_km === null ? 'flagged' : 'completed'),
+                                                'flagged' => 'flagged',
+                                                default => $shift->status,
+                                            };
+                                            $shiftBadgeClass = match($shift->status) {
+                                                'verified' => 'border-emerald-500/30 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+                                                'in_progress' => 'border-amber-500/30 bg-amber-500/15 text-amber-600 dark:text-amber-400',
+                                                'completed' => ($shift->end_km === null ? 'border-destructive/30 bg-destructive/15 text-destructive' : 'border-blue-500/30 bg-blue-500/15 text-blue-600 dark:text-blue-400'),
+                                                'flagged' => 'border-destructive/30 bg-destructive/15 text-destructive',
+                                                default => 'border-transparent bg-secondary text-secondary-foreground'
+                                            };
+                                            $statusLabel = match($shift->status) {
+                                                'verified' => 'Verified',
+                                                'in_progress' => 'Active',
+                                                'completed' => ($shift->end_km === null ? 'Flagged' : 'Pending Audit'),
+                                                'flagged' => 'Flagged',
+                                                default => ucfirst($shift->status)
+                                            };
+
+                                            $hasStartAndEnd = ($shift->start_km !== null && $shift->end_km !== null);
+
+                                            $shiftDataJson = [
+                                                'id' => $shift->id,
+                                                'display_id' => $shift->display_id,
+                                                'shift_number' => $shift->shift_number,
+                                                'bus_id' => $shift->bus?->display_id ?? 'Bus —',
+                                                'bus_plate' => $shift->bus?->plate ?? '—',
+                                                'bus_model' => $shift->bus?->model ?? 'Standard Chassis',
+                                                'driver_name' => $driverUser->name ?? 'Unassigned Driver',
+                                                'driver_badge' => $shift->driver?->badge_id ?? 'DRV-—',
+                                                'start_km' => number_format($shift->start_km) . ' km',
+                                                'end_km' => $shift->end_km ? number_format($shift->end_km) . ' km' : 'Pending Close',
+                                                'distance_km' => $shift->distance_km !== null ? number_format($shift->distance_km, 1) . ' km' : '—',
+                                                'status' => $shift->status,
+                                                'filter_status' => $filterStatus,
+                                                'status_label' => $statusLabel,
+                                                'status_badge_class' => $shiftBadgeClass,
+                                                'has_start_and_end' => $hasStartAndEnd,
+                                                'started_at_date' => $shift->started_at?->format('M j, Y') ?? '—',
+                                                'started_at_time' => $shift->started_at?->format('H:i') ?? '—',
+                                                'ended_at_date' => $shift->ended_at?->format('M j, Y') ?? '—',
+                                                'ended_at_time' => $shift->ended_at?->format('H:i') ?? '—',
+                                                'start_notes' => $shift->start_notes ?? '',
+                                                'end_notes' => $shift->end_notes ?? '',
+                                                'start_meter_image_url' => $shift->start_meter_image_url ?? '',
+                                                'end_meter_image_url' => $shift->end_meter_image_url ?? '',
+                                                'route_label' => $shift->trip ? ($shift->trip->origin . ' → ' . $shift->trip->destination . ' (' . $shift->trip->display_id . ')') : ($shift->bus ? $shift->bus->display_id . ' Depot Round' : 'No Scheduled Route'),
+                                            ];
+                                        @endphp
+                                        <tr id="shift-row-{{ $shift->id }}"
+                                            data-shift-id="{{ $shift->id }}"
+                                            data-status="{{ $filterStatus }}"
+                                            onclick="inspectShiftById('{{ $shift->id }}')"
+                                            class="shift-table-row border-b transition-colors cursor-pointer hover:bg-muted/50 {{ $isSelected ? 'bg-muted/60 font-medium border-l-2 border-primary' : '' }}">
+                                            <td class="p-4 align-middle font-mono font-bold">{{ $shift->display_id }}</td>
+                                            <td class="p-4 align-middle">
+                                                <div class="font-mono font-bold text-xs">{{ $shift->bus?->display_id ?? 'Bus —' }}</div>
+                                                <span class="text-[11px] text-muted-foreground">{{ $driverUser->name ?? 'Unknown Driver' }}</span>
+                                            </td>
+                                            <td class="p-4 align-middle font-mono text-xs">
+                                                <div>{{ $shift->started_at?->format('M j, Y') ?? '—' }}</div>
+                                                <span class="text-muted-foreground text-[11px]">{{ $shift->started_at?->format('H:i') ?? '—' }}</span>
+                                            </td>
+                                            <td class="p-4 align-middle font-mono text-xs">
+                                                <div>{{ number_format($shift->start_km) }} km</div>
+                                                <span class="text-muted-foreground text-[11px]">{{ $shift->end_km ? number_format($shift->end_km) . ' km' : 'En route' }}</span>
+                                            </td>
+                                            <td class="p-4 align-middle font-mono font-bold text-xs">
+                                                {{ $shift->distance_km !== null ? number_format($shift->distance_km, 1) . ' km' : '—' }}
+                                            </td>
+                                            <td class="p-4 align-middle">
+                                                <span class="shift-badge inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors {{ $shiftBadgeClass }}">
+                                                    {{ $statusLabel }}
+                                                </span>
+                                            </td>
+                                            <td class="p-4 align-middle text-right">
+                                                <button type="button"
+                                                        onclick="event.stopPropagation(); inspectShiftById('{{ $shift->id }}')"
+                                                        title="Inspect Shift without reload"
+                                                        class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent hover:text-accent-foreground text-muted-foreground shadow-xs transition-colors">
+                                                    <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <script>
+                                            window.__shiftsRegistry = window.__shiftsRegistry || {};
+                                            window.__shiftsRegistry['{{ $shift->id }}'] = @json($shiftDataJson);
+                                        </script>
+                                    @empty
+                                        <tr class="empty-row">
+                                            <td colspan="7" class="p-8 text-center text-muted-foreground">
+                                                No shifts found matching your query.
+                                            </td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Inspection Desk (Selected Shift Detail Card) (1/3) -->
+                    <div id="inspectionDeskCard" class="rounded-xl border bg-card text-card-foreground shadow-xs p-5 space-y-4 transition-all">
+                        <div class="flex items-center justify-between pb-3 border-b">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="shield-check" class="w-4 h-4 text-primary"></i>
+                                <h3 class="text-sm font-semibold leading-none">Inspection Desk</h3>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="font-mono text-xs font-bold" id="deskShiftDisplayId">{{ $selected?->display_id ?? 'Shift #—' }}</span>
+                                <span id="deskStatusBadge" class="inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold">
+                                    {{ $selected ? ($selected->status === 'verified' ? 'Verified' : ($selected->status === 'in_progress' ? 'Active' : ($selected->end_km === null ? 'Flagged' : 'Pending Audit'))) : '—' }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div id="deskEmptyState" class="{{ $selected ? 'hidden' : '' }} py-12 text-center text-xs text-muted-foreground">
+                            Select a shift row from the table to inspect telemetry &amp; meter images.
+                        </div>
+
+                        <div id="deskContentState" class="{{ $selected ? '' : 'hidden' }} space-y-4">
+                            <!-- Visual Lifecycle Timeline -->
+                            <div class="p-3.5 rounded-lg border bg-muted/30 space-y-2">
+                                <div class="flex items-center justify-between text-xs font-medium text-muted-foreground uppercase font-mono">
+                                    <span>Lifecycle Track</span>
+                                    <span id="deskLifecycleStatus" class="text-[11px] font-bold text-foreground font-sans"></span>
+                                </div>
+                                <div class="grid grid-cols-4 gap-1 text-[11px] pt-1">
+                                    <!-- 1. Start Shift -->
+                                    <div class="flex flex-col items-center text-center gap-1">
+                                        <div id="trackStartDot" class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs">
+                                            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                                        </div>
+                                        <span class="font-medium text-[11px]">Start</span>
+                                        <span id="trackStartTime" class="text-[10px] text-muted-foreground"></span>
+                                    </div>
+                                    <!-- 2. Transit Duty -->
+                                    <div class="flex flex-col items-center text-center gap-1">
+                                        <div id="trackTransitDot" class="w-6 h-6 rounded-full bg-muted border text-muted-foreground flex items-center justify-center text-[10px] font-bold shadow-xs">
+                                            <i data-lucide="bus" class="w-3.5 h-3.5"></i>
+                                        </div>
+                                        <span class="font-medium text-[11px]">Duty</span>
+                                        <span id="trackTransitSub" class="text-[10px] text-muted-foreground">Route</span>
+                                    </div>
+                                    <!-- 3. End Shift -->
+                                    <div class="flex flex-col items-center text-center gap-1">
+                                        <div id="trackEndDot" class="w-6 h-6 rounded-full bg-muted border text-muted-foreground flex items-center justify-center text-[10px] font-bold shadow-xs">
+                                            <i data-lucide="flag" class="w-3.5 h-3.5"></i>
+                                        </div>
+                                        <span class="font-medium text-[11px]">End</span>
+                                        <span id="trackEndTime" class="text-[10px] text-muted-foreground"></span>
+                                    </div>
+                                    <!-- 4. Desk Verification -->
+                                    <div class="flex flex-col items-center text-center gap-1">
+                                        <div id="trackVerifyDot" class="w-6 h-6 rounded-full bg-muted border text-muted-foreground flex items-center justify-center text-[10px] font-bold shadow-xs">
+                                            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+                                        </div>
+                                        <span class="font-medium text-[11px]">Audit</span>
+                                        <span id="trackVerifySub" class="text-[10px] text-muted-foreground">Desk</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Telemetry Specs Grid -->
+                            <div class="space-y-2 text-xs">
+                                <div class="flex justify-between items-center py-1 border-b border-border/40">
+                                    <span class="text-muted-foreground">Vehicle:</span>
+                                    <span class="font-mono font-bold" id="deskBusInfo">
+                                        {{ $selected?->bus?->display_id }} ({{ $selected?->bus?->plate }})
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center py-1 border-b border-border/40">
+                                    <span class="text-muted-foreground">Driver:</span>
+                                    <span class="font-medium" id="deskDriverInfo">
+                                        {{ $selected?->driver?->user?->name ?? 'Unassigned' }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center py-1 border-b border-border/40">
+                                    <span class="text-muted-foreground">Assigned Route:</span>
+                                    <span class="font-medium text-foreground text-right" id="deskRouteLabel">
+                                        {{ $selected?->trip ? ($selected->trip->origin . ' → ' . $selected->trip->destination) : 'Depot Service Round' }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center py-1 border-b border-border/40">
+                                    <span class="text-muted-foreground">Start Reading:</span>
+                                    <span class="font-mono font-bold" id="deskStartKm">
+                                        {{ $selected ? number_format($selected->start_km) . ' km' : '—' }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center py-1 border-b border-border/40">
+                                    <span class="text-muted-foreground">End Reading:</span>
+                                    <span class="font-mono font-bold" id="deskEndKm">
+                                        {{ $selected && $selected->end_km ? number_format($selected->end_km) . ' km' : 'Pending Close' }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between items-center pt-2 font-medium">
+                                    <span>Distance Traveled:</span>
+                                    <span class="font-mono font-bold text-primary text-sm" id="deskDistanceKm">
+                                        {{ $selected && $selected->distance_km !== null ? number_format($selected->distance_km, 1) . ' km' : '—' }}
+                                    </span>
+                                </div>
+                                <div class="pt-2 flex justify-end">
+                                    <button type="button"
+                                            onclick="openAdjustMileageModal()"
+                                            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-input bg-card hover:bg-muted text-[11px] font-medium text-foreground hover:text-primary transition-colors cursor-pointer shadow-2xs"
+                                            title="Manually calibrate or adjust odometer numbers">
+                                        <i data-lucide="sliders" class="w-3 h-3 text-primary"></i>
+                                        <span>Adjust Mileage Range</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Photo Proofs (Start & End Meter Images) -->
+                            <div class="pt-2 border-t space-y-2.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs font-medium text-muted-foreground uppercase font-mono">Meter Verification Photos</span>
+                                    <span class="text-[10px] text-muted-foreground">Click to inspect</span>
+                                </div>
+
+                                <!-- Start Meter Box -->
+                                <div id="deskStartMeterBox">
+                                    <div id="deskStartMeterContainer" class="{{ $selected && $selected->start_meter_image_url ? '' : 'hidden' }} rounded-lg overflow-hidden border bg-muted h-36 relative group cursor-pointer"
+                                         onclick="openPhotoModal(document.getElementById('deskStartMeterImg').src, 'Start Meter Capture', document.getElementById('deskStartKm').textContent)">
+                                        <img id="deskStartMeterImg"
+                                             src="{{ $selected?->start_meter_image_url }}"
+                                             alt="Start Meter"
+                                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"/>
+                                        <span class="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-background/90 text-[10px] font-mono border flex items-center gap-1 shadow-xs">
+                                            <i data-lucide="maximize-2" class="w-2.5 h-2.5"></i>
+                                            <span>Start Meter Capture</span>
+                                        </span>
+                                    </div>
+                                    <div id="deskStartMeterEmpty" class="{{ $selected && $selected->start_meter_image_url ? 'hidden' : '' }} rounded-lg border border-dashed p-3 text-center text-muted-foreground text-xs">
+                                        No start meter photo recorded
+                                    </div>
+                                </div>
+
+                                <!-- End Meter Box -->
+                                <div id="deskEndMeterBox">
+                                    <div id="deskEndMeterContainer" class="{{ $selected && $selected->end_meter_image_url ? '' : 'hidden' }} rounded-lg overflow-hidden border bg-muted h-36 relative group cursor-pointer mt-2"
+                                         onclick="openPhotoModal(document.getElementById('deskEndMeterImg').src, 'End Meter Capture', document.getElementById('deskEndKm').textContent)">
+                                        <img id="deskEndMeterImg"
+                                             src="{{ $selected?->end_meter_image_url }}"
+                                             alt="End Meter"
+                                             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"/>
+                                        <span class="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-background/90 text-[10px] font-mono border flex items-center gap-1 shadow-xs">
+                                            <i data-lucide="maximize-2" class="w-2.5 h-2.5"></i>
+                                            <span>End Meter Capture</span>
+                                        </span>
+                                    </div>
+                                    <div id="deskEndMeterEmpty" class="{{ $selected && $selected->end_meter_image_url ? 'hidden' : '' }} rounded-lg border border-dashed p-3 text-center text-muted-foreground text-xs mt-2">
+                                        End meter photo pending shift completion
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Shift Notes (if any) -->
+                            <div id="deskNotesContainer" class="{{ $selected && ($selected->start_notes || $selected->end_notes) ? '' : 'hidden' }} p-3 rounded-lg bg-muted/40 border text-xs space-y-1">
+                                <span class="font-medium text-foreground">Operator Notes:</span>
+                                <p class="text-muted-foreground italic text-[11px]" id="deskNotesText">
+                                    {{ $selected?->start_notes ?: $selected?->end_notes }}
+                                </p>
+                            </div>
+
+                            <!-- Auditor Action Desk: Conditional views -->
+                            <div class="pt-2 border-t">
+                                <!-- State 1: In Progress (Trip started, but not yet ended -> No approval button) -->
+                                <div id="deskActionInProgress" class="p-3.5 rounded-lg border border-amber-500/25 bg-amber-500/10 space-y-1.5 hidden">
+                                    <div class="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-xs font-semibold">
+                                        <i data-lucide="clock" class="w-4 h-4 text-amber-500"></i>
+                                        <span>Shift In Progress &bull; Driver Active</span>
+                                    </div>
+                                    <p class="text-[11px] text-muted-foreground leading-relaxed">
+                                        Vehicle is en route. The approval &amp; verification desk unlocks automatically once the driver completes the trip and records the closing meter photo.
+                                    </p>
+                                </div>
+
+                                <!-- State 2: Completed (Trip started AND ended -> Approval button unlocked!) -->
+                                <div id="deskActionCompleted" class="space-y-2.5 hidden">
+                                    <div class="p-3 rounded-lg border border-blue-500/25 bg-blue-500/10 flex items-start gap-2 text-xs">
+                                        <i data-lucide="check-circle-2" class="w-4 h-4 text-blue-600 mt-0.5 shrink-0"></i>
+                                        <div>
+                                            <span class="font-semibold text-blue-700 dark:text-blue-400">Ready for Verification</span>
+                                            <p class="text-[11px] text-muted-foreground mt-0.5">Start and end meter photos are logged. Review readings and approve shift mileage.</p>
+                                        </div>
+                                    </div>
+                                    <button type="button"
+                                            id="deskApproveBtn"
+                                            onclick="verifyCurrentShift()"
+                                            class="w-full inline-flex items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2.5 px-4 shadow transition-all gap-1.5 cursor-pointer">
+                                        <i data-lucide="shield-check" class="w-4 h-4"></i>
+                                        <span>Approve &amp; Verify Shift</span>
+                                    </button>
+                                    <button type="button"
+                                            id="deskFlagBtn"
+                                            onclick="flagCurrentShift()"
+                                            class="w-full inline-flex items-center justify-center rounded-lg border border-input bg-card text-foreground hover:bg-muted text-xs font-medium py-2 px-4 shadow-xs transition-colors gap-1.5 cursor-pointer">
+                                        <i data-lucide="flag" class="w-3.5 h-3.5 text-destructive"></i>
+                                        <span>Flag for Re-inspection</span>
+                                    </button>
+                                </div>
+
+                                <!-- State 3: Verified (Already approved by desk -> Manageable status) -->
+                                <div id="deskActionVerified" class="p-3.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 space-y-2 text-xs hidden">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400 text-xs">
+                                            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+                                            <span>Shift Verified &amp; Approved</span>
+                                        </div>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600 text-white">
+                                            VERIFIED
+                                        </span>
+                                    </div>
+                                    <p class="text-[11px] text-muted-foreground leading-relaxed">
+                                        Start &amp; end meter readings, instrument cluster photos, and calculated mileage (<strong id="deskVerifiedDist" class="text-foreground"></strong>) verified by inspection desk.
+                                    </p>
+                                    <div class="pt-2 border-t border-emerald-500/20 flex items-center justify-between text-[11px]">
+                                        <span class="text-muted-foreground">Manage status:</span>
+                                        <div class="flex items-center gap-2">
+                                            <button type="button" onclick="revertShiftStatus('completed')" class="font-medium text-foreground hover:underline cursor-pointer">
+                                                Revert to Pending
+                                            </button>
+                                            <span class="text-muted-foreground">&bull;</span>
+                                            <button type="button" onclick="flagCurrentShift()" class="font-medium text-destructive hover:underline cursor-pointer">
+                                                Flag Shift
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- State 4: Flagged for audit -->
+                                <div id="deskActionFlagged" class="p-3.5 rounded-lg border border-destructive/30 bg-destructive/10 space-y-2.5 text-xs hidden">
+                                    <div class="flex items-center gap-2 font-bold text-destructive text-xs">
+                                        <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+                                        <span>Flagged for Audit Review</span>
+                                    </div>
+                                    <p class="text-[11px] text-muted-foreground leading-relaxed">
+                                        Discrepancy detected in meter readings or closing photo. Requires supervisor physical recount.
+                                    </p>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button"
+                                                onclick="openAdjustMileageModal()"
+                                                class="flex-1 inline-flex items-center justify-center rounded-lg border border-input bg-card text-foreground hover:bg-muted text-xs font-semibold py-2 px-3 shadow-xs gap-1.5 cursor-pointer">
+                                            <i data-lucide="sliders" class="w-3.5 h-3.5 text-primary"></i>
+                                            <span>Calibrate Mileage</span>
+                                        </button>
+                                        <button type="button"
+                                                id="deskClearFlagBtn"
+                                                onclick="verifyCurrentShift()"
+                                                class="flex-1 inline-flex items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-3 shadow-xs gap-1.5 cursor-pointer">
+                                            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+                                            <span>Clear &amp; Verify</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- ================= shadcn Dialog: METER PHOTO MODAL ================= -->
+    <div id="photoModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs hidden">
+        <div class="relative w-full max-w-lg rounded-xl border bg-background p-6 shadow-lg modal-content text-left">
+            <div class="flex items-center justify-between pb-3 border-b">
+                <div>
+                    <h3 class="text-base font-semibold leading-none tracking-tight" id="modalPhotoTitle">Meter Capture Inspection</h3>
+                    <p class="text-xs text-muted-foreground mt-1" id="modalPhotoSubtitle">Optical verification of instrument cluster</p>
+                </div>
+                <button type="button" onclick="window.shadcnModal.close('photoModal')" class="text-muted-foreground hover:text-foreground">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div class="mt-4 rounded-lg overflow-hidden border bg-muted h-80 relative flex items-center justify-center">
+                <img id="modalPhotoImg" src="" alt="Meter High-Res" class="max-h-full max-w-full object-contain"/>
+            </div>
+            <div class="mt-4 flex justify-between items-center text-xs">
+                <span class="text-muted-foreground">Odometer Reading:</span>
+                <span class="font-mono font-bold text-sm text-foreground" id="modalPhotoOdo"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= shadcn Dialog: ADJUST MILEAGE MODAL ================= -->
+    <div id="adjustMileageModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs hidden">
+        <div class="relative w-full max-w-md rounded-xl border bg-background p-6 shadow-lg modal-content text-left">
+            <div class="flex items-center justify-between pb-3 border-b">
+                <div>
+                    <h3 class="text-base font-semibold leading-none tracking-tight">Adjust Mileage Range</h3>
+                    <p class="text-xs text-muted-foreground mt-1" id="mileageShiftRef">Calibrate odometer meter readings</p>
+                </div>
+                <button type="button" onclick="window.shadcnModal.close('adjustMileageModal')" class="text-muted-foreground hover:text-foreground">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <form onsubmit="submitAdjustMileage(event)" class="mt-4 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-medium">Start Meter (KM)</label>
+                        <input type="number" id="adjustStartKm" step="0.1" min="0" required oninput="calculatePreviewDistance()"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs font-mono focus:ring-1 focus:ring-ring"/>
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium">End Meter (KM)</label>
+                        <input type="number" id="adjustEndKm" step="0.1" min="0" oninput="calculatePreviewDistance()"
+                               placeholder="Optional if active"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs font-mono focus:ring-1 focus:ring-ring"/>
+                    </div>
+                </div>
+                <div class="p-2.5 rounded-lg bg-muted/60 border text-xs flex items-center justify-between">
+                    <span class="text-muted-foreground">Calculated Distance:</span>
+                    <span id="previewNetDistance" class="font-mono font-bold text-xs text-primary">—</span>
+                </div>
+                <div>
+                    <label class="text-xs font-medium">Adjustment Rationale / Supervisor Note</label>
+                    <textarea id="adjustReason" rows="2" placeholder="e.g. Optical OCR misread last digit; recalibrated with physical cluster capture."
+                              class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-xs shadow-xs focus:ring-1 focus:ring-ring"></textarea>
+                </div>
+                <div class="flex justify-end gap-2 pt-2 border-t">
+                    <button type="button" onclick="window.shadcnModal.close('adjustMileageModal')" class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submitAdjustMileageBtn" class="rounded-md bg-primary text-primary-foreground px-4 py-1.5 text-xs font-semibold hover:bg-primary/90 shadow-xs inline-flex items-center gap-1.5">
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                        <span>Save &amp; Recalculate</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentInspectedShiftId = '{{ $selected?->id }}';
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+        function inspectShiftById(shiftId) {
+            const shift = (window.__shiftsRegistry && window.__shiftsRegistry[shiftId]) || null;
+            if (!shift) return;
+
+            currentInspectedShiftId = shiftId;
+
+            // 1. Update row highlights in DataTable
+            document.querySelectorAll('.shift-table-row').forEach(row => {
+                row.classList.remove('bg-muted/60', 'font-medium', 'border-l-2', 'border-primary');
+            });
+            const activeRow = document.getElementById('shift-row-' + shiftId);
+            if (activeRow) {
+                activeRow.classList.add('bg-muted/60', 'font-medium', 'border-l-2', 'border-primary');
+            }
+
+            // 2. Update Inspection Desk details instantly (NO page reload)
+            const emptyState = document.getElementById('deskEmptyState');
+            const contentState = document.getElementById('deskContentState');
+
+            if (emptyState) emptyState.classList.add('hidden');
+            if (contentState) contentState.classList.remove('hidden');
+
+            // Reset verify buttons to prevent loader from hanging on status revert
+            const approveBtn = document.getElementById('deskApproveBtn');
+            if (approveBtn) {
+                approveBtn.disabled = false;
+                approveBtn.innerHTML = '<i data-lucide="shield-check" class="w-4 h-4"></i><span>Approve &amp; Verify Shift</span>';
+            }
+            const clearFlagBtn = document.getElementById('deskClearFlagBtn');
+            if (clearFlagBtn) {
+                clearFlagBtn.disabled = false;
+                clearFlagBtn.innerHTML = '<i data-lucide="shield-check" class="w-3.5 h-3.5"></i><span>Clear &amp; Verify</span>';
+            }
+
+            document.getElementById('deskShiftDisplayId').textContent = shift.display_id;
+
+            const statusBadge = document.getElementById('deskStatusBadge');
+            if (statusBadge) {
+                statusBadge.textContent = shift.status_label;
+                statusBadge.className = 'inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold ' + shift.status_badge_class;
+            }
+
+            document.getElementById('deskBusInfo').textContent = shift.bus_id + ' (' + shift.bus_plate + ')';
+            document.getElementById('deskDriverInfo').textContent = shift.driver_name + ' (' + shift.driver_badge + ')';
+            document.getElementById('deskStartKm').textContent = shift.start_km;
+            document.getElementById('deskEndKm').textContent = shift.end_km;
+            document.getElementById('deskDistanceKm').textContent = shift.distance_km;
+            document.getElementById('deskRouteLabel').textContent = shift.route_label;
+
+            // Update Lifecycle Pipeline Track
+            const lifecycleStatus = document.getElementById('deskLifecycleStatus');
+            const trackStartTime = document.getElementById('trackStartTime');
+            const trackEndTime = document.getElementById('trackEndTime');
+            const trackTransitDot = document.getElementById('trackTransitDot');
+            const trackTransitSub = document.getElementById('trackTransitSub');
+            const trackEndDot = document.getElementById('trackEndDot');
+            const trackVerifyDot = document.getElementById('trackVerifyDot');
+            const trackVerifySub = document.getElementById('trackVerifySub');
+
+            if (trackStartTime) trackStartTime.textContent = shift.started_at_time || 'Started';
+            if (trackEndTime) trackEndTime.textContent = shift.ended_at_time && shift.ended_at_time !== '—' ? shift.ended_at_time : 'Pending';
+
+            if (shift.status === 'in_progress' || !shift.has_start_and_end) {
+                if (lifecycleStatus) {
+                    lifecycleStatus.textContent = 'Active On Route';
+                    lifecycleStatus.className = 'text-[11px] font-bold text-amber-500 font-sans';
+                }
+                if (trackTransitDot) trackTransitDot.className = 'w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] font-bold animate-pulse shadow-xs';
+                if (trackTransitSub) trackTransitSub.textContent = 'Underway';
+                if (trackEndDot) trackEndDot.className = 'w-6 h-6 rounded-full bg-muted border text-muted-foreground flex items-center justify-center text-[10px] font-bold shadow-xs';
+                if (trackVerifyDot) trackVerifyDot.className = 'w-6 h-6 rounded-full bg-muted border text-muted-foreground flex items-center justify-center text-[10px] font-bold shadow-xs';
+                if (trackVerifySub) trackVerifySub.textContent = 'Locked';
+            } else if (shift.status === 'verified') {
+                if (lifecycleStatus) {
+                    lifecycleStatus.textContent = 'Verified & Approved';
+                    lifecycleStatus.className = 'text-[11px] font-bold text-emerald-600 font-sans';
+                }
+                if (trackTransitDot) trackTransitDot.className = 'w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
+                if (trackTransitSub) trackTransitSub.textContent = 'Complete';
+                if (trackEndDot) trackEndDot.className = 'w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
+                if (trackVerifyDot) trackVerifyDot.className = 'w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
+                if (trackVerifySub) trackVerifySub.textContent = 'Approved';
+            } else if (shift.status === 'flagged') {
+                if (lifecycleStatus) {
+                    lifecycleStatus.textContent = 'Flagged for Audit';
+                    lifecycleStatus.className = 'text-[11px] font-bold text-destructive font-sans';
+                }
+                if (trackTransitDot) trackTransitDot.className = 'w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
+                if (trackTransitSub) trackTransitSub.textContent = 'Complete';
+                if (trackEndDot) trackEndDot.className = 'w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
+                if (trackVerifyDot) trackVerifyDot.className = 'w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
+                if (trackVerifySub) trackVerifySub.textContent = 'Flagged';
+            } else {
+                // Completed & Pending audit
+                if (lifecycleStatus) {
+                    lifecycleStatus.textContent = 'Ready for Verification';
+                    lifecycleStatus.className = 'text-[11px] font-bold text-blue-600 font-sans';
+                }
+                if (trackTransitDot) trackTransitDot.className = 'w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
+                if (trackTransitSub) trackTransitSub.textContent = 'Complete';
+                if (trackEndDot) trackEndDot.className = 'w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
+                if (trackVerifyDot) trackVerifyDot.className = 'w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold shadow-xs animate-bounce';
+                if (trackVerifySub) trackVerifySub.textContent = 'Action Ready';
+            }
+
+            // Photos
+            const startContainer = document.getElementById('deskStartMeterContainer');
+            const startEmpty = document.getElementById('deskStartMeterEmpty');
+            const startImg = document.getElementById('deskStartMeterImg');
+            if (shift.start_meter_image_url) {
+                startImg.src = shift.start_meter_image_url;
+                startContainer.classList.remove('hidden');
+                startEmpty.classList.add('hidden');
+            } else {
+                startContainer.classList.add('hidden');
+                startEmpty.classList.remove('hidden');
+            }
+
+            const endContainer = document.getElementById('deskEndMeterContainer');
+            const endEmpty = document.getElementById('deskEndMeterEmpty');
+            const endImg = document.getElementById('deskEndMeterImg');
+            if (shift.end_meter_image_url) {
+                endImg.src = shift.end_meter_image_url;
+                endContainer.classList.remove('hidden');
+                endEmpty.classList.add('hidden');
+            } else {
+                endContainer.classList.add('hidden');
+                endEmpty.classList.remove('hidden');
+            }
+
+            // Notes
+            const notesContainer = document.getElementById('deskNotesContainer');
+            const notesText = document.getElementById('deskNotesText');
+            const combinedNotes = (shift.start_notes ? 'Start: ' + shift.start_notes : '') + (shift.end_notes ? ' | End: ' + shift.end_notes : '');
+            if (combinedNotes.trim() && notesContainer && notesText) {
+                notesText.textContent = combinedNotes;
+                notesContainer.classList.remove('hidden');
+            } else if (notesContainer) {
+                notesContainer.classList.add('hidden');
+            }
+
+            // Auditor Action Desk: Switch visible view
+            const boxInProgress = document.getElementById('deskActionInProgress');
+            const boxCompleted = document.getElementById('deskActionCompleted');
+            const boxVerified = document.getElementById('deskActionVerified');
+            const boxFlagged = document.getElementById('deskActionFlagged');
+
+            if (boxInProgress) boxInProgress.classList.add('hidden');
+            if (boxCompleted) boxCompleted.classList.add('hidden');
+            if (boxVerified) boxVerified.classList.add('hidden');
+            if (boxFlagged) boxFlagged.classList.add('hidden');
+
+            if (shift.status === 'verified') {
+                if (boxVerified) boxVerified.classList.remove('hidden');
+                const distSpan = document.getElementById('deskVerifiedDist');
+                if (distSpan) distSpan.textContent = shift.distance_km;
+            } else if (shift.status === 'flagged') {
+                if (boxFlagged) boxFlagged.classList.remove('hidden');
+            } else if (shift.status === 'in_progress' || !shift.has_start_and_end) {
+                // Trip started, not yet ended -> Locked notice, NO approval button
+                if (boxInProgress) boxInProgress.classList.remove('hidden');
+            } else {
+                // Trip started AND ended -> Approval button show!
+                if (boxCompleted) boxCompleted.classList.remove('hidden');
+            }
+
+            // Refresh icons if lucide exists
+            if (window.lucide) window.lucide.createIcons();
+
+            // 3. Update browser history cleanly without full page refresh
+            window.history.replaceState(null, '', '/shifts/' + shift.id);
         }
-      } finally {
-        shiftDetailPanel.classList.remove('opacity-60');
-      }
-    }
-  </script>
-</body></html>
+
+        function openPhotoModal(imgSrc, title, odo) {
+            if (!imgSrc) return;
+            document.getElementById('modalPhotoImg').src = imgSrc;
+            document.getElementById('modalPhotoTitle').textContent = title;
+            document.getElementById('modalPhotoOdo').textContent = odo;
+            window.shadcnModal.open('photoModal');
+        }
+
+        async function verifyCurrentShift() {
+            if (!currentInspectedShiftId) return;
+            const shift = window.__shiftsRegistry && window.__shiftsRegistry[currentInspectedShiftId];
+            if (!shift) return;
+
+            const btn = document.getElementById('deskApproveBtn');
+            const originalContent = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i><span>Verifying...</span>';
+                if (window.lucide) window.lucide.createIcons();
+            }
+
+            try {
+                const res = await fetch('/shifts/' + currentInspectedShiftId + '/verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                });
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    window.toast?.error('Verification Failed', data.message || 'Unable to verify shift.');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.innerHTML = originalContent;
+                        if (window.lucide) window.lucide.createIcons();
+                    }
+                    return;
+                }
+
+                // Update registry
+                const prevStatus = shift.status;
+                shift.status = 'verified';
+                shift.status_label = 'Verified';
+                shift.status_badge_class = 'border-emerald-500/30 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400';
+                shift.filter_status = 'verified';
+
+                // Update row in table
+                const row = document.getElementById('shift-row-' + currentInspectedShiftId);
+                if (row) {
+                    row.setAttribute('data-status', 'verified');
+                    const badgeSpan = row.querySelector('.shift-badge');
+                    if (badgeSpan) {
+                        badgeSpan.className = 'shift-badge inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors border-emerald-500/30 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400';
+                        badgeSpan.textContent = 'Verified';
+                    }
+                }
+
+                // Re-inspect to render Verified card
+                inspectShiftById(currentInspectedShiftId);
+
+                // Update top counters
+                adjustCounter('statCountVerified', 1);
+                if (prevStatus === 'completed') adjustCounter('statCountCompleted', -1);
+                if (prevStatus === 'flagged') adjustCounter('statCountFlagged', -1);
+
+                window.toast?.success(
+                    'Shift Verified & Approved',
+                    (shift.display_id || 'Shift') + ' mileage and telemetry verified.'
+                );
+            } catch (err) {
+                window.toast?.error('Network Error', 'Could not reach server to verify shift.');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalContent || '<i data-lucide="shield-check" class="w-4 h-4"></i><span>Approve &amp; Verify Shift</span>';
+                    if (window.lucide) window.lucide.createIcons();
+                }
+            }
+        }
+
+        async function flagCurrentShift() {
+            if (!currentInspectedShiftId) return;
+            const shift = window.__shiftsRegistry && window.__shiftsRegistry[currentInspectedShiftId];
+            if (!shift) return;
+
+            try {
+                const res = await fetch('/shifts/' + currentInspectedShiftId + '/flag', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ reason: 'Flagged for supervisor physical recount.' }),
+                });
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    window.toast?.error('Action Failed', data.message || 'Unable to flag shift.');
+                    return;
+                }
+
+                const prevStatus = shift.status;
+                shift.status = 'flagged';
+                shift.status_label = 'Flagged';
+                shift.status_badge_class = 'border-destructive/30 bg-destructive/15 text-destructive';
+                shift.filter_status = 'flagged';
+
+                const row = document.getElementById('shift-row-' + currentInspectedShiftId);
+                if (row) {
+                    row.setAttribute('data-status', 'flagged');
+                    const badgeSpan = row.querySelector('.shift-badge');
+                    if (badgeSpan) {
+                        badgeSpan.className = 'shift-badge inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors border-destructive/30 bg-destructive/15 text-destructive';
+                        badgeSpan.textContent = 'Flagged';
+                    }
+                }
+
+                inspectShiftById(currentInspectedShiftId);
+
+                adjustCounter('statCountFlagged', 1);
+                if (prevStatus === 'completed') adjustCounter('statCountCompleted', -1);
+                if (prevStatus === 'verified') adjustCounter('statCountVerified', -1);
+
+                window.toast?.warning(
+                    'Shift Flagged for Audit',
+                    (shift.display_id || 'Shift') + ' marked for physical meter audit.'
+                );
+            } catch (err) {
+                window.toast?.error('Network Error', 'Could not reach server to flag shift.');
+            }
+        }
+
+        async function revertShiftStatus(targetStatus) {
+            if (!currentInspectedShiftId) return;
+            const shift = window.__shiftsRegistry && window.__shiftsRegistry[currentInspectedShiftId];
+            if (!shift) return;
+
+            try {
+                const res = await fetch('/shifts/' + currentInspectedShiftId + '/status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({ status: targetStatus }),
+                });
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    window.toast?.error('Update Failed', data.message || 'Unable to revert shift status.');
+                    return;
+                }
+
+                const prevStatus = shift.status;
+                shift.status = targetStatus;
+                shift.status_label = targetStatus === 'completed' ? 'Pending Audit' : ucfirst(targetStatus);
+                shift.status_badge_class = targetStatus === 'completed'
+                    ? 'border-blue-500/30 bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent bg-secondary text-secondary-foreground';
+                shift.filter_status = targetStatus;
+
+                const row = document.getElementById('shift-row-' + currentInspectedShiftId);
+                if (row) {
+                    row.setAttribute('data-status', targetStatus);
+                    const badgeSpan = row.querySelector('.shift-badge');
+                    if (badgeSpan) {
+                        badgeSpan.className = 'shift-badge inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold transition-colors ' + shift.status_badge_class;
+                        badgeSpan.textContent = shift.status_label;
+                    }
+                }
+
+                inspectShiftById(currentInspectedShiftId);
+
+                if (prevStatus === 'verified') adjustCounter('statCountVerified', -1);
+                if (targetStatus === 'completed') adjustCounter('statCountCompleted', 1);
+
+                window.toast?.info('Status Reverted', (shift.display_id || 'Shift') + ' reverted to pending audit.');
+            } catch (err) {
+                window.toast?.error('Network Error', 'Could not reach server.');
+            }
+        }
+
+        function adjustCounter(id, delta) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const val = parseInt(el.textContent.replace(/\D/g, ''), 10) || 0;
+            el.textContent = Math.max(0, val + delta);
+        }
+
+        function openAdjustMileageModal() {
+            if (!currentInspectedShiftId) return;
+            const shift = window.__shiftsRegistry && window.__shiftsRegistry[currentInspectedShiftId];
+            if (!shift) return;
+
+            document.getElementById('mileageShiftRef').textContent = (shift.display_id || 'Shift') + ' • ' + (shift.bus_id || 'Bus');
+            const startKm = parseFloat(String(shift.start_km).replace(/[^0-9.]/g, '')) || 0;
+            const endKm = shift.end_km && !String(shift.end_km).includes('Pending')
+                ? parseFloat(String(shift.end_km).replace(/[^0-9.]/g, ''))
+                : '';
+
+            document.getElementById('adjustStartKm').value = startKm;
+            document.getElementById('adjustEndKm').value = endKm;
+            document.getElementById('adjustReason').value = '';
+            calculatePreviewDistance();
+            window.shadcnModal.open('adjustMileageModal');
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        function calculatePreviewDistance() {
+            const start = parseFloat(document.getElementById('adjustStartKm').value) || 0;
+            const endVal = document.getElementById('adjustEndKm').value;
+            const end = endVal !== '' ? parseFloat(endVal) : null;
+            const previewEl = document.getElementById('previewNetDistance');
+
+            if (end !== null && !isNaN(end)) {
+                const diff = (end - start).toFixed(1);
+                if (diff < 0) {
+                    previewEl.textContent = 'Invalid: End reading cannot be lower than start';
+                    previewEl.className = 'font-mono font-bold text-xs text-destructive';
+                } else {
+                    previewEl.textContent = diff + ' km net distance';
+                    previewEl.className = 'font-mono font-bold text-xs text-primary';
+                }
+            } else {
+                previewEl.textContent = 'Shift in progress (no closing reading yet)';
+                previewEl.className = 'font-mono text-xs text-muted-foreground';
+            }
+        }
+
+        async function submitAdjustMileage(e) {
+            e.preventDefault();
+            if (!currentInspectedShiftId) return;
+            const shift = window.__shiftsRegistry && window.__shiftsRegistry[currentInspectedShiftId];
+            if (!shift) return;
+
+            const startKm = parseFloat(document.getElementById('adjustStartKm').value);
+            const endKmVal = document.getElementById('adjustEndKm').value;
+            const endKm = endKmVal !== '' ? parseFloat(endKmVal) : null;
+            const reason = document.getElementById('adjustReason').value;
+
+            if (endKm !== null && endKm < startKm) {
+                window.toast?.error('Invalid Reading', 'End meter reading cannot be lower than start reading.');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitAdjustMileageBtn');
+            const orig = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i><span>Saving...</span>';
+            if (window.lucide) window.lucide.createIcons();
+
+            try {
+                const res = await fetch('/shifts/' + currentInspectedShiftId + '/mileage', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        start_km: startKm,
+                        end_km: endKm,
+                        adjustment_reason: reason,
+                    }),
+                });
+                const data = await res.json();
+
+                if (!res.ok || !data.success) {
+                    window.toast?.error('Calibration Failed', data.message || 'Could not adjust mileage.');
+                    return;
+                }
+
+                // Update shift registry
+                shift.start_km = Number(startKm).toLocaleString() + ' km';
+                shift.end_km = endKm !== null ? Number(endKm).toLocaleString() + ' km' : 'Pending Close';
+                shift.distance_km = data.distance_km !== null ? Number(data.distance_km).toFixed(1) + ' km' : '—';
+                shift.has_start_and_end = (startKm !== null && endKm !== null);
+
+                // Update table row
+                const row = document.getElementById('shift-row-' + currentInspectedShiftId);
+                if (row) {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length >= 6) {
+                        cells[3].textContent = shift.start_km + (endKm ? ' → ' + shift.end_km : '');
+                        cells[4].textContent = shift.distance_km;
+                    }
+                }
+
+                // Update detail desk
+                inspectShiftById(currentInspectedShiftId);
+                window.shadcnModal.close('adjustMileageModal');
+                window.toast?.success('Mileage Calibrated', data.message);
+            } catch (err) {
+                window.toast?.error('Network Error', 'Failed to reach server.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = orig;
+                if (window.lucide) window.lucide.createIcons();
+            }
+        }
+
+        // Initialize first inspection if selected
+        document.addEventListener('DOMContentLoaded', () => {
+            if (currentInspectedShiftId) {
+                inspectShiftById(currentInspectedShiftId);
+            }
+        });
+    </script>
+</body>
+</html>

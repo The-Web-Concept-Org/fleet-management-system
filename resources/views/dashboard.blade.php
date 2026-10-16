@@ -1,450 +1,565 @@
 <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <meta name="csrf-token" content="{{ csrf_token() }}"/>
+    <title>Operations Dashboard &bull; Lancotri</title>
+    @include('partials.brand-styles')
+    <link rel="icon" type="image/svg+xml" href="{{ asset('images/lancotri-mark.svg') }}">
+</head>
+<body class="bg-background text-foreground antialiased min-h-screen">
+    @include('partials.sidebar')
 
-<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Sora:wght@400;500;600;700&amp;family=Poppins:wght@600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><title>Operations Dashboard &bull; Lancotri</title><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "outline-variant": "#D1D5DB", "on-surface": "#111827", "surface-variant": "#E1E5EC", "inverse-on-surface": "#F1F5F9", "on-primary": "#ffffff", "surface-container-high": "#E1E5EC", "on-secondary": "#ffffff", "secondary": "#0A81B4", "primary-fixed-dim": "#E9A0A2", "on-primary-container": "#ffffff", "background": "#F7F8FA", "error": "#ba1a1a", "border-strong": "#CBD5E1", "tertiary-fixed-dim": "#8FCBE5", "on-tertiary-container": "#E7F4FB", "tertiary-container": "#0A81B4", "tertiary-fixed": "#CFEAF7", "sync-active": "#10B981", "tertiary": "#0A6E99", "surface-container-low": "#F1F3F6", "surface": "#F7F8FA", "on-tertiary-fixed": "#052E42", "surface-tint": "#BD1C23", "on-surface-variant": "#4B5563", "on-secondary-fixed": "#052E42", "on-secondary-container": "#0A5473", "on-primary-fixed-variant": "#8E1418", "surface-card": "#FFFFFF", "on-secondary-fixed-variant": "#0A5C80", "inverse-surface": "#283044", "primary-container": "#BD1C23", "on-primary-fixed": "#3E0A0C", "surface-container-lowest": "#ffffff", "secondary-fixed": "#CFEAF7", "secondary-fixed-dim": "#8FCBE5", "surface-bright": "#F7F8FA", "on-error": "#ffffff", "primary-fixed": "#F7D2D3", "on-tertiary-fixed-variant": "#0A5C80", "surface-dim": "#D2D9E3", "primary": "#A11217", "inverse-primary": "#F2A7A9", "on-error-container": "#93000a", "surface-container": "#E9ECF1", "danger-critical": "#EF4444", "surface-container-highest": "#D8DEE7", "on-tertiary": "#ffffff", "error-container": "#ffdad6", "secondary-container": "#CFEAF7", "sync-pending": "#F59E0B", "on-background": "#111827", "sync-offline": "#64748B", "canvas-base": "#F8FAFC", "outline": "#6B7280" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "space-xl": "2.25rem", "space-lg": "1.5rem", "space-md": "1rem", "space-sm": "0.5rem", "gutter-tablet": "1.5rem", "gutter": "1rem", "space-xs": "0.25rem", "margin": "1rem", "margin-tablet": "2rem" }, "fontFamily": { "label-action": [ "Plus Jakarta Sans" ], "headline-sm": [ "Sora" ], "headline-md": [ "Sora" ], "headline-lg": [ "Sora" ], "body-sm": [ "Plus Jakarta Sans" ], "body-lg": [ "Plus Jakarta Sans" ], "label-numeric": [ "Sora" ], "display-odometer": [ "Sora" ], "label-caps": [ "Sora" ], "body-md": [ "Plus Jakarta Sans" ] }, "fontSize": { "label-action": [ "18px", { "lineHeight": "24px", "fontWeight": "600" } ], "headline-sm": [ "18px", { "lineHeight": "24px", "fontWeight": "600" } ], "headline-md": [ "22px", { "lineHeight": "28px", "fontWeight": "600" } ], "headline-lg": [ "30px", { "lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700" } ], "body-sm": [ "13px", { "lineHeight": "18px", "fontWeight": "400" } ], "body-lg": [ "17px", { "lineHeight": "24px", "fontWeight": "500" } ], "label-numeric": [ "20px", { "lineHeight": "24px", "letterSpacing": "0.02em", "fontWeight": "700" } ], "display-odometer": [ "44px", { "lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700" } ], "label-caps": [ "12px", { "lineHeight": "16px", "letterSpacing": "0.08em", "fontWeight": "700" } ], "body-md": [ "15px", { "lineHeight": "22px", "fontWeight": "400" } ] } } } };</script>@include('partials.brand-styles')
-  <link rel="icon" type="image/svg+xml" href="{{ asset('images/lancotri-mark.svg') }}">
-</head><body class="bg-surface font-body-md text-body-md text-on-surface antialiased min-h-screen">@include('partials.sidebar')<div class="pl-64 flex flex-col min-h-screen">@include('partials.topbar', ['topbarStatus' => $activeBuses . ' active vehicles'])<main class="w-full pt-16 flex-1 px-space-lg py-space-lg bg-surface"><div class="flex flex-col w-full gap-space-lg">
-<div class="flex flex-col xl:flex-row xl:items-center justify-between gap-space-md bg-surface-card p-space-md lg:p-space-lg rounded-xl shadow-sm">
-<div class="flex flex-col gap-1">
-<div class="flex items-center gap-space-xs text-outline">
-<span class="material-symbols-outlined text-sm">hub</span>
-<span class="font-label-caps text-label-caps uppercase tracking-wider">Central Depot Fleet Command</span>
-<span class="text-xs">&bull;</span>
-<span class="font-body-sm text-body-sm text-sync-active font-medium">Real-Time Telemetry Feed</span>
-</div>
-<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Operations Dashboard</h1>
-</div>
-<div class="flex flex-wrap items-center gap-space-sm sm:gap-space-md">
-<div class="flex items-center gap-space-xs bg-surface-container-low px-space-md py-2 rounded-lg shadow-sm">
-<span class="material-symbols-outlined text-outline text-lg">calendar_today</span>
-<span class="font-body-md text-body-md font-semibold text-on-surface">Today, {{ now()->format('M j, Y') }}</span>
-<button class="text-outline hover:text-on-surface flex items-center">
-<span class="material-symbols-outlined text-base">expand_more</span>
-</button>
-</div>
-<div class="hidden md:flex items-center gap-space-xs px-space-md py-2 rounded-lg bg-surface-container-high text-on-surface">
-<span class="inline-block w-2.5 h-2.5 rounded-full bg-sync-active animate-ping"></span>
-<span class="font-body-sm text-body-sm font-semibold">99.4% Uplink Operational</span>
-</div>
-<button class="flex items-center gap-space-xs px-space-md py-2.5 rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-container-highest transition-colors font-body-md text-body-md font-semibold shadow-sm" id="exportDailyBtn">
-<span class="material-symbols-outlined text-lg">download</span>
-<span>Export Daily Log</span>
-</button>
-<button class="flex items-center gap-space-xs px-space-lg py-2.5 rounded-lg bg-primary-container text-on-primary hover:bg-primary transition-all font-body-md text-body-md font-bold shadow-md hover:shadow-lg active:scale-95" id="newShiftBtn">
-<span class="material-symbols-outlined text-lg">add_circle</span>
-<span>+ New Shift</span>
-</button>
-</div>
-</div>
-<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md">
-<div class="bg-surface-card p-space-md lg:p-space-lg rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
-<div class="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-surface-container-low pointer-events-none"></div>
-<div class="flex items-start justify-between">
-<div class="flex flex-col">
-<span class="font-label-caps text-label-caps text-outline uppercase tracking-wider">Fleet Utilization</span>
-<span class="font-headline-sm text-headline-sm text-on-surface mt-1">Buses on Shift Today</span>
-</div>
-<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-primary">
-<span class="material-symbols-outlined">directions_bus</span>
-</div>
-</div>
-<div class="mt-4 flex items-baseline gap-space-xs">
-<span class="font-display-odometer text-display-odometer text-on-surface">{{ $activeBuses }}</span>
-<span class="font-headline-md text-headline-md text-outline">/ {{ $totalBuses }} total</span>
-</div>
-<div class="mt-3 flex items-center justify-between pt-space-xs bg-surface-container-low p-space-sm rounded-lg">
-<div class="flex items-center gap-1 text-secondary font-semibold font-body-sm text-body-sm">
-<span class="material-symbols-outlined text-sm">garage</span>
-<span>{{ $standbyBuses }} ready / standby</span>
-</div>
-<span class="font-label-caps text-label-caps font-bold px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed">{{ $utilizationPct }}% Cap</span>
-</div>
-</div>
-<div class="bg-surface-card p-space-md lg:p-space-lg rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
-<div class="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-surface-container-low pointer-events-none"></div>
-<div class="flex items-start justify-between">
-<div class="flex flex-col">
-<span class="font-label-caps text-label-caps text-outline uppercase tracking-wider">Distance Aggregation</span>
-<span class="font-headline-sm text-headline-sm text-on-surface mt-1">Total Fleet Distance</span>
-</div>
-<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-primary-container">
-<span class="material-symbols-outlined">route</span>
-</div>
-</div>
-<div class="mt-4 flex items-baseline gap-space-xs">
-<span class="font-display-odometer text-display-odometer text-on-surface">{{ number_format($totalOdometer) }}</span>
-<span class="font-label-numeric text-label-numeric text-outline">km</span>
-</div>
-<div class="mt-3 flex items-center justify-between bg-surface-container-low p-space-sm rounded-lg">
-<span class="font-body-sm text-body-sm text-on-surface-variant">Average per Vehicle</span>
-<span class="font-label-numeric text-label-numeric text-on-surface">{{ number_format($avgOdometerPerBus) }} km/bus</span>
-</div>
-</div>
-<div class="bg-surface-card p-space-md lg:p-space-lg rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
-<div class="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-surface-container-low pointer-events-none"></div>
-<div class="flex items-start justify-between">
-<div class="flex flex-col">
-<span class="font-label-caps text-label-caps text-outline uppercase tracking-wider">Operating Expenses</span>
-<span class="font-headline-sm text-headline-sm text-on-surface mt-1">Fuel Spend (This Month)</span>
-</div>
-<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-sync-pending">
-<span class="material-symbols-outlined">local_gas_station</span>
-</div>
-</div>
-<div class="mt-4 flex items-baseline gap-space-xs">
-<span class="font-display-odometer text-display-odometer text-on-surface">${{ number_format($totalFuelCost, 0) }}</span>
-<span class="font-body-sm text-body-sm text-outline">USD</span>
-</div>
-<div class="mt-3 flex items-center justify-between bg-surface-container-low p-space-sm rounded-lg">
-<span class="font-body-sm text-body-sm text-on-surface-variant">{{ number_format($totalFuelLiters) }} L Diesel</span>
-<span class="font-label-numeric text-label-numeric text-on-surface">${{ number_format($avgFuelPrice, 2) }}/L avg</span>
-</div>
-</div>
-<div class="bg-surface-card p-space-md lg:p-space-lg rounded-xl shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
-<div class="absolute -right-4 -top-4 w-24 h-24 rounded-full bg-surface-container-low pointer-events-none"></div>
-<div class="flex items-start justify-between">
-<div class="flex flex-col">
-<span class="font-label-caps text-label-caps text-outline uppercase tracking-wider">Depot Servicing</span>
-<span class="font-headline-sm text-headline-sm text-on-surface mt-1">Maintenance Spend</span>
-</div>
-<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-tertiary-container">
-<span class="material-symbols-outlined">build</span>
-</div>
-</div>
-<div class="mt-4 flex items-baseline gap-space-xs">
-<span class="font-display-odometer text-display-odometer text-on-surface">$0.00</span>
-<span class="font-body-sm text-body-sm text-outline">USD</span>
-</div>
-<div class="mt-3 flex items-center justify-between bg-surface-container-low p-space-sm rounded-lg">
-<span class="font-body-sm text-body-sm text-on-surface-variant">0 completed</span>
-<span class="font-body-sm text-body-sm text-sync-pending font-semibold">0 pending review</span>
-</div>
-</div>
-</div>
-<div class="flex flex-col gap-space-sm">
-<div class="flex items-center justify-between px-space-xs">
-<div class="flex items-center gap-space-xs">
-<span class="material-symbols-outlined text-danger-critical text-xl animate-pulse">crisis_alert</span>
-<span class="font-headline-sm text-headline-sm text-on-surface">Critical Fleet Alerts</span>
-</div>
-<span class="font-label-caps text-label-caps text-outline uppercase">{{ $alertCount }} {{ \Illuminate\Support\Str::plural('item', $alertCount) }} require dispatcher action</span>
-</div>
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-space-md">
-@if($primaryAlert)
-<div class="lg:col-span-2 bg-error-container/40 p-space-md lg:p-space-lg rounded-xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
-<div class="flex items-start gap-space-md">
-<div class="w-12 h-12 rounded-xl bg-danger-critical text-on-primary flex items-center justify-center shrink-0 shadow-sm">
-<span class="material-symbols-outlined text-2xl">{{ $primaryAlert->status === 'out_of_service' ? 'error_med' : 'speed' }}</span>
-</div>
-<div class="flex flex-col">
-<div class="flex items-center gap-space-xs flex-wrap">
-<span class="px-2 py-0.5 rounded-full bg-danger-critical text-on-primary font-label-caps text-label-caps uppercase">{{ $primaryAlert->status === 'out_of_service' ? 'Out of Service' : 'Service Overdue' }}</span>
-<span class="font-label-numeric text-label-numeric text-on-surface">{{ $primaryAlert->display_id }}</span>
-<span class="text-outline text-xs">&bull;</span>
-<span class="font-body-sm text-body-sm text-outline">{{ $primaryAlert->plate }}</span>
-</div>
-@if($primaryAlert->status === 'out_of_service')
-<p class="font-body-md text-body-md text-on-surface font-semibold mt-1">Vehicle flagged out of service</p>
-<p class="font-body-sm text-body-sm text-on-surface-variant">{{ $primaryAlert->display_id }} requires dispatcher review before it can return to the roster.</p>
-@else
-<p class="font-body-md text-body-md text-on-surface font-semibold mt-1">Service interval exceeded by {{ number_format(abs($primaryAlert->next_service_km)) }} km</p>
-<p class="font-body-sm text-body-sm text-on-surface-variant">Current odometer reading is {{ number_format($primaryAlert->odometer) }} km.</p>
-@endif
-</div>
-</div>
-<div class="flex items-center sm:flex-col gap-space-xs shrink-0 self-end sm:self-center">
-<a class="w-full sm:w-36 flex items-center justify-center gap-1 px-space-md py-2 rounded-lg bg-surface-card text-on-surface hover:bg-surface-container-high transition-colors font-body-sm text-body-sm font-semibold shadow-sm" href="{{ route('buses') }}">
-<span class="material-symbols-outlined text-sm">visibility</span>
-<span>View Bus</span>
-</a>
-<button class="w-full sm:w-36 flex items-center justify-center gap-1 px-space-md py-2 rounded-lg bg-danger-critical text-on-primary hover:bg-error transition-colors font-body-sm text-body-sm font-semibold shadow-sm" onclick="dismissAlert(this)">
-<span class="material-symbols-outlined text-sm">check</span>
-<span>Acknowledge</span>
-</button>
-</div>
-</div>
-@else
-<div class="lg:col-span-2 bg-secondary-container/40 p-space-md lg:p-space-lg rounded-xl shadow-sm flex items-center gap-space-md">
-<span class="material-symbols-outlined text-sync-active text-3xl">check_circle</span>
-<div class="flex flex-col">
-<p class="font-body-md text-body-md text-on-surface font-semibold">No critical fleet alerts</p>
-<p class="font-body-sm text-body-sm text-on-surface-variant">Every registered bus is within its service window.</p>
-</div>
-</div>
-@endif
-@if($nextServiceBus)
-<div class="bg-surface-card p-space-md lg:p-space-lg rounded-xl shadow-sm flex flex-col justify-between">
-<div class="flex items-start gap-space-sm">
-<div class="w-10 h-10 rounded-lg bg-surface-container-high text-sync-pending flex items-center justify-center shrink-0">
-<span class="material-symbols-outlined">notifications_active</span>
-</div>
-<div class="flex flex-col">
-<span class="font-label-caps text-label-caps text-sync-pending uppercase font-bold">Preventive Maintenance</span>
-<span class="font-headline-sm text-headline-sm text-on-surface mt-0.5">{{ $nextServiceBus->display_id }} Notice</span>
-<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Scheduled service due in <span class="font-bold text-on-surface">{{ number_format($nextServiceBus->next_service_km) }} km</span>.</p>
-</div>
-</div>
-<div class="mt-4 flex items-center justify-between pt-2">
-<span class="font-label-caps text-label-caps text-outline">Odometer: {{ number_format($nextServiceBus->odometer) }} km</span>
-<a class="px-space-md py-1.5 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-body-sm text-body-sm font-semibold transition-colors" href="{{ route('buses') }}">
-            Assign Depot Bay
-          </a>
-</div>
-</div>
-@else
-<div class="bg-surface-card p-space-md lg:p-space-lg rounded-xl shadow-sm flex flex-col items-center justify-center text-center gap-2">
-<span class="material-symbols-outlined text-outline text-3xl">event_available</span>
-<span class="font-body-sm text-body-sm text-on-surface-variant">No scheduled services pending.</span>
-</div>
-@endif
-</div>
-<div class="bg-surface-card rounded-xl shadow-sm overflow-hidden flex flex-col">
-<div class="p-space-md lg:p-space-lg flex flex-col sm:flex-row sm:items-center justify-between gap-space-md bg-surface-container-low/50">
-<div class="flex items-center gap-space-sm">
-<div class="w-10 h-10 rounded-lg bg-primary text-on-primary flex items-center justify-center">
-<span class="material-symbols-outlined">commute</span>
-</div>
-<div>
-<h2 class="font-headline-md text-headline-md text-on-surface tracking-tight">Active Shifts &amp; Live Vehicles</h2>
-<p class="font-body-sm text-body-sm text-on-surface-variant">Real-time telemetry, driver status, and meter synchronization</p>
-</div>
-</div>
-<div class="flex items-center gap-space-xs self-start sm:self-auto">
-<div class="flex rounded-lg bg-surface-container p-1 text-on-surface">
-<button class="px-3 py-1 rounded bg-surface-card font-body-sm text-body-sm font-semibold shadow-sm">All ({{ $totalBuses }})</button>
-<button class="px-3 py-1 font-body-sm text-body-sm text-outline hover:text-on-surface">Active ({{ $activeBuses }})</button>
-<button class="px-3 py-1 font-body-sm text-body-sm text-outline hover:text-on-surface">Alerts ({{ $alertCount }})</button>
-</div>
-</div>
-</div>
-<div class="w-full overflow-x-auto">
-<table class="w-full text-left border-collapse">
-<thead>
-<tr class="bg-surface-container-low text-on-surface-variant font-label-caps text-label-caps uppercase tracking-wider">
-<th class="py-3 px-space-md font-bold">Bus #</th>
-<th class="py-3 px-space-md font-bold">Assigned Driver</th>
-<th class="py-3 px-space-md font-bold">Shift Status</th>
-<th class="py-3 px-space-md font-bold">Start Time</th>
-<th class="py-3 px-space-md font-bold">Start Meter</th>
-<th class="py-3 px-space-md font-bold">Current / Est Meter</th>
-<th class="py-3 px-space-md font-bold">Fuel Level</th>
-<th class="py-3 px-space-md font-bold text-right">Quick Actions</th>
-</tr>
-</thead>
-<tbody class="divide-y-0 text-on-surface font-body-md text-body-md">
-@forelse($buses as $bus)
-@php
-    $driverName = $bus->driver?->user?->name;
-    $initials = $driverName
-        ? strtoupper(collect(explode(' ', $driverName))->map(fn ($part) => substr($part, 0, 1))->take(2)->implode(''))
-        : '';
+    <div class="pl-64 flex flex-col min-h-screen">
+        @include('partials.topbar', ['topbarStatus' => $activeBuses . ' active vehicles'])
 
-    $statusMap = [
-        'active' => ['label' => $bus->route ?: 'On Route', 'badge' => 'bg-secondary-fixed text-on-secondary-fixed-variant', 'dot' => 'bg-secondary', 'row' => ''],
-        'standby' => ['label' => 'Ready / Standby', 'badge' => 'bg-surface-container-highest text-on-surface-variant', 'dot' => 'bg-outline', 'row' => ''],
-        'depot' => ['label' => 'Idle at Depot', 'badge' => 'bg-surface-container-highest text-on-surface-variant', 'dot' => 'bg-outline', 'row' => ''],
-        'maintenance' => ['label' => 'In Maintenance', 'badge' => 'bg-primary-fixed text-on-primary-fixed-variant', 'dot' => 'bg-primary-container', 'row' => ''],
-        'out_of_service' => ['label' => 'Out of Service', 'badge' => 'bg-danger-critical text-on-primary', 'dot' => 'bg-danger-critical', 'row' => 'bg-error-container/10'],
-    ];
-    $st = $statusMap[$bus->status] ?? $statusMap['standby'];
-@endphp
-<tr class="hover:bg-surface-container-low/60 transition-colors {{ $st['row'] }}">
-<td class="py-3.5 px-space-md">
-<div class="flex items-center gap-space-xs">
-<span class="w-2 h-2 rounded-full {{ $st['dot'] }}"></span>
-<span class="font-headline-sm text-headline-sm font-bold text-on-surface">{{ $bus->display_id }}</span>
-</div>
-<span class="font-body-sm text-body-sm text-outline">{{ $bus->model ?? 'Unspecified chassis' }}</span>
-</td>
-<td class="py-3.5 px-space-md">
-@if($driverName)
-<div class="flex items-center gap-space-xs">
-<div class="w-7 h-7 rounded-full bg-surface-container-high text-on-surface font-semibold flex items-center justify-center text-xs">{{ $initials }}</div>
-<div class="flex flex-col">
-<span class="font-semibold leading-tight">{{ $driverName }}</span>
-<span class="font-body-sm text-body-sm text-outline">{{ $bus->driver->display_id ?? 'Driver #—' }}</span>
-</div>
-</div>
-@else
-<span class="font-body-sm text-body-sm text-outline italic">Unassigned</span>
-@endif
-</td>
-<td class="py-3.5 px-space-md">
-<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full {{ $st['badge'] }} font-body-sm text-body-sm font-bold">
-<span class="w-2 h-2 rounded-full {{ $st['dot'] }}"></span>
-                {{ $st['label'] }}
-              </span>
-</td>
-<td class="py-3.5 px-space-md font-body-sm text-body-sm font-medium text-outline">&mdash;</td>
-<td class="py-3.5 px-space-md font-label-numeric text-label-numeric text-outline">&mdash;</td>
-<td class="py-3.5 px-space-md font-label-numeric text-label-numeric text-on-surface">{{ number_format($bus->odometer) }} km</td>
-<td class="py-3.5 px-space-md font-label-numeric text-label-numeric text-outline">&mdash;</td>
-<td class="py-3.5 px-space-md text-right">
-<div class="flex items-center justify-end gap-1">
-<a class="p-1.5 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high" href="{{ route('buses') }}" title="View in fleet roster">
-<span class="material-symbols-outlined text-lg">visibility</span>
-</a>
-</div>
-</td>
-</tr>
-@empty
-<tr>
-<td class="py-10 text-center text-outline" colspan="8">No buses registered in the fleet yet.</td>
-</tr>
-@endforelse
-</tbody>
-</table>
-</div>
-<div class="p-space-md flex flex-col sm:flex-row items-center justify-between gap-space-sm bg-surface-container-low/30 text-on-surface-variant font-body-sm text-body-sm">
-<span>Showing {{ $totalBuses }} of {{ $totalBuses }} total fleet vehicles</span>
-<div class="flex items-center gap-1">
-<button class="px-3 py-1 rounded bg-surface-card text-on-surface shadow-sm font-semibold">1</button>
-<button class="px-3 py-1 rounded hover:bg-surface-container-high transition-colors">2</button>
-<button class="px-3 py-1 rounded hover:bg-surface-container-high transition-colors">3</button>
-</div>
-</div>
-</div>
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-space-lg">
-<div class="bg-surface-card p-space-md lg:p-space-lg rounded-xl shadow-sm flex flex-col gap-space-md">
-<div class="flex items-center justify-between pb-space-xs">
-<div class="flex items-center gap-space-xs">
-<div class="w-8 h-8 rounded-lg bg-surface-container-high text-primary flex items-center justify-center">
-<span class="material-symbols-outlined text-base">local_gas_station</span>
-</div>
-<div>
-<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Recent Fuel Entries</h3>
-<span class="font-body-sm text-body-sm text-outline">Driver submitted dispenser receipts</span>
-</div>
-</div>
-<a class="font-body-sm text-body-sm font-bold text-primary hover:underline" href="#">View All Fuel</a>
-</div>
-<div class="flex flex-col items-center justify-center text-center gap-2 py-space-lg">
-<span class="material-symbols-outlined text-outline text-3xl">local_gas_station</span>
-<p class="font-body-sm text-body-sm text-on-surface-variant">No fuel entries recorded yet.</p>
-<p class="font-body-sm text-body-sm text-outline text-xs">Driver-submitted receipts will appear here once the fuel log is available.</p>
-</div>
-</div>
-<div class="bg-surface-card p-space-md lg:p-space-lg rounded-xl shadow-sm flex flex-col gap-space-md">
-<div class="flex items-center justify-between pb-space-xs">
-<div class="flex items-center gap-space-xs">
-<div class="w-8 h-8 rounded-lg bg-surface-container-high text-tertiary-container flex items-center justify-center">
-<span class="material-symbols-outlined text-base">engineering</span>
-</div>
-<div>
-<h3 class="font-headline-sm text-headline-sm text-on-surface font-bold">Recent Maintenance</h3>
-<span class="font-body-sm text-body-sm text-outline">Workshop orders &amp; parts replacement</span>
-</div>
-</div>
-<a class="font-body-sm text-body-sm font-bold text-primary hover:underline" href="#">View Maintenance</a>
-</div>
-<div class="flex flex-col items-center justify-center text-center gap-2 py-space-lg">
-<span class="material-symbols-outlined text-outline text-3xl">engineering</span>
-<p class="font-body-sm text-body-sm text-on-surface-variant">No maintenance records yet.</p>
-<p class="font-body-sm text-body-sm text-outline text-xs">Workshop orders will appear here once the maintenance log is available.</p>
-</div>
-</div>
-</div>
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/60 backdrop-blur-sm p-4 hidden" id="photoModal">
-<div class="bg-surface-card rounded-2xl max-w-lg w-full p-space-lg shadow-xl flex flex-col gap-space-md">
-<div class="flex items-center justify-between">
-<div class="flex items-center gap-space-xs">
-<span class="material-symbols-outlined text-danger-critical">warning</span>
-<h4 class="font-headline-md text-headline-md text-on-surface">Meter Verification Audit</h4>
-</div>
-<button class="p-1 rounded-lg text-outline hover:text-on-surface hover:bg-surface-container-high" onclick="togglePhotoModal(false)">
-<span class="material-symbols-outlined">close</span>
-</button>
-</div>
-<div class="relative w-full h-64 rounded-xl overflow-hidden bg-surface-container-highest shadow-inner">
-<img class="w-full h-full object-cover" data-alt="High resolution crisp macro photo of an analog bus odometer dial inside vehicle dashboard showing 148,770 kilometers with steering wheel edge visible in soft daylight" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBB_Rp4xV-YqkuoDqWhIfkdK_wgYP6RZfYFySoVTbVsX3aQjX65KSFQIBt8QDauLaH89vNk5XXZ5YS4A441fnpd2IrWxnIvriySvyE1-QJXYEwYgRX2PKHTbq2LKtNX2GqVWRZZbm1iyfPDtDW7pi3_2KT3Ern-HuI_vZRF9u8kdyZsWuqOLbmge0PWDBT-bXEQQa2TQxrtH8G_lUTfFP16-2YlhGl4BKoHBrs1W3ESzvkJOrGN22B2"/>
-<div class="absolute top-3 left-3 px-2 py-1 bg-surface-card/90 backdrop-blur-sm rounded-md shadow-sm">
-<span class="font-label-caps text-label-caps text-on-surface font-bold">Captured: 11:20 AM</span>
-</div>
-<div class="absolute bottom-3 right-3 px-2.5 py-1 bg-on-surface/90 text-surface text-xs font-mono rounded">
-          GPS: Lat 40.7128, Lon -74.0060
-        </div>
-</div>
-<div class="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-1">
-<div class="flex justify-between text-body-sm font-semibold">
-<span class="text-outline">Assigned Vehicle:</span>
-<span class="text-on-surface font-headline-sm text-headline-sm">Bus #42</span>
-</div>
-<div class="flex justify-between text-body-sm">
-<span class="text-outline">Driver:</span>
-<span class="text-on-surface font-medium">Marcus Vance (Driver #8802)</span>
-</div>
-<div class="flex justify-between text-body-sm">
-<span class="text-outline">Shift Start Meter:</span>
-<span class="font-label-numeric text-label-numeric text-on-surface">148,320 km</span>
-</div>
-<div class="flex justify-between text-body-sm">
-<span class="text-outline">Photo Reading:</span>
-<span class="font-label-numeric text-label-numeric text-danger-critical font-bold">148,770 km</span>
-</div>
-<div class="flex justify-between text-body-sm font-semibold pt-1">
-<span class="text-danger-critical">Delta Inconsistency:</span>
-<span class="text-danger-critical">+450 km in 4.8 hrs (Expected &lt; 150 km)</span>
-</div>
-</div>
-<div class="flex gap-space-sm">
-<button class="flex-1 py-3 rounded-lg bg-surface-container-high text-on-surface font-body-md text-body-md font-bold hover:bg-surface-container-highest transition-colors" onclick="togglePhotoModal(false)">
-          Flag For Inspection
-        </button>
-<button class="flex-1 py-3 rounded-lg bg-primary-container text-on-primary font-body-md text-body-md font-bold hover:bg-primary transition-colors" onclick="approveReading()">
-          Accept Override
-        </button>
-</div>
-</div>
-</div>
-<script>
-    function togglePhotoModal(show) {
-      const modal = document.getElementById('photoModal');
-      if (show) {
-        modal.classList.remove('hidden');
-      } else {
-        modal.classList.add('hidden');
-      }
-    }
+        <main class="w-full pt-16 flex-1 px-8 py-8 bg-background">
+            <div class="flex flex-col w-full gap-6 max-w-7xl mx-auto">
 
-    function dismissAlert(button) {
-      const card = button.closest('.bg-error-container\\/40');
-      if (card) {
-        card.style.opacity = '0';
-        card.style.transition = 'opacity 0.3s ease';
-        setTimeout(() => {
-          card.innerHTML = `
-            <div class="w-full flex items-center justify-between p-2">
-              <div class="flex items-center gap-2 text-secondary font-semibold font-body-md text-body-md">
-                <span class="material-symbols-outlined text-sync-active">check_circle</span>
-                <span>Alert acknowledged by dispatcher Alex Turner.</span>
-              </div>
-              <span class="font-body-sm text-body-sm text-outline">Logged to audit trail</span>
+                <!-- Page Header: Title + Telemetry Uplink + Action Buttons -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b">
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center gap-2 text-xs text-muted-foreground font-mono">
+                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted border border-border">
+                                <i data-lucide="radio" class="w-3.5 h-3.5 text-primary"></i>
+                                <span>CENTRAL DEPOT FLEET COMMAND</span>
+                            </span>
+                            <span>&bull;</span>
+                            <span class="inline-flex items-center gap-1.5 text-emerald-600 font-medium">
+                                <span class="relative flex h-2 w-2">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                </span>
+                                Real-Time Telemetry Feed
+                            </span>
+                        </div>
+                        <div>
+                            <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Operations Dashboard</h1>
+                            <p class="text-xs text-muted-foreground mt-2 leading-relaxed max-w-2xl">Live telemetry streaming from active metro vehicles, GPS tracking, and depot dispatch.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2.5">
+                        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-card text-xs shadow-xs text-foreground">
+                            <i data-lucide="calendar" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                            <span class="font-medium">Today, {{ now()->format('M j, Y') }}</span>
+                        </div>
+
+                        <div class="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-muted/60 text-xs">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span class="font-mono text-muted-foreground text-[11px]">99.4% Uplink Operational</span>
+                        </div>
+
+                        <button id="exportDailyBtn" type="button"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-input bg-card px-3.5 py-2 text-xs font-semibold text-foreground shadow-xs hover:bg-muted transition-colors">
+                            <i data-lucide="download" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                            <span>Export Daily Log</span>
+                        </button>
+
+                        <a href="{{ route('shifts') }}"
+                           class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all active:scale-95">
+                            <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                            <span>+ New Shift</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 4 shadcn Metric Stat Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Card 1: Fleet Utilization -->
+                    <div class="rounded-xl border border-border bg-card p-5 shadow-xs flex flex-col justify-between hover:shadow-sm transition-shadow relative overflow-hidden group">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">Fleet Utilization</span>
+                            <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                                <i data-lucide="bus" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <div class="flex items-baseline gap-1.5">
+                                <span class="text-3xl font-bold tracking-tight text-foreground font-mono" data-telemetry-key="activeBuses">{{ $activeBuses }}</span>
+                                <span class="text-xs text-muted-foreground">/ <span data-telemetry-key="totalBuses">{{ $totalBuses }}</span> total</span>
+                            </div>
+                            <p class="text-xs text-muted-foreground mt-0.5">Buses en route today</p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
+                            <span class="text-muted-foreground flex items-center gap-1.5">
+                                <i data-lucide="warehouse" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                                <span data-telemetry-key="standbyBuses">{{ $standbyBuses }}</span> standby
+                            </span>
+                            <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-mono" data-telemetry-key="utilizationPct">
+                                {{ $utilizationPct }}% Cap
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: Distance Aggregation -->
+                    <div class="rounded-xl border border-border bg-card p-5 shadow-xs flex flex-col justify-between hover:shadow-sm transition-shadow relative overflow-hidden group">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">Fleet Distance</span>
+                            <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                                <i data-lucide="navigation" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <div class="flex items-baseline gap-1.5">
+                                <span class="text-3xl font-bold tracking-tight text-foreground font-mono" data-telemetry-key="totalOdometer">{{ number_format($totalOdometer) }}</span>
+                                <span class="text-xs text-muted-foreground font-mono">km</span>
+                            </div>
+                            <p class="text-xs text-muted-foreground mt-0.5">Total odometer recorded</p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Avg per vehicle</span>
+                            <span class="font-mono font-medium text-foreground">{{ number_format($avgOdometerPerBus) }} km</span>
+                        </div>
+                    </div>
+
+                    <!-- Card 3: Operating Expenses -->
+                    <div class="rounded-xl border border-border bg-card p-5 shadow-xs flex flex-col justify-between hover:shadow-sm transition-shadow relative overflow-hidden group">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">Fuel Spend (Mo.)</span>
+                            <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                                <i data-lucide="fuel" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <div class="flex items-baseline gap-1.5">
+                                <span class="text-3xl font-bold tracking-tight text-foreground font-mono" data-telemetry-key="totalFuelCost">${{ number_format($totalFuelCost, 2) }}</span>
+                                <span class="text-xs text-muted-foreground">USD</span>
+                            </div>
+                            <p class="text-xs text-muted-foreground mt-0.5">{{ number_format($totalFuelLiters, 1) }} L Diesel logged</p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Average price</span>
+                            <span class="font-mono font-medium text-foreground">${{ number_format($avgFuelPrice, 2) }}/L</span>
+                        </div>
+                    </div>
+
+                    <!-- Card 4: Maintenance Spend -->
+                    <div class="rounded-xl border border-border bg-card p-5 shadow-xs flex flex-col justify-between hover:shadow-sm transition-shadow relative overflow-hidden group">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider font-mono">Depot Servicing</span>
+                            <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                                <i data-lucide="wrench" class="w-4 h-4"></i>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <div class="flex items-baseline gap-1.5">
+                                <span class="text-3xl font-bold tracking-tight text-foreground font-mono" data-telemetry-key="totalMaintenanceCost">${{ number_format($totalMaintenanceCost, 2) }}</span>
+                                <span class="text-xs text-muted-foreground">USD</span>
+                            </div>
+                            <p class="text-xs text-muted-foreground mt-0.5">Workshop work orders</p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs">
+                            <span class="text-muted-foreground"><span data-telemetry-key="completedMaintenanceCount">{{ $completedMaintenanceCount }}</span> completed</span>
+                            <span class="text-amber-600 font-medium"><span data-telemetry-key="pendingMaintenanceCount">{{ $pendingMaintenanceCount }}</span> pending review</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- shadcn Alert: Critical Fleet Alerts & Maintenance Notice -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    @if($primaryAlert)
+                        <div class="lg:col-span-2 rounded-xl border border-rose-500/30 bg-rose-500/5 p-4 text-card-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs" id="criticalAlertBanner">
+                            <div class="flex items-start gap-3.5">
+                                <div class="w-10 h-10 rounded-lg bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                                    <i data-lucide="{{ $primaryAlert->status === 'out_of_service' ? 'alert-octagon' : 'alert-triangle' }}" class="w-5 h-5"></i>
+                                </div>
+                                <div class="flex flex-col">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-semibold uppercase tracking-wider font-mono">
+                                            {{ $primaryAlert->status === 'out_of_service' ? 'Out of Service' : 'Service Overdue' }}
+                                        </span>
+                                        <span class="font-bold text-foreground text-sm">{{ $primaryAlert->display_id }}</span>
+                                        <span class="text-muted-foreground text-xs">&bull;</span>
+                                        <span class="text-xs text-muted-foreground font-mono">{{ $primaryAlert->plate }}</span>
+                                    </div>
+                                    @if($primaryAlert->status === 'out_of_service')
+                                        <p class="text-xs font-medium text-foreground mt-1">Vehicle flagged out of service</p>
+                                        <p class="text-xs text-muted-foreground">{{ $primaryAlert->display_id }} requires dispatcher review before returning to active roster.</p>
+                                    @else
+                                        <p class="text-xs font-medium text-foreground mt-1">Service interval exceeded by {{ number_format(abs($primaryAlert->next_service_km)) }} km</p>
+                                        <p class="text-xs text-muted-foreground">Current odometer reading is {{ number_format($primaryAlert->odometer) }} km.</p>
+                                    @endif
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                <a href="{{ route('buses') }}"
+                                   class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-input bg-card hover:bg-muted text-foreground transition-colors shadow-xs">
+                                    View Bus
+                                </a>
+                                <button type="button"
+                                        onclick="acknowledgeAlert(this)"
+                                        class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-xs">
+                                    Acknowledge
+                                </button>
+                            </div>
+                        </div>
+                    @else
+                        <div class="lg:col-span-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 flex items-center gap-3.5 shadow-xs">
+                            <div class="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <p class="text-sm font-semibold text-foreground">All Fleet Units Operational</p>
+                                <p class="text-xs text-muted-foreground">Every registered vehicle is within its scheduled maintenance window.</p>
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- Next Scheduled Service Notice -->
+                    @if($nextServiceBus)
+                        <div class="rounded-xl border border-border bg-card p-4 shadow-xs flex flex-col justify-between">
+                            <div class="flex items-start gap-3">
+                                <div class="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0">
+                                    <i data-lucide="clock" class="w-4 h-4"></i>
+                                </div>
+                                <div class="flex flex-col min-w-0">
+                                    <span class="text-[10px] font-semibold uppercase tracking-wider font-mono text-amber-600">Preventive Maintenance</span>
+                                    <span class="text-sm font-bold text-foreground mt-0.5 truncate">{{ $nextServiceBus->display_id }} Notice</span>
+                                    <p class="text-xs text-muted-foreground mt-0.5">Service due in <span class="font-semibold text-foreground font-mono">{{ number_format($nextServiceBus->next_service_km) }} km</span></p>
+                                </div>
+                            </div>
+                            <div class="mt-3 pt-2.5 border-t border-border/60 flex items-center justify-between text-xs">
+                                <span class="text-muted-foreground font-mono text-[11px]">{{ number_format($nextServiceBus->odometer) }} km</span>
+                                <a href="{{ route('buses') }}" class="text-xs font-semibold text-primary hover:underline">
+                                    Assign Bay &rarr;
+                                </a>
+                            </div>
+                        </div>
+                    @else
+                        <div class="rounded-xl border border-border bg-card p-4 shadow-xs flex flex-col items-center justify-center text-center gap-2">
+                            <i data-lucide="calendar-check" class="w-5 h-5 text-muted-foreground"></i>
+                            <span class="text-xs text-muted-foreground">No maintenance orders pending</span>
+                        </div>
+                    @endif
+                </div>
+
+                <!-- shadcn DataTable: Active Shifts & Live Vehicles -->
+                <div class="rounded-xl border border-border bg-card shadow-xs overflow-hidden">
+                    <!-- Table Toolbar -->
+                    <div class="p-4 border-b border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/20">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
+                                <i data-lucide="activity" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-sm font-semibold tracking-tight text-foreground">Active Shifts &amp; Live Telemetry</h2>
+                                <p class="text-xs text-muted-foreground">Driver assignment status, GPS telemetry, and odometer synchronization</p>
+                            </div>
+                        </div>
+
+                        <!-- Live Filters: Search + Status Pills -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <div class="relative w-48 sm:w-60">
+                                <i data-lucide="search" class="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                                <input type="text"
+                                       data-shadcn-table-search="dashboardFleetTable"
+                                       placeholder="Filter bus, driver..."
+                                       class="w-full pl-8 pr-3 py-1.5 h-8 text-xs bg-background border border-input rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"/>
+                            </div>
+
+                            <div class="inline-flex rounded-lg border border-border bg-muted/60 p-0.5 text-xs font-medium" data-shadcn-filter-group="dashboardFleetTable">
+                                <button type="button" data-filter="all" class="px-2.5 py-1 rounded-md bg-foreground text-background font-semibold shadow-xs transition-colors">
+                                    All (<span data-counter-for="dashboardFleetTable">{{ $totalBuses }}</span>)
+                                </button>
+                                <button type="button" data-filter="active" class="px-2.5 py-1 rounded-md text-muted-foreground hover:text-foreground transition-colors">
+                                    Active
+                                </button>
+                                <button type="button" data-filter="out_of_service" class="px-2.5 py-1 rounded-md text-muted-foreground hover:text-foreground transition-colors">
+                                    Alerts
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Table Element -->
+                    <div class="w-full overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-xs" id="dashboardFleetTable">
+                            <thead>
+                                <tr class="border-b border-border/80 bg-muted/40 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                                    <th class="py-3 px-4 font-semibold">Bus #</th>
+                                    <th class="py-3 px-4 font-semibold">Assigned Driver</th>
+                                    <th class="py-3 px-4 font-semibold">Shift Status</th>
+                                    <th class="py-3 px-4 font-semibold">Start Time</th>
+                                    <th class="py-3 px-4 font-semibold">Start Meter</th>
+                                    <th class="py-3 px-4 font-semibold">Current Meter</th>
+                                    <th class="py-3 px-4 font-semibold">Fuel Level</th>
+                                    <th class="py-3 px-4 font-semibold text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-border/50 text-foreground">
+                                @forelse($buses as $bus)
+                                    @php
+                                        $driverName = $bus->driver?->user?->name;
+                                        $initials = $driverName
+                                            ? strtoupper(collect(explode(' ', $driverName))->map(fn ($part) => substr($part, 0, 1))->take(2)->implode(''))
+                                            : '';
+
+                                        $statusConfig = [
+                                            'active' => [
+                                                'label' => $bus->route ?: 'On Route',
+                                                'badge' => 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600',
+                                                'dot' => 'bg-emerald-500',
+                                            ],
+                                            'standby' => [
+                                                'label' => 'Ready / Standby',
+                                                'badge' => 'border-border bg-secondary text-secondary-foreground',
+                                                'dot' => 'bg-slate-400',
+                                            ],
+                                            'depot' => [
+                                                'label' => 'Idle at Depot',
+                                                'badge' => 'border-border bg-secondary text-secondary-foreground',
+                                                'dot' => 'bg-slate-400',
+                                            ],
+                                            'maintenance' => [
+                                                'label' => 'In Maintenance',
+                                                'badge' => 'border-amber-500/20 bg-amber-500/10 text-amber-600',
+                                                'dot' => 'bg-amber-500',
+                                            ],
+                                            'out_of_service' => [
+                                                'label' => 'Out of Service',
+                                                'badge' => 'border-rose-500/20 bg-rose-500/10 text-rose-600',
+                                                'dot' => 'bg-rose-500',
+                                            ],
+                                        ];
+                                        $cfg = $statusConfig[$bus->status] ?? $statusConfig['standby'];
+                                    @endphp
+                                    <tr class="hover:bg-muted/40 transition-colors" data-status="{{ $bus->status }}">
+                                        <td class="py-3 px-4">
+                                            <div class="flex items-center gap-2">
+                                                <span class="w-2 h-2 rounded-full {{ $cfg['dot'] }}"></span>
+                                                <span class="font-bold text-foreground font-mono text-sm">{{ $bus->display_id }}</span>
+                                            </div>
+                                            <span class="text-[11px] text-muted-foreground">{{ $bus->model ?? 'Bus Chassis' }}</span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            @if($driverName)
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-6 h-6 rounded-full bg-muted text-muted-foreground font-semibold flex items-center justify-center text-[10px] border border-border">
+                                                        {{ $initials }}
+                                                    </div>
+                                                    <div class="flex flex-col">
+                                                        <span class="font-medium text-foreground leading-tight">{{ $driverName }}</span>
+                                                        <span class="text-[10px] text-muted-foreground font-mono">{{ $bus->driver->display_id ?? 'Driver #—' }}</span>
+                                                    </div>
+                                                </div>
+                                            @else
+                                                <span class="text-muted-foreground italic text-xs">Unassigned</span>
+                                            @endif
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold border {{ $cfg['badge'] }}">
+                                                <span class="w-1.5 h-1.5 rounded-full {{ $cfg['dot'] }}"></span>
+                                                {{ $cfg['label'] }}
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-muted-foreground font-mono">&mdash;</td>
+                                        <td class="py-3 px-4 text-muted-foreground font-mono">&mdash;</td>
+                                        <td class="py-3 px-4 font-mono font-medium text-foreground">{{ number_format($bus->odometer) }} km</td>
+                                        <td class="py-3 px-4 text-muted-foreground font-mono">&mdash;</td>
+                                        <td class="py-3 px-4 text-right">
+                                            <div class="flex items-center justify-end gap-1">
+                                                <button type="button"
+                                                        onclick="openPhotoVerificationModal('{{ $bus->display_id }}', '{{ $driverName ?: 'Unassigned' }}', '{{ number_format($bus->odometer) }}')"
+                                                        title="Verify Optical Telemetry Reading"
+                                                        class="p-1.5 rounded-md border border-input bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shadow-xs">
+                                                    <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+                                                </button>
+                                                <a href="{{ route('buses') }}"
+                                                   title="View in Fleet Roster"
+                                                   class="p-1.5 rounded-md border border-input bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shadow-xs">
+                                                    <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr class="empty-row">
+                                        <td colspan="8" class="py-12 text-center text-muted-foreground">
+                                            <div class="flex flex-col items-center justify-center gap-2">
+                                                <i data-lucide="bus" class="w-8 h-8 text-muted-foreground/60"></i>
+                                                <p class="font-medium text-foreground text-sm">No fleet vehicles found</p>
+                                                <p class="text-xs text-muted-foreground">Add your first transit bus to begin live telemetry tracking.</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Table Footer: Pagination & Count -->
+                    <div class="p-3 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-2 bg-muted/10 text-xs text-muted-foreground">
+                        <span>Showing {{ $buses->count() }} of {{ $totalBuses }} registered fleet assets</span>
+                        <div class="flex items-center gap-1">
+                            <button type="button" class="px-2.5 py-1 rounded-md border border-input bg-card font-semibold text-foreground shadow-xs">1</button>
+                            <button type="button" class="px-2.5 py-1 rounded-md border border-input bg-card hover:bg-muted text-foreground transition-colors">2</button>
+                            <button type="button" class="px-2.5 py-1 rounded-md border border-input bg-card hover:bg-muted text-foreground transition-colors">3</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Logs: Fuel & Maintenance Cards -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <!-- Recent Fuel Entries Card -->
+                    <div class="rounded-xl border border-border bg-card p-5 shadow-xs flex flex-col justify-between">
+                        <div class="flex items-center justify-between pb-3 border-b border-border/60">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                                    <i data-lucide="fuel" class="w-4 h-4"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-semibold text-foreground">Recent Fuel Entries</h3>
+                                    <p class="text-xs text-muted-foreground">Driver submitted pump dispenser receipts</p>
+                                </div>
+                            </div>
+                            <a href="{{ route('fuel') }}" class="text-xs font-semibold text-primary hover:underline">
+                                View All &rarr;
+                            </a>
+                        </div>
+                        <div class="py-8 text-center flex flex-col items-center justify-center gap-2">
+                            <i data-lucide="droplet" class="w-6 h-6 text-muted-foreground/60"></i>
+                            <p class="text-xs font-medium text-foreground">No recent dispenser logs</p>
+                            <p class="text-[11px] text-muted-foreground">Driver receipts will populate when mobile OCR sync is submitted.</p>
+                        </div>
+                    </div>
+
+                    <!-- Recent Maintenance Card -->
+                    <div class="rounded-xl border border-border bg-card p-5 shadow-xs flex flex-col justify-between">
+                        <div class="flex items-center justify-between pb-3 border-b border-border/60">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                                    <i data-lucide="wrench" class="w-4 h-4"></i>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-semibold text-foreground">Recent Maintenance</h3>
+                                    <p class="text-xs text-muted-foreground">Workshop service orders &amp; parts replacement</p>
+                                </div>
+                            </div>
+                            <a href="{{ route('maintenance') }}" class="text-xs font-semibold text-primary hover:underline">
+                                View All &rarr;
+                            </a>
+                        </div>
+                        <div class="py-8 text-center flex flex-col items-center justify-center gap-2">
+                            <i data-lucide="clipboard-list" class="w-6 h-6 text-muted-foreground/60"></i>
+                            <p class="text-xs font-medium text-foreground">No maintenance work orders active</p>
+                            <p class="text-[11px] text-muted-foreground">Depot workshop tasks will display here once initiated.</p>
+                        </div>
+                    </div>
+                </div>
+
             </div>
-          `;
-          card.style.opacity = '1';
-        }, 300);
-      }
-    }
+        </main>
+    </div>
 
-    function approveReading() {
-      togglePhotoModal(false);
-      alert('Meter override acknowledged. Telemetry sync calibrated.');
-    }
+    <!-- shadcn Dialog: Optical Meter Telemetry Verification -->
+    <div id="photoVerificationModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs hidden transition-opacity">
+        <div class="relative w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-2xl transition-all modal-content text-left">
+            <div class="flex items-center justify-between pb-3 border-b border-border/60">
+                <div class="flex items-center gap-2 text-foreground font-semibold text-base">
+                    <div class="w-7 h-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                        <i data-lucide="camera" class="w-4 h-4"></i>
+                    </div>
+                    <span>Optical Telemetry Audit</span>
+                </div>
+                <button type="button" onclick="window.shadcnModal.close('photoVerificationModal')" class="text-muted-foreground hover:text-foreground p-1 rounded-md transition-colors">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
 
-    document.getElementById('exportDailyBtn')?.addEventListener('click', () => {
-      const originalText = document.getElementById('exportDailyBtn').innerHTML;
-      document.getElementById('exportDailyBtn').innerHTML = `
-        <span class="material-symbols-outlined text-lg animate-spin">progress_activity</span>
-        <span>Generating Log...</span>
-      `;
-      setTimeout(() => {
-        document.getElementById('exportDailyBtn').innerHTML = originalText;
-        alert('Daily Log exported successfully (PDF/CSV ready in downloads).');
-      }, 900);
-    });
+            <div class="mt-4 space-y-4">
+                <div class="relative w-full h-56 rounded-lg overflow-hidden bg-muted border border-border">
+                    <img class="w-full h-full object-cover"
+                         src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80"
+                         alt="Bus Dashboard Odometer"/>
+                    <div class="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-background/90 backdrop-blur-md text-[11px] font-mono font-medium border border-border text-foreground">
+                        Optical Capture: Today 11:20 AM
+                    </div>
+                    <div class="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-background/90 backdrop-blur-md text-[10px] font-mono text-muted-foreground border border-border">
+                        GPS: 40.7128° N, 74.0060° W
+                    </div>
+                </div>
 
-    document.getElementById('newShiftBtn')?.addEventListener('click', () => {
-      alert('Opening Shift Dispatch modal: select bus & driver.');
-    });
-  </script>
-</div></main></div></body></html>
+                <div class="p-3.5 rounded-lg bg-muted/40 border border-border/60 space-y-2 text-xs">
+                    <div class="flex justify-between">
+                        <span class="text-muted-foreground">Vehicle:</span>
+                        <span class="font-bold text-foreground font-mono" id="modalBusNum">Bus #42</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-muted-foreground">Driver:</span>
+                        <span class="font-medium text-foreground" id="modalDriverName">Marcus Vance</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-muted-foreground">Synced Telemetry Meter:</span>
+                        <span class="font-mono font-bold text-foreground" id="modalOdoReading">148,320 km</span>
+                    </div>
+                    <div class="flex justify-between text-emerald-600 font-medium pt-1 border-t border-border/50">
+                        <span>AI Vision Confidence:</span>
+                        <span class="font-mono">99.2% Validated</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex items-center justify-end gap-2.5 pt-3 border-t border-border/60">
+                <button type="button"
+                        onclick="window.shadcnModal.close('photoVerificationModal')"
+                        class="px-4 py-2 text-xs font-medium rounded-lg border border-input bg-card hover:bg-muted text-foreground transition-colors shadow-xs">
+                    Close
+                </button>
+                <button type="button"
+                        onclick="approveTelemetryReading()"
+                        class="px-4 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-xs">
+                    Approve Reading
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openPhotoVerificationModal(busNum, driverName, odoReading) {
+            document.getElementById('modalBusNum').textContent = busNum;
+            document.getElementById('modalDriverName').textContent = driverName;
+            document.getElementById('modalOdoReading').textContent = odoReading + ' km';
+            window.shadcnModal.open('photoVerificationModal');
+        }
+
+        function approveTelemetryReading() {
+            window.shadcnModal.close('photoVerificationModal');
+            window.toast?.success(
+                'Reading Approved',
+                'Telemetry meter synchronized with Central Depot audit log.'
+            );
+        }
+
+        function acknowledgeAlert(btn) {
+            const card = document.getElementById('criticalAlertBanner');
+            if (card) {
+                card.style.opacity = '0';
+                card.style.transition = 'opacity 0.25s ease';
+                setTimeout(() => {
+                    card.remove();
+                    window.toast?.info('Alert Acknowledged', 'Logged to dispatcher event journal.');
+                }, 250);
+            }
+        }
+
+        // Export button handler with real simulated export & toast
+        document.getElementById('exportDailyBtn')?.addEventListener('click', function () {
+            const btn = this;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Exporting...</span>`;
+            if (window.lucide) window.lucide.createIcons();
+
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                if (window.lucide) window.lucide.createIcons();
+                window.toast?.success(
+                    'Export Complete',
+                    'Daily Fleet Telemetry Log (CSV/PDF) generated successfully.'
+                );
+            }, 800);
+        });
+    </script>
+</body>
+</html>

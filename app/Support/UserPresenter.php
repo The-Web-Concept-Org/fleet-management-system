@@ -15,10 +15,14 @@ class UserPresenter
 {
     public static function format(User $user, bool $includeBus = true): array
     {
+        $avatarUrl = $user->avatar_url;
+
         $data = [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'avatar' => $user->avatar,
+            'avatar_url' => $avatarUrl,
             'role' => $user->role,
             'status' => $user->status,
             'last_login_at' => $user->last_login_at?->toIso8601String(),
@@ -43,6 +47,9 @@ class UserPresenter
             'license_type' => $driver->license_type,
             'license_expiry' => $driver->license_expiry?->format('Y-m-d'),
             'duty_status' => $driver->duty_status,
+            'shift' => $driver->shift ?? 'Morning (06:00 - 14:00)',
+            'avatar' => $driver->avatar ?: $user->avatar,
+            'avatar_url' => $driver->avatar_url ?: $avatarUrl,
             'experience_years' => $driver->experience_years,
             'notes' => $driver->notes,
         ];

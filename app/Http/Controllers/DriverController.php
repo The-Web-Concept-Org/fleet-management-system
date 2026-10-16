@@ -84,6 +84,7 @@ class DriverController extends Controller
             'license_type' => ['nullable', 'string', 'max:50'],
             'license_expiry' => ['nullable', 'date'],
             'duty_status' => ['required', 'string', 'in:available,on_route,off_duty,on_leave'],
+            'shift' => ['nullable', 'string', 'max:100'],
             'status' => ['required', 'string', 'in:active,inactive'],
             'experience_years' => ['nullable', 'integer', 'min:0', 'max:50'],
             'notes' => ['nullable', 'string', 'max:1000'],
@@ -106,6 +107,7 @@ class DriverController extends Controller
                 'license_type' => $validated['license_type'] ?? 'Class B CDL',
                 'license_expiry' => $validated['license_expiry'] ?? null,
                 'duty_status' => $validated['duty_status'],
+                'shift' => $validated['shift'] ?? 'Morning (06:00 - 14:00)',
                 'experience_years' => $validated['experience_years'] ?? 0,
                 'notes' => $validated['notes'] ?? null,
             ]);
@@ -140,6 +142,7 @@ class DriverController extends Controller
             'license_type' => ['nullable', 'string', 'max:50'],
             'license_expiry' => ['nullable', 'date'],
             'duty_status' => ['required', 'string', 'in:available,on_route,off_duty,on_leave'],
+            'shift' => ['nullable', 'string', 'max:100'],
             'status' => ['required', 'string', 'in:active,inactive'],
             'experience_years' => ['nullable', 'integer', 'min:0', 'max:50'],
             'notes' => ['nullable', 'string', 'max:1000'],
@@ -166,6 +169,7 @@ class DriverController extends Controller
                 'license_type' => $validated['license_type'] ?? 'Class B CDL',
                 'license_expiry' => $validated['license_expiry'] ?? null,
                 'duty_status' => $validated['duty_status'],
+                'shift' => $validated['shift'] ?? $driver->shift ?? 'Morning (06:00 - 14:00)',
                 'experience_years' => $validated['experience_years'] ?? 0,
                 'notes' => $validated['notes'] ?? null,
             ]);

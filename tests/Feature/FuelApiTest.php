@@ -304,3 +304,39 @@ it('rejects an unknown trip id', function (): void {
         ->assertStatus(422)
         ->assertJsonValidationErrors('trip_id');
 });
+
+it('allows updating fuel log status', function (): void {
+    $bus = fuelBus();
+    $admin = fuelAdmin();
+
+    $log = FuelLog::create([
+        'reference' => 'FUL-0001',
+        'bus_id' => $bus->id,
+        'fuel_type' => 'diesel',
+        'liters' => 50,
+        'total_cost' => 150,
+        'unit_price' => 3.0,
+        'status' => 'pending',
+    ]);
+
+    $this->actingAs($admin)
+        ->post("/fuel/{$log->id}/status", [
+            'status' => 'approved',
+        ])
+        ->assertRedirect();
+
+    expect($log->fresh()->status)->toBe('approved');
+
+    $this->actingAs($admin)
+        ->postJson("/fuel/{$log->id}/status", [
+            'status' => 'flagged',
+            'flagged_reason' => 'Receipt price discrepancy',
+        ])
+        ->assertOk()
+        ->assertJson([
+            'success' => true,
+        ]);
+
+    expect($log->fresh()->status)->toBe('flagged')
+        ->and($log->fresh()->flagged_reason)->toBe('Receipt price discrepancy');
+});

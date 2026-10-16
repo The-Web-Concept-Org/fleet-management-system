@@ -9,6 +9,7 @@ use App\Services\DocumentCompressionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -82,6 +83,42 @@ class MaintenanceController extends Controller
     }
 
     /**
+     * API list of maintenance records for the driver app or fleet dashboard.
+     *
+     * GET /api/maintenance
+     */
+    public function apiIndex(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $busId = $request->input('bus_id') ?? $user?->driver?->bus?->id;
+        $driverId = $request->input('driver_id') ?? $user?->driver?->id;
+
+        $query = MaintenanceLog::with(['bus', 'driver.user', 'trip']);
+
+        if ($busId && $user?->role === 'driver') {
+            $query->where('bus_id', $busId);
+        } elseif ($busId) {
+            $query->where('bus_id', (int) $busId);
+        }
+
+        if ($driverId && $user?->role === 'driver') {
+            $query->orWhere('driver_id', $driverId);
+        }
+
+        $logs = $query->orderByDesc('performed_at')->orderByDesc('id')->paginate((int) $request->input('limit', 20));
+
+        return response()->json([
+            'success' => true,
+            'data' => collect($logs->items())->map(fn (MaintenanceLog $m) => $m->toApiArray())->values(),
+            'pagination' => [
+                'total' => $logs->total(),
+                'page' => $logs->currentPage(),
+                'last_page' => $logs->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
      * Store a vehicle maintenance record sent from the app.
      *
      * POST /api/maintenance
@@ -132,9 +169,23 @@ class MaintenanceController extends Controller
             'note' => $validated['note'] ?? null,
             'image' => $imagePath,
             'status' => 'pending',
-            // Use the datetime sent by the app; fall back to now() only when absent.
             'performed_at' => $performedAt ?? now(),
         ]);
+
+        // Notify admins of new maintenance record
+        $adminUserIds = \App\Models\User::whereIn('role', ['admin', 'super_admin'])->pluck('id')->all();
+        if (!empty($adminUserIds)) {
+            $busNum = $bus?->bus_number ?? (string) $busId;
+            $serviceType = $log->service_type ?: 'Workshop invoice';
+            \App\Support\Notifier::send(
+                $adminUserIds,
+                'maintenance_logged',
+                'Workshop Record Logged',
+                "Maintenance of \${$log->price} recorded for Bus #{$busNum}: {$serviceType}.",
+                ['maintenance_id' => $log->id, 'bus_id' => $busId],
+                route('maintenance')
+            );
+        }
 
         $response = [
             'success' => true,
@@ -316,5 +367,33 @@ class MaintenanceController extends Controller
         } while (MaintenanceLog::where('reference', $candidate)->exists());
 
         return $candidate;
+    }
+
+    /**
+     * Update the status of a maintenance log (e.g. pending, in_progress, completed, flagged).
+     *
+     * POST /maintenance/{maintenanceLog}/status
+     */
+    public function updateStatus(Request $request, MaintenanceLog $maintenanceLog)
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'string', Rule::in(['completed', 'in_progress', 'pending', 'flagged'])],
+            'flagged_reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $maintenanceLog->update([
+            'status' => $validated['status'],
+            'flagged_reason' => $validated['status'] === 'flagged' ? ($validated['flagged_reason'] ?? $maintenanceLog->flagged_reason) : null,
+        ]);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Maintenance record status updated to ' . ucfirst(str_replace('_', ' ', $validated['status'])),
+                'maintenance' => $maintenanceLog->load(['bus', 'driver.user', 'trip'])->toApiArray(),
+            ]);
+        }
+
+        return back()->with('success', 'Maintenance record status updated to ' . ucfirst(str_replace('_', ' ', $validated['status'])));
     }
 }

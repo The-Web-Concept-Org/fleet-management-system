@@ -15,11 +15,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            UserSeeder::class,
-            DriverSeeder::class,
-            BusSeeder::class,
-            TripSeeder::class,
-            ShiftLogSeeder::class,
+            UserSeeder::class
         ]);
     }
 }

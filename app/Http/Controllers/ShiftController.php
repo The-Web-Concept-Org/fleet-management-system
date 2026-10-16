@@ -30,18 +30,188 @@ class ShiftController extends Controller
      */
     public function index(Request $request): View
     {
+        return $this->renderShiftsBoard($request);
+    }
+
+    /**
+     * Shift detail for the inspection desk. Returns the full shifts board with
+     * the requested shift in focus, or the rendered detail partial / json for AJAX.
+     *
+     * GET /shifts/{shift}
+     */
+    public function show(Request $request, ShiftLog $shift): View|HttpResponse|JsonResponse
+    {
+        $shift->load(['bus', 'driver.user', 'trip']);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'shift' => $shift->toApiArray(),
+            ]);
+        }
+
+        if ($request->ajax()) {
+            return response()->view('partials.shift-detail', ['shift' => $shift]);
+        }
+
+        return $this->renderShiftsBoard($request, $shift);
+    }
+
+    /**
+     * Approve and verify a shift's mileage & telemetry from the Inspection Desk.
+     * Requires both start and end meter readings (i.e. shift completed).
+     *
+     * POST /shifts/{shift}/verify
+     */
+    public function verify(Request $request, ShiftLog $shift): JsonResponse
+    {
+        if ($shift->status === ShiftLog::STATUS_IN_PROGRESS || $shift->end_km === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot verify shift: both start and end shift meter readings are required before approval.',
+            ], 422);
+        }
+
+        $shift->update([
+            'status' => ShiftLog::STATUS_VERIFIED,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$shift->display_id} has been verified and approved by the inspection desk.",
+            'shift' => $shift->fresh(['bus', 'driver.user', 'trip'])->toApiArray(),
+            'status' => ShiftLog::STATUS_VERIFIED,
+        ]);
+    }
+
+    /**
+     * Flag a shift for supervisor audit or meter recount.
+     *
+     * POST /shifts/{shift}/flag
+     */
+    public function flag(Request $request, ShiftLog $shift): JsonResponse
+    {
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $shift->update([
+            'status' => ShiftLog::STATUS_FLAGGED,
+            'end_notes' => !empty($validated['reason'])
+                ? ($shift->end_notes ? $shift->end_notes . ' | Flagged: ' . $validated['reason'] : 'Flagged: ' . $validated['reason'])
+                : $shift->end_notes,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$shift->display_id} has been flagged for audit review.",
+            'shift' => $shift->fresh(['bus', 'driver.user', 'trip'])->toApiArray(),
+            'status' => ShiftLog::STATUS_FLAGGED,
+        ]);
+    }
+
+    /**
+     * Update shift status directly (e.g. revert from verified to completed).
+     *
+     * POST /shifts/{shift}/status
+     */
+    public function updateStatus(Request $request, ShiftLog $shift): JsonResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'string', 'in:verified,completed,flagged'],
+        ]);
+
+        if ($validated['status'] === ShiftLog::STATUS_VERIFIED && ($shift->status === ShiftLog::STATUS_IN_PROGRESS || $shift->end_km === null)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot verify shift: both start and end shift meter readings are required before approval.',
+            ], 422);
+        }
+
+        $shift->update([
+            'status' => $validated['status'],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$shift->display_id} status updated to {$validated['status']}.",
+            'shift' => $shift->fresh(['bus', 'driver.user', 'trip'])->toApiArray(),
+            'status' => $validated['status'],
+        ]);
+    }
+
+    /**
+     * Manually adjust shift mileage range (start_km / end_km) from the inspection desk.
+     *
+     * POST /shifts/{shift}/mileage
+     */
+    public function adjustMileage(Request $request, ShiftLog $shift): JsonResponse
+    {
+        $validated = $request->validate([
+            'start_km' => ['required', 'numeric', 'min:0', 'max:99999999'],
+            'end_km' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
+            'adjustment_reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $startKm = (float) $validated['start_km'];
+        $endKm = $validated['end_km'] !== null ? (float) $validated['end_km'] : null;
+
+        if ($endKm !== null && $endKm < $startKm) {
+            return response()->json([
+                'success' => false,
+                'message' => "The ending meter reading ({$endKm} km) cannot be lower than the starting reading ({$startKm} km).",
+            ], 422);
+        }
+
+        $distance = $endKm !== null ? round($endKm - $startKm, 2) : null;
+        $reason = $validated['adjustment_reason'] ?? 'Manual odometer calibration by supervisor';
+
+        $shift->update([
+            'start_km' => $startKm,
+            'end_km' => $endKm,
+            'distance_km' => $distance,
+            'end_notes' => $shift->end_notes ? $shift->end_notes . ' | Adjusted: ' . $reason : 'Adjusted: ' . $reason,
+        ]);
+
+        if ($endKm !== null && $shift->bus && $endKm > $shift->bus->odometer) {
+            $shift->bus->update(['odometer' => (int) $endKm]);
+        }
+
+        if ($shift->trip && $distance !== null) {
+            $shift->trip->update(['distance_km' => $distance]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Mileage calibrated: {$startKm} km – " . ($endKm ? "{$endKm} km ({$distance} km)" : 'In Progress'),
+            'shift' => $shift->fresh(['bus', 'driver.user', 'trip'])->toApiArray(),
+            'distance_km' => $distance,
+        ]);
+    }
+
+    private function renderShiftsBoard(Request $request, ?ShiftLog $selectedShift = null): View
+    {
         $status = (string) $request->input('status', 'all');
         $busId = $request->input('bus_id');
         $driverId = $request->input('driver_id');
 
         $query = ShiftLog::with(['bus', 'driver.user', 'trip']);
 
-        if (in_array($status, ShiftLog::STATUSES, true)) {
-            $query->where('status', $status);
+        if ($status === 'verified') {
+            $query->where('status', ShiftLog::STATUS_VERIFIED);
+        } elseif ($status === 'completed') {
+            $query->where('status', ShiftLog::STATUS_COMPLETED)->whereNotNull('end_km');
+        } elseif ($status === 'in_progress') {
+            $query->where('status', ShiftLog::STATUS_IN_PROGRESS);
         } elseif ($status === 'flagged') {
-            // Completed logs that were never closed out with an end meter
-            // reading are the ones an auditor still has to look at.
-            $query->where('status', ShiftLog::STATUS_COMPLETED)->whereNull('end_km');
+            $query->where(function ($q) {
+                $q->where('status', ShiftLog::STATUS_FLAGGED)
+                  ->orWhere(function ($sub) {
+                      $sub->where('status', ShiftLog::STATUS_COMPLETED)->whereNull('end_km');
+                  });
+            });
+        } elseif (in_array($status, ShiftLog::STATUSES, true)) {
+            $query->where('status', $status);
         }
 
         if ($busId !== null && $busId !== '') {
@@ -54,15 +224,27 @@ class ShiftController extends Controller
 
         $shifts = $query->orderByDesc('started_at')->orderByDesc('id')->get();
 
-        // The inspection desk always shows a shift: the first row of the
-        // current view, or the newest log overall when the filters empty it.
-        $selected = $shifts->first()
+        // The inspection desk always shows a shift: the requested shift (e.g. /shifts/{shift}),
+        // or the shift specified by shift_id, or the first row of the current view, or the newest log.
+        $selected = $selectedShift
+            ?? ($request->input('shift_id') ? ShiftLog::with(['bus', 'driver.user', 'trip'])->find($request->input('shift_id')) : null)
+            ?? $shifts->first()
             ?? ShiftLog::with(['bus', 'driver.user', 'trip'])->orderByDesc('id')->first();
+
+        if ($selected && !$selected->relationLoaded('bus')) {
+            $selected->load(['bus', 'driver.user', 'trip']);
+        }
 
         $countAll = ShiftLog::count();
         $countOpen = ShiftLog::where('status', ShiftLog::STATUS_IN_PROGRESS)->count();
-        $countCompleted = ShiftLog::where('status', ShiftLog::STATUS_COMPLETED)->count();
-        $countFlagged = ShiftLog::where('status', ShiftLog::STATUS_COMPLETED)->whereNull('end_km')->count();
+        $countCompleted = ShiftLog::where('status', ShiftLog::STATUS_COMPLETED)->whereNotNull('end_km')->count();
+        $countVerified = ShiftLog::where('status', ShiftLog::STATUS_VERIFIED)->count();
+        $countFlagged = ShiftLog::where(function ($q) {
+            $q->where('status', ShiftLog::STATUS_FLAGGED)
+              ->orWhere(function ($sub) {
+                  $sub->where('status', ShiftLog::STATUS_COMPLETED)->whereNull('end_km');
+              });
+        })->count();
 
         $totalBuses = Bus::count();
         $activeBuses = Bus::where('status', 'active')->count();
@@ -79,6 +261,7 @@ class ShiftController extends Controller
             'countAll',
             'countOpen',
             'countCompleted',
+            'countVerified',
             'countFlagged',
             'totalBuses',
             'activeBuses',
@@ -92,23 +275,70 @@ class ShiftController extends Controller
     }
 
     /**
-     * Shift detail for the inspection desk. Returns the rendered detail panel
-     * so the board can swap it in without a full page reload.
+     * API list of shift records for the driver app or fleet dashboard.
      *
-     * GET /shifts/{shift}
+     * GET /api/shifts
      */
-    public function show(Request $request, ShiftLog $shift): HttpResponse|JsonResponse
+    public function apiIndex(Request $request): JsonResponse
     {
-        $shift->load(['bus', 'driver.user', 'trip']);
+        $user = $request->user();
+        $busId = $request->input('bus_id') ?? $user?->driver?->bus?->id;
+        $driverId = $request->input('driver_id') ?? $user?->driver?->id;
 
-        if ($request->expectsJson()) {
+        $query = ShiftLog::with(['bus', 'driver.user', 'trip']);
+
+        if ($busId && $user?->role === 'driver') {
+            $query->where('bus_id', $busId);
+        } elseif ($busId) {
+            $query->where('bus_id', (int) $busId);
+        }
+
+        if ($driverId && $user?->role === 'driver') {
+            $query->orWhere('driver_id', $driverId);
+        }
+
+        $shifts = $query->orderByDesc('started_at')->orderByDesc('id')->paginate((int) $request->input('limit', 20));
+
+        return response()->json([
+            'success' => true,
+            'data' => collect($shifts->items())->map(fn (ShiftLog $s) => $s->toApiArray())->values(),
+            'pagination' => [
+                'total' => $shifts->total(),
+                'page' => $shifts->currentPage(),
+                'last_page' => $shifts->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
+     * Return the currently active in_progress shift for the bus/driver.
+     *
+     * GET /api/shifts/current
+     */
+    public function current(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $busId = $request->input('bus_id') ?? $user?->driver?->bus?->id;
+
+        if (!$busId) {
             return response()->json([
                 'success' => true,
-                'shift' => $shift->toApiArray(),
+                'active' => false,
+                'shift' => null,
             ]);
         }
 
-        return response()->view('partials.shift-detail', ['shift' => $shift]);
+        $shift = ShiftLog::with(['bus', 'driver.user', 'trip'])
+            ->where('bus_id', $busId)
+            ->where('status', ShiftLog::STATUS_IN_PROGRESS)
+            ->latest('id')
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'active' => $shift !== null,
+            'shift' => $shift?->toApiArray(),
+        ]);
     }
 
     /**
@@ -182,7 +412,9 @@ class ShiftController extends Controller
                 'start_meter_image' => $imagePath,
                 'start_notes' => $validated['start_notes'] ?? null,
                 'status' => ShiftLog::STATUS_IN_PROGRESS,
-                'started_at' => !empty($validated['started_at']) ? Carbon::parse($validated['started_at']) : now(),
+                'started_at' => (!empty($validated['started_at']) && !Carbon::parse($validated['started_at'])->isFuture())
+                    ? Carbon::parse($validated['started_at'])
+                    : now(),
             ]);
 
             // Reflect that this vehicle is now out on the road.
@@ -295,6 +527,20 @@ class ShiftController extends Controller
                 ]);
             }
         });
+
+        // Notify admins of completed shift awaiting inspection audit
+        $adminUserIds = \App\Models\User::whereIn('role', ['admin', 'super_admin'])->pluck('id')->all();
+        if (!empty($adminUserIds)) {
+            $driverName = $bus->driver?->user?->name ?? 'Driver';
+            \App\Support\Notifier::send(
+                $adminUserIds,
+                'shift_completed',
+                'Shift Completed — Verification Required',
+                "{$driverName} completed shift on {$bus->display_id} ({$distance} km). Awaiting inspection desk review.",
+                ['shift_id' => $log->id, 'bus_id' => $bus->id, 'distance_km' => $distance],
+                route('shifts.show', $log->id)
+            );
+        }
 
         return response()->json([
             'success' => true,

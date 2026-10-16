@@ -230,3 +230,37 @@ it('shows maintenance records on the maintenance screen', function (): void {
         ->assertSee('Replaced brake pads and front discs.')
         ->assertSee('8,500.50');
 });
+
+it('allows updating maintenance log status', function (): void {
+    $bus = maintenanceBus();
+    $admin = maintenanceAdmin();
+
+    $log = MaintenanceLog::create([
+        'reference' => 'MNT-0002',
+        'bus_id' => $bus->id,
+        'price' => 500.00,
+        'note' => 'Oil filter replacement',
+        'status' => 'pending',
+    ]);
+
+    $this->actingAs($admin)
+        ->post("/maintenance/{$log->id}/status", [
+            'status' => 'completed',
+        ])
+        ->assertRedirect();
+
+    expect($log->fresh()->status)->toBe('completed');
+
+    $this->actingAs($admin)
+        ->postJson("/maintenance/{$log->id}/status", [
+            'status' => 'flagged',
+            'flagged_reason' => 'Vendor overcharged labor fee',
+        ])
+        ->assertOk()
+        ->assertJson([
+            'success' => true,
+        ]);
+
+    expect($log->fresh()->status)->toBe('flagged')
+        ->and($log->fresh()->flagged_reason)->toBe('Vendor overcharged labor fee');
+});

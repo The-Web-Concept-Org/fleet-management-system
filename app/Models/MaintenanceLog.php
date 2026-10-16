@@ -59,6 +59,20 @@ class MaintenanceLog extends Model
         return $this->belongsTo(Trip::class);
     }
 
+    public function getImageUrlAttribute(): ?string
+    {
+        return StorageUrl::for($this->image);
+    }
+
+    public function getDisplayIdAttribute(): string
+    {
+        if ($this->reference) {
+            return $this->reference;
+        }
+
+        return 'MN-' . str_pad((string) $this->id, 5, '0', STR_PAD_LEFT);
+    }
+
     /**
      * Serialize the maintenance record into the shape returned by the API.
      */

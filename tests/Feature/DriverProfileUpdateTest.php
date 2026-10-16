@@ -122,3 +122,27 @@ it('rejects profile updates from non-driver accounts', function (): void {
 
     $this->patchJson('/api/profile', ['name' => 'Nope'])->assertStatus(403);
 });
+
+it('updates driver profile with avatar image and prevents modifying shift', function (): void {
+    \Illuminate\Support\Facades\Storage::fake('public');
+    $driver = makeProfileDriver();
+    $originalShift = $driver->shift ?? 'Morning (06:00 - 14:00)';
+    Sanctum::actingAs($driver->user);
+
+    $file = \Illuminate\Http\UploadedFile::fake()->image('avatar.jpg', 200, 200);
+
+    $this->postJson('/api/profile', [
+        '_method' => 'PUT',
+        'name' => 'Driver With Avatar',
+        'shift' => '10:00 - 18:00',
+        'avatar_image' => $file,
+    ])
+        ->assertOk()
+        ->assertJsonPath('user.name', 'Driver With Avatar')
+        ->assertJsonPath('user.driver.shift', $originalShift);
+
+    // Shift remains under web admin dispatcher control
+    expect($driver->fresh()->shift)->toBe($originalShift);
+    expect($driver->fresh()->avatar)->not->toBeNull();
+    expect($driver->user->fresh()->avatar)->not->toBeNull();
+});

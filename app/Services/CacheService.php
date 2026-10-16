@@ -140,12 +140,19 @@ class CacheService
 
         $path = trim($request->path(), '/');
 
-        // Exclude file downloads / streams / OCR endpoints
+        // Exclude file downloads / streams / OCR endpoints and real-time fleet operations
         $excludedPatterns = [
             '*/export',
             '*/download',
             'api/ocr/*',
             'ocr/*',
+            'api/dashboard*',
+            'api/trips*',
+            'api/shifts*',
+            'api/me',
+            'api/notifications*',
+            'api/fuel*',
+            'api/maintenance*',
             'up',
             'health',
         ];
