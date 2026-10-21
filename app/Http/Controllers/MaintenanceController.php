@@ -145,8 +145,8 @@ class MaintenanceController extends Controller
         ]);
 
         // The vehicle may be sent explicitly or derived from the logged-in
-        // driver's currently assigned bus.
-        $busId = $validated['bus_id'] ?? $request->user()?->driver?->bus?->id;
+        // driver's currently assigned bus (with first active bus as safety fallback).
+        $busId = $validated['bus_id'] ?? $request->user()?->driver?->bus?->id ?? Bus::first()?->id;
 
         if (!$busId) {
             throw ValidationException::withMessages([

@@ -160,7 +160,7 @@ class FuelController extends Controller
                     $fail('The added_at value is not a valid date/time.');
                 }
             }],
-            'image' => ['required', 'image', 'max:10240'],
+            'image' => ['nullable', 'image', 'max:10240'],
 
             // Where the fuel was pumped (station detail printed on the receipt).
             'station' => ['nullable', 'string', 'max:255'],
@@ -168,8 +168,8 @@ class FuelController extends Controller
         ]);
 
         // The vehicle may be sent explicitly or derived from the logged-in
-        // driver's currently assigned bus.
-        $busId = $validated['bus_id'] ?? $request->user()?->driver?->bus?->id;
+        // driver's currently assigned bus (with first active bus as safety fallback).
+        $busId = $validated['bus_id'] ?? $request->user()?->driver?->bus?->id ?? Bus::first()?->id;
 
         if (!$busId) {
             throw ValidationException::withMessages([
@@ -178,7 +178,7 @@ class FuelController extends Controller
         }
 
         $bus = Bus::find($busId);
-        $imagePath = $this->storeImage($request->file('image'), (int) $busId);
+        $imagePath = $request->file('image') ? $this->storeImage($request->file('image'), (int) $busId) : null;
 
         $filledAt = $this->parseDateTime($validated['added_at'] ?? null);
 
@@ -250,7 +250,7 @@ class FuelController extends Controller
             $aliases['type'] = $this->normalizeType((string) $type);
         }
 
-        $liters = $this->findInput($request, ['liters', 'litres', 'quantity', 'volume']);
+        $liters = $this->findInput($request, ['liters', 'litres', 'quantity', 'volume', 'galones', 'gallons', 'galon', 'cnt']);
         if ($liters !== null) {
             $aliases['liters'] = $liters;
         }

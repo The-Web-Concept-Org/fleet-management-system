@@ -29,6 +29,37 @@ class UserPresenter
         ];
 
         if ($user->role !== 'driver') {
+            $firstBus = \App\Models\Bus::where('status', 'active')->first() ?? \App\Models\Bus::first();
+            $data['bus'] = $firstBus ? [
+                'id' => $firstBus->id,
+                'bus_number' => $firstBus->bus_number,
+                'plate' => $firstBus->plate,
+                'model' => $firstBus->model,
+                'status' => $firstBus->status,
+                'odometer' => $firstBus->odometer,
+                'fuel_month_liters' => $firstBus->fuel_month_liters,
+                'fuel_cost' => $firstBus->fuel_cost,
+                'km_per_liter' => $firstBus->km_per_liter,
+                'next_service_km' => $firstBus->next_service_km,
+                'route' => $firstBus->route,
+            ] : null;
+
+            $data['driver'] = [
+                'id' => 0,
+                'user_id' => $user->id,
+                'badge_id' => 'ADMIN-' . $user->id,
+                'phone' => '',
+                'license_number' => 'ADMIN',
+                'license_type' => 'Administrator',
+                'license_expiry' => null,
+                'duty_status' => 'available',
+                'shift' => 'All Day',
+                'avatar' => $user->avatar,
+                'avatar_url' => $avatarUrl,
+                'experience_years' => 5,
+                'notes' => 'Fleet Administrator',
+            ];
+            $data['trips'] = [];
             return $data;
         }
 

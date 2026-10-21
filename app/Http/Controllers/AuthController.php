@@ -36,35 +36,74 @@ class AuthController extends Controller
 
     public function login(Request $request): JsonResponse
     {
-        $data = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string'],
-        ]);
+        // Accept email, username, or driver badge_id
+        $loginIdentifier = trim((string) (
+            $request->input('email')
+            ?? $request->input('username')
+            ?? $request->input('badge_id')
+            ?? $request->input('badgeNumber')
+            ?? ''
+        ));
 
-        $user = User::where('email', $data['email'])->first();
+        $password = (string) $request->input('password', '');
 
-        if (!$user || !Hash::check($data['password'], $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
-            ]);
+        if ($loginIdentifier === '' || $password === '') {
+            $errors = [];
+            if ($loginIdentifier === '') {
+                $errors['email'] = ['The email field is required.'];
+            }
+            if ($password === '') {
+                $errors['password'] = ['The password field is required.'];
+            }
+
+            return response()->json([
+                'message' => 'Both email and password are required to log in.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        // Find user by email or by associated driver badge_id or phone
+        $user = User::where('email', $loginIdentifier)->first();
+        if (!$user) {
+            $user = User::whereHas('driver', function ($q) use ($loginIdentifier): void {
+                $q->where('badge_id', $loginIdentifier)->orWhere('phone', $loginIdentifier);
+            })->first();
+        }
+
+        if (!$user || !Hash::check($password, $user->password)) {
+            return response()->json([
+                'message' => 'The provided credentials are incorrect. Please verify your email and password.',
+                'errors' => [
+                    'email' => ['The provided credentials are incorrect.'],
+                ],
+            ], 401);
         }
 
         if ($user->status === 'pending') {
-            throw ValidationException::withMessages([
-                'email' => ['Your account is pending administrator approval.'],
-            ]);
+            return response()->json([
+                'message' => 'Your account is pending administrator approval.',
+                'errors' => [
+                    'email' => ['Your account is pending administrator approval.'],
+                ],
+            ], 403);
         }
 
         if ($user->status !== 'active') {
-            throw ValidationException::withMessages([
-                'email' => ['This account is inactive.'],
-            ]);
+            return response()->json([
+                'message' => 'This account is inactive. Please contact your fleet administrator.',
+                'errors' => [
+                    'email' => ['This account is inactive.'],
+                ],
+            ], 403);
         }
 
         if ($reason = $this->driverLoginBlockReason($user)) {
-            throw ValidationException::withMessages([
-                'email' => [$reason],
-            ]);
+            return response()->json([
+                'message' => $reason,
+                'errors' => [
+                    'email' => [$reason],
+                ],
+            ], 403);
         }
 
         $user->forceFill(['last_login_at' => now()])->save();
@@ -135,14 +174,8 @@ class AuthController extends Controller
      */
     private function driverLoginBlockReason(User $user): ?string
     {
-        if ($user->role !== 'driver') {
-            return 'Only drivers can sign in to this app. Please use the fleet web console instead.';
-        }
-
-        $driver = $user->driver;
-
-        if (!$driver || !$driver->bus()->exists()) {
-            return 'No vehicle is assigned to your account yet. Please contact dispatch to assign a vehicle before signing in.';
+        if (!in_array($user->role, ['driver', 'admin', 'super_admin'], true)) {
+            return 'Only drivers and fleet administrators can sign in to this app.';
         }
 
         return null;

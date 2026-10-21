@@ -124,37 +124,39 @@ PROMPT;
         }
 
         $prompt = <<<PROMPT
-You are an expert fuel station pump display and printed receipt analyst for commercial fleets.
-Analyze this photo of a fuel pump screen or printed fuel receipt slip.
+You are an expert fuel station pump display and printed receipt analyst for commercial fleets (including Latin American / Ecuadorian stations such as ANADAPAU CIA LTDA, LANCOMTRI).
+Analyze this photo of a fuel pump screen (e.g. digital 7-segment or LCD display) or printed fuel receipt slip.
 
 CRITICAL INSTRUCTIONS:
-1. Extract the fuel volume in Liters (or Gallons):
-   - Look for "Volume", "Liters", "Litres", "Qty", "L", "LTR". Return as a float number in "liters".
+1. Extract the fuel volume (Gallons or Liters):
+   - Look for "Galones", "Galón", "Galon", "Cnt.", "Cantidad", "Volume", "Liters", "Litres", "Qty", "L", "LTR". Return as a float number in "liters".
 2. Extract the Total Cost / Amount:
-   - Look for "Total", "Amount", "Cost", "Price", "$", "EUR", "USD", etc. Return as float in "total_cost".
-3. Extract the Unit Price per liter:
-   - Look for "Price/L", "Rate", "Price/Unit", "$/L". If missing but total_cost and liters are present, calculate total_cost / liters. Return as float in "unit_price".
-4. Extract the Fuel Station / Brand / Location:
-   - Name of brand or station (e.g. Shell, Chevron, BP, Total, Depot Terminal, etc.) in "station_name".
+   - Look for "Esta Venta", "Total", "Amount", "Cost", "Price", "$", "USD", etc. Return as float in "total_cost".
+3. Extract the Unit Price per gallon or liter:
+   - Look for "Precio Por Galón", "Precio Por Galon", "P.Unit", "P. Unit", "Price/L", "Rate", "Price/Unit", "$/L", "$/Gal". If missing but total_cost and liters are present, calculate total_cost / liters. Return as float in "unit_price".
+4. Extract the Fuel Station / Brand / Company:
+   - Name of brand or station (e.g. "ANADAPAU CIA LTDA", "ANADAPAU", "LANCOMTRI", Shell, Chevron, BP, Total, etc. Check receipt headers or dispensary labels). Return in "station_name".
 5. Extract the Fuel Type:
-   - ONLY "Diesel" or "Petrol" in "fuel_type" (Commercial bus fleet vehicles use Diesel or Petrol). If not explicitly Petrol, default to "Diesel". Do NOT use CNG, Bio-Diesel, LPG, or Electric.
-6. If an odometer or mileage reading is printed on the receipt, extract it into "odometer" as an integer (or null).
-7. Extract receipt number or transaction reference in "receipt_number" (or null).
+   - ONLY "Diesel" or "Petrol" in "fuel_type" (e.g. "DIESEL PREMIUM", "DIESEL" -> "Diesel", "EXTRA", "SUPER", "ECOPAIS" -> "Petrol").
+6. Extract the Vehicle Plate if printed on the receipt (e.g. "Placa: AAA5750") in "plate_number" (or null).
+7. Extract the Receipt / Invoice Number (e.g. "Numero: 001-102-1479330543") in "receipt_number" (or null).
 8. Extract date in "YYYY-MM-DD" format in "date" (or null).
-9. Confidence: estimate confidence between 85.0 and 99.9.
+9. Extract unit: "Gal" (Gallons) or "L" (Liters).
+10. Confidence: estimate confidence between 85.0 and 99.9.
 
 Return ONLY a valid JSON object with this exact structure:
 {
-  "liters": 120.0,
-  "total_cost": 195.0,
-  "unit_price": 1.625,
-  "station_name": "Airport Terminal Fuel Depot",
+  "liters": 24.436,
+  "total_cost": 77.00,
+  "unit_price": 3.151,
+  "station_name": "ANADAPAU CIA LTDA",
   "fuel_type": "Diesel",
-  "odometer": null,
-  "receipt_number": "REC-8841",
-  "date": "2026-10-16",
-  "confidence": 99.0,
-  "raw_text": "VOLUME 120.0L TOTAL $195.00"
+  "unit": "Gal",
+  "plate_number": "AAA5750",
+  "receipt_number": "001-102-1479330543",
+  "date": "2026-10-17",
+  "confidence": 99.2,
+  "raw_text": "ESTA VENTA $77.00 GALONES 24.436 PRECIO POR GALON 3.151"
 }
 PROMPT;
 
@@ -173,23 +175,25 @@ PROMPT;
         $unitPrice = isset($result['unit_price']) ? (float) $result['unit_price'] : ($liters > 0 ? round($cost / $liters, 3) : 0.0);
 
         $rawType = strtolower((string) ($result['fuel_type'] ?? 'diesel'));
-        $fuelType = (str_contains($rawType, 'petrol') || str_contains($rawType, 'gasoline') || str_contains($rawType, 'unleaded')) ? 'Petrol' : 'Diesel';
+        $fuelType = (str_contains($rawType, 'petrol') || str_contains($rawType, 'gasoline') || str_contains($rawType, 'unleaded') || str_contains($rawType, 'extra') || str_contains($rawType, 'super')) ? 'Petrol' : 'Diesel';
 
         return response()->json([
             'success' => true,
             'scan_method' => 'GEMINI_AI',
-            'method_label' => 'Google Gemini 3.5 Flash-Lite Vision',
+            'method_label' => 'Google Gemini Vision AI',
             'data' => [
                 'liters' => $liters,
                 'cost' => $cost,
                 'unit_price' => $unitPrice,
-                'station' => (string) ($result['station_name'] ?? 'Depot Fuel Station'),
+                'station' => (string) ($result['station_name'] ?? 'ANADAPAU CIA LTDA'),
                 'fuel_type' => $fuelType,
+                'unit' => (string) ($result['unit'] ?? 'Gal'),
+                'plate' => (string) ($result['plate_number'] ?? ''),
                 'odometer' => isset($result['odometer']) ? (int) $result['odometer'] : null,
                 'receipt_number' => (string) ($result['receipt_number'] ?? ''),
                 'date' => (string) ($result['date'] ?? ''),
-                'confidence' => (float) ($result['confidence'] ?? 98.5),
-                'raw_text' => (string) ($result['raw_text'] ?? "{$liters}L @ {$unitPrice} = \${$cost}"),
+                'confidence' => (float) ($result['confidence'] ?? 99.0),
+                'raw_text' => (string) ($result['raw_text'] ?? "{$liters} Gal @ \${$unitPrice} = \${$cost}"),
                 'extracted_locally' => false,
             ],
         ]);
@@ -349,6 +353,11 @@ PROMPT;
             ?: $request->header('x-gemini-api-key')
             ?: config('services.gemini.key');
 
-        return $key && trim($key) !== '' ? trim($key) : null;
+        if ($key) {
+            $clean = trim(preg_replace('/[^A-Za-z0-9_\-\.]/', '', (string) $key));
+            return $clean !== '' ? $clean : null;
+        }
+
+        return null;
     }
 }
