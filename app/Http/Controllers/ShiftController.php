@@ -436,6 +436,25 @@ class ShiftController extends Controller
             return $log;
         });
 
+        // Notify admins and driver of started shift
+        $recipients = \App\Models\User::whereIn('role', ['admin', 'super_admin'])->pluck('id')->all();
+        if ($bus->driver?->user_id) {
+            $recipients[] = $bus->driver->user_id;
+        }
+        $recipients = array_unique(array_filter($recipients));
+
+        if (!empty($recipients)) {
+            $driverName = $bus->driver?->user?->name ?? 'Driver';
+            \App\Support\Notifier::send(
+                $recipients,
+                'shift',
+                'Shift Started',
+                "{$driverName} started shift on {$bus->display_id} at {$log->start_km} KM.",
+                ['shift_id' => $log->id, 'bus_id' => $bus->id, 'start_km' => $log->start_km],
+                route('shifts')
+            );
+        }
+
         return response()->json([
             'success' => true,
             'message' => "{$log->display_id} started for {$bus->display_id}.",
@@ -528,17 +547,22 @@ class ShiftController extends Controller
             }
         });
 
-        // Notify admins of completed shift awaiting inspection audit
+        // Notify admins and driver of completed shift awaiting inspection audit
         $adminUserIds = \App\Models\User::whereIn('role', ['admin', 'super_admin'])->pluck('id')->all();
+        if ($bus->driver?->user_id) {
+            $adminUserIds[] = $bus->driver->user_id;
+        }
+        $adminUserIds = array_unique(array_filter($adminUserIds));
+
         if (!empty($adminUserIds)) {
             $driverName = $bus->driver?->user?->name ?? 'Driver';
             \App\Support\Notifier::send(
                 $adminUserIds,
-                'shift_completed',
-                'Shift Completed — Verification Required',
-                "{$driverName} completed shift on {$bus->display_id} ({$distance} km). Awaiting inspection desk review.",
+                'shift',
+                'Shift Closed — Mileage Recorded',
+                "{$driverName} closed shift on {$bus->display_id} ({$distance} km). Awaiting inspection desk review.",
                 ['shift_id' => $log->id, 'bus_id' => $bus->id, 'distance_km' => $distance],
-                route('shifts.show', $log->id)
+                route('shifts')
             );
         }
 

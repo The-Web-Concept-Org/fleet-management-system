@@ -30,4 +30,9 @@ class AppNotification extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function getMessageAttribute(): string
+    {
+        return $this->body ?? '';
+    }
 }

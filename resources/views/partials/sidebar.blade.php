@@ -14,6 +14,7 @@
     $logNav = [
         ['label' => 'Fuel Logs', 'icon' => 'fuel', 'route' => 'fuel', 'badge' => null],
         ['label' => 'Maintenance', 'icon' => 'wrench', 'route' => 'maintenance', 'badge' => null],
+        ['label' => 'Notifications', 'icon' => 'bell', 'route' => 'notifications', 'badge' => \App\Models\AppNotification::where('user_id', auth()->id())->whereNull('read_at')->count() ?: null],
     ];
 
     $sysNav = [

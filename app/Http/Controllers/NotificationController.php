@@ -14,36 +14,40 @@ use Illuminate\Http\Request;
  */
 class NotificationController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): mixed
     {
-        $data = $request->validate([
-            'page' => ['nullable', 'integer', 'min:1'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
-            'unreadOnly' => ['nullable', 'in:true,false,1,0'],
-            'type' => ['nullable', 'string', 'max:60'],
-        ]);
         $userId = $request->user()->id;
-        $limit = (int) ($data['limit'] ?? 20);
+        $unreadOnly = in_array($request->input('unreadOnly') ?? 'false', ['true', '1'], true);
+        $type = $request->input('type');
 
         $query = AppNotification::where('user_id', $userId)
-            ->when(in_array($data['unreadOnly'] ?? 'false', ['true', '1'], true), fn ($q) => $q->whereNull('read_at'))
-            ->when(!empty($data['type']), fn ($q) => $q->where('type', $data['type']))
+            ->when($unreadOnly, fn ($q) => $q->whereNull('read_at'))
+            ->when(!empty($type), fn ($q) => $q->where('type', $type))
             ->latest('created_at')
             ->latest('id');
 
-        $page = $query->paginate($limit, ['*'], 'page', (int) ($data['page'] ?? 1));
+        if ($request->expectsJson() || $request->is('api/*') || $request->ajax()) {
+            $limit = (int) ($request->input('limit') ?? 20);
+            $page = $query->paginate($limit, ['*'], 'page', (int) ($request->input('page') ?? 1));
 
-        return response()->json([
-            'success' => true,
-            'data' => collect($page->items())->map(fn (AppNotification $n) => $this->present($n))->values(),
-            'unreadCount' => $this->unread($userId),
-            'pagination' => [
-                'page' => $page->currentPage(),
-                'limit' => $page->perPage(),
-                'total' => $page->total(),
-                'totalPages' => max(1, $page->lastPage()),
-            ],
-        ]);
+            return response()->json([
+                'success' => true,
+                'data' => collect($page->items())->map(fn (AppNotification $n) => $this->present($n))->values(),
+                'unreadCount' => $this->unread($userId),
+                'pagination' => [
+                    'page' => $page->currentPage(),
+                    'limit' => $page->perPage(),
+                    'total' => $page->total(),
+                    'totalPages' => max(1, $page->lastPage()),
+                ],
+            ]);
+        }
+
+        $notifications = $query->paginate(20);
+        $unreadCount = $this->unread($userId);
+        $activeBuses = \App\Models\Bus::where('status', 'active')->count();
+
+        return view('notifications', compact('notifications', 'unreadCount', 'activeBuses'));
     }
 
     public function unreadCount(Request $request): JsonResponse
