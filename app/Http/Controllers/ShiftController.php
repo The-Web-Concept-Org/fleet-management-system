@@ -448,6 +448,24 @@ class ShiftController extends Controller
                 ]);
             }
 
+            // Record initial Start Location checkpoint
+            $startLat = (float) ($request->input('latitude') ?? $bus->last_latitude);
+            $startLng = (float) ($request->input('longitude') ?? $bus->last_longitude);
+            if ($startLat !== 0.0 || $startLng !== 0.0) {
+                \App\Models\ShiftLocation::create([
+                    'shift_log_id' => $log->id,
+                    'bus_id' => $bus->id,
+                    'driver_id' => $bus->driver_id,
+                    'latitude' => $startLat,
+                    'longitude' => $startLng,
+                    'speed' => (float) ($request->input('speed') ?? 0),
+                    'heading' => (float) ($request->input('heading') ?? 0),
+                    'accuracy' => (float) ($request->input('accuracy') ?? 10),
+                    'recorded_at' => $log->started_at ?? now(),
+                    'is_offline_sync' => false,
+                ]);
+            }
+
             return $log;
         });
 
@@ -456,7 +474,10 @@ class ShiftController extends Controller
         if ($bus->driver?->user_id) {
             $recipients[] = $bus->driver->user_id;
         }
-        $recipients = array_unique(array_filter($recipients));
+        if ($request->user()) {
+            $recipients[] = $request->user()->id;
+        }
+        $recipients = array_values(array_unique(array_filter($recipients)));
 
         if (!empty($recipients)) {
             $driverName = $bus->driver?->user?->name ?? 'Driver';
@@ -560,6 +581,31 @@ class ShiftController extends Controller
                     'bus_id' => $trip->bus_id ?? $bus->id,
                 ]);
             }
+
+            // Enforce clean 2-checkpoint GPS policy: Start & End only
+            $shiftLocs = $log->locations()->orderBy('id', 'asc')->get();
+            if ($shiftLocs->count() > 2) {
+                $firstId = $shiftLocs->first()->id;
+                $lastId = $shiftLocs->last()->id;
+                $log->locations()->whereNotIn('id', [$firstId, $lastId])->delete();
+            } elseif ($shiftLocs->count() === 1 && ($bus->last_latitude || $request->filled('latitude'))) {
+                $endLat = (float) ($request->input('latitude') ?? $bus->last_latitude);
+                $endLng = (float) ($request->input('longitude') ?? $bus->last_longitude);
+                if ($endLat !== 0.0 || $endLng !== 0.0) {
+                    \App\Models\ShiftLocation::create([
+                        'shift_log_id' => $log->id,
+                        'bus_id' => $bus->id,
+                        'driver_id' => $bus->driver?->id,
+                        'latitude' => $endLat,
+                        'longitude' => $endLng,
+                        'speed' => (float) ($request->input('speed') ?? 0),
+                        'heading' => (float) ($request->input('heading') ?? 0),
+                        'accuracy' => (float) ($request->input('accuracy') ?? 10),
+                        'recorded_at' => now(),
+                        'is_offline_sync' => false,
+                    ]);
+                }
+            }
         });
 
         // Notify admins and driver of completed shift awaiting inspection audit
@@ -567,7 +613,10 @@ class ShiftController extends Controller
         if ($bus->driver?->user_id) {
             $adminUserIds[] = $bus->driver->user_id;
         }
-        $adminUserIds = array_unique(array_filter($adminUserIds));
+        if ($request->user()) {
+            $adminUserIds[] = $request->user()->id;
+        }
+        $adminUserIds = array_values(array_unique(array_filter($adminUserIds)));
 
         if (!empty($adminUserIds)) {
             $driverName = $bus->driver?->user?->name ?? 'Driver';

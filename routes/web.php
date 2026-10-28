@@ -74,6 +74,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/drivers/{driver}', [\App\Http\Controllers\DriverController::class, 'destroy'])->name('drivers.destroy');
 
     Route::get('/notifications', [\App\Http\Controllers\NotificationController::class, 'index'])->name('notifications');
+    Route::post('/notifications/broadcast', [\App\Http\Controllers\NotificationController::class, 'broadcast'])->name('notifications.broadcast');
     Route::post('/notifications/read-all', [\App\Http\Controllers\NotificationController::class, 'markAllRead'])->name('notifications.read-all');
     Route::post('/notifications/{id}/read', [\App\Http\Controllers\NotificationController::class, 'markRead'])->whereNumber('id')->name('notifications.read');
 

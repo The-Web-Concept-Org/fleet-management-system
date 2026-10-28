@@ -62,6 +62,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
     // Notification inbox
     Route::get('notifications', [NotificationController::class, 'index']);
+    Route::post('notifications/broadcast', [NotificationController::class, 'broadcast']);
     Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::get('notifications/tokens', [NotificationController::class, 'tokens']);
     Route::patch('notifications/read-all', [NotificationController::class, 'markAllRead']);

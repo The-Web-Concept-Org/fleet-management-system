@@ -46,8 +46,10 @@ class NotificationController extends Controller
         $notifications = $query->paginate(20);
         $unreadCount = $this->unread($userId);
         $activeBuses = \App\Models\Bus::where('status', 'active')->count();
+        $users = \App\Models\User::orderBy('name')->get();
+        $drivers = \App\Models\Driver::with('user')->get();
 
-        return view('notifications', compact('notifications', 'unreadCount', 'activeBuses'));
+        return view('notifications', compact('notifications', 'unreadCount', 'activeBuses', 'users', 'drivers'));
     }
 
     public function unreadCount(Request $request): JsonResponse
@@ -133,6 +135,73 @@ class NotificationController extends Controller
                 'updatedAt' => $t->updated_at?->toIso8601String(),
             ])->values(),
         ]);
+    }
+
+    /**
+     * POST /notifications/broadcast or /api/notifications/broadcast
+     * Create role-wise or user-specific notification by Admin
+     */
+    public function broadcast(Request $request): mixed
+    {
+        $validated = $request->validate([
+            'target_type' => ['required', 'string', 'in:role,user,all'],
+            'role' => ['nullable', 'string', 'in:all,driver,admin,super_admin,staff'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'type' => ['required', 'string', 'max:60'],
+            'title' => ['required', 'string', 'max:150'],
+            'body' => ['required', 'string', 'max:2000'],
+            'priority' => ['nullable', 'string', 'in:normal,high,urgent'],
+            'link' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $userIds = [];
+
+        if ($validated['target_type'] === 'user' && !empty($validated['user_id'])) {
+            $userIds = [(int) $validated['user_id']];
+        } elseif ($validated['target_type'] === 'role') {
+            $role = $validated['role'] ?? 'all';
+            if ($role === 'all') {
+                $userIds = \App\Models\User::pluck('id')->all();
+            } elseif ($role === 'driver') {
+                $driverUserIds = \App\Models\User::where('role', 'driver')->pluck('id')->all();
+                $mappedDriverIds = \App\Models\Driver::whereNotNull('user_id')->pluck('user_id')->all();
+                $userIds = array_values(array_unique(array_merge($driverUserIds, $mappedDriverIds)));
+            } elseif ($role === 'admin' || $role === 'super_admin') {
+                $userIds = \App\Models\User::whereIn('role', ['admin', 'super_admin'])->pluck('id')->all();
+            } else {
+                $userIds = \App\Models\User::where('role', $role)->pluck('id')->all();
+            }
+        } else {
+            // 'all'
+            $userIds = \App\Models\User::pluck('id')->all();
+        }
+
+        if (empty($userIds)) {
+            $userIds = \App\Models\User::pluck('id')->all();
+        }
+
+        $sentCount = Notifier::send(
+            $userIds,
+            $validated['type'],
+            $validated['title'],
+            $validated['body'],
+            [
+                'priority' => $validated['priority'] ?? 'normal',
+                'sender' => $request->user()?->name ?? 'Admin',
+                'broadcast_at' => now()->toIso8601String(),
+            ],
+            $validated['link'] ?? null
+        );
+
+        if ($request->expectsJson() || $request->is('api/*')) {
+            return response()->json([
+                'success' => true,
+                'message' => "Notification broadcasted successfully to {$sentCount} recipient(s).",
+                'recipient_count' => $sentCount,
+            ]);
+        }
+
+        return redirect()->route('notifications')->with('success', "Notification broadcasted successfully to {$sentCount} recipient(s).");
     }
 
     /** POST /notifications/test — puts a test notification in your own inbox */

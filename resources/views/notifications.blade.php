@@ -51,13 +51,27 @@
                             </button>
                         @endif
 
+                        <button type="button"
+                                onclick="openBroadcastModal()"
+                                class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-xs transition-colors">
+                            <i data-lucide="send" class="w-4 h-4"></i>
+                            <span>Create Notification</span>
+                        </button>
+
                         <a href="{{ route('shifts') }}"
-                           class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-xs transition-colors">
+                           class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-input bg-card hover:bg-muted text-xs font-medium text-foreground transition-colors shadow-xs">
                             <i data-lucide="clock-3" class="w-4 h-4"></i>
                             <span>Shifts Desk</span>
                         </a>
                     </div>
                 </div>
+
+                @if(session('success'))
+                    <div class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-medium flex items-center gap-2">
+                        <i data-lucide="check-circle" class="w-4 h-4 shrink-0"></i>
+                        <span>{{ session('success') }}</span>
+                    </div>
+                @endif
 
                 <!-- Notifications List -->
                 <div class="space-y-3">
@@ -149,7 +163,158 @@
         </main>
     </div>
 
+    <!-- Modal: Broadcast Role-Based Notification -->
+    <div id="broadcastModal" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-card border border-border rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-border flex items-center justify-between bg-muted/30">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                        <i data-lucide="send" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-foreground">Send Fleet Notification</h2>
+                        <p class="text-xs text-muted-foreground">Deliver role-targeted alerts or individual notifications</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeBroadcastModal()" class="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Modal Form -->
+            <form action="{{ route('notifications.broadcast') }}" method="POST" class="p-6 space-y-4">
+                @csrf
+
+                <!-- Target Audience Selector -->
+                <div>
+                    <label class="block text-xs font-semibold text-foreground mb-1.5 uppercase tracking-wider font-mono">
+                        Target Audience
+                    </label>
+                    <div class="grid grid-cols-2 gap-2 p-1 rounded-xl bg-muted/50 border border-border">
+                        <button type="button" id="tabRoleBtn" onclick="switchTargetType('role')" class="py-1.5 px-3 rounded-lg text-xs font-bold transition-all bg-card text-foreground shadow-xs">
+                            By User Role
+                        </button>
+                        <button type="button" id="tabUserBtn" onclick="switchTargetType('user')" class="py-1.5 px-3 rounded-lg text-xs font-medium transition-all text-muted-foreground hover:text-foreground">
+                            Specific User / Driver
+                        </button>
+                    </div>
+                    <input type="hidden" name="target_type" id="targetTypeInput" value="role">
+                </div>
+
+                <!-- Role Selection -->
+                <div id="roleSelectGroup">
+                    <label class="block text-xs font-medium text-foreground mb-1">Select Role Group</label>
+                    <select name="role" class="w-full text-xs rounded-lg border border-input bg-background px-3 py-2 text-foreground focus:ring-1 focus:ring-primary focus:outline-hidden">
+                        <option value="driver" selected>Drivers Only (Mobile App Users)</option>
+                        <option value="all">All Fleet Users (Drivers &amp; Admins)</option>
+                        <option value="admin">Administrators &amp; Supervisors</option>
+                        <option value="super_admin">Super Admins Only</option>
+                    </select>
+                </div>
+
+                <!-- Individual User Selection (Hidden by default) -->
+                <div id="userSelectGroup" class="hidden">
+                    <label class="block text-xs font-medium text-foreground mb-1">Select Recipient</label>
+                    <select name="user_id" class="w-full text-xs rounded-lg border border-input bg-background px-3 py-2 text-foreground focus:ring-1 focus:ring-primary focus:outline-hidden">
+                        @foreach($users ?? [] as $usr)
+                            <option value="{{ $usr->id }}">
+                                {{ $usr->name }} ({{ ucfirst($usr->role ?? 'user') }}) &bull; {{ $usr->email }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <!-- Type & Priority Row -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-foreground mb-1">Category</label>
+                        <select name="type" class="w-full text-xs rounded-lg border border-input bg-background px-3 py-2 text-foreground focus:ring-1 focus:ring-primary focus:outline-hidden">
+                            <option value="shift">Shift / Schedule</option>
+                            <option value="announcement" selected>Fleet Announcement</option>
+                            <option value="safety">Safety / Weather Alert</option>
+                            <option value="maintenance">Maintenance Notice</option>
+                            <option value="fuel">Fuel &amp; Efficiency</option>
+                            <option value="general">General Notice</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-foreground mb-1">Priority</label>
+                        <select name="priority" class="w-full text-xs rounded-lg border border-input bg-background px-3 py-2 text-foreground focus:ring-1 focus:ring-primary focus:outline-hidden">
+                            <option value="normal" selected>Normal</option>
+                            <option value="high">High Priority</option>
+                            <option value="urgent">Urgent Alert</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Notification Title -->
+                <div>
+                    <label class="block text-xs font-medium text-foreground mb-1">Notification Title</label>
+                    <input type="text" name="title" required placeholder="e.g. Schedule Update or Weather Precaution"
+                           class="w-full text-xs rounded-lg border border-input bg-background px-3 py-2 text-foreground focus:ring-1 focus:ring-primary focus:outline-hidden">
+                </div>
+
+                <!-- Notification Body -->
+                <div>
+                    <label class="block text-xs font-medium text-foreground mb-1">Message Body</label>
+                    <textarea name="body" rows="3" required placeholder="Write the details of the notification here..."
+                              class="w-full text-xs rounded-lg border border-input bg-background px-3 py-2 text-foreground focus:ring-1 focus:ring-primary focus:outline-hidden resize-none"></textarea>
+                </div>
+
+                <!-- Optional Target Link -->
+                <div>
+                    <label class="block text-xs font-medium text-foreground mb-1">Action Link (Optional)</label>
+                    <input type="text" name="link" placeholder="/shifts, /log-entry, or custom URL"
+                           class="w-full text-xs rounded-lg border border-input bg-background px-3 py-2 text-foreground focus:ring-1 focus:ring-primary focus:outline-hidden">
+                </div>
+
+                <!-- Actions -->
+                <div class="pt-2 flex items-center justify-end gap-2 border-t border-border">
+                    <button type="button" onclick="closeBroadcastModal()" class="px-3.5 py-2 rounded-lg border border-input bg-card hover:bg-muted text-xs font-medium text-foreground transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold shadow-xs transition-colors">
+                        <i data-lucide="send" class="w-4 h-4"></i>
+                        <span>Send Broadcast</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
+        function openBroadcastModal() {
+            document.getElementById('broadcastModal').classList.remove('hidden');
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        }
+
+        function closeBroadcastModal() {
+            document.getElementById('broadcastModal').classList.add('hidden');
+        }
+
+        function switchTargetType(type) {
+            document.getElementById('targetTypeInput').value = type;
+            const roleBtn = document.getElementById('tabRoleBtn');
+            const userBtn = document.getElementById('tabUserBtn');
+            const roleGroup = document.getElementById('roleSelectGroup');
+            const userGroup = document.getElementById('userSelectGroup');
+
+            if (type === 'role') {
+                roleBtn.className = 'py-1.5 px-3 rounded-lg text-xs font-bold transition-all bg-card text-foreground shadow-xs';
+                userBtn.className = 'py-1.5 px-3 rounded-lg text-xs font-medium transition-all text-muted-foreground hover:text-foreground';
+                roleGroup.classList.remove('hidden');
+                userGroup.classList.add('hidden');
+            } else {
+                userBtn.className = 'py-1.5 px-3 rounded-lg text-xs font-bold transition-all bg-card text-foreground shadow-xs';
+                roleBtn.className = 'py-1.5 px-3 rounded-lg text-xs font-medium transition-all text-muted-foreground hover:text-foreground';
+                userGroup.classList.remove('hidden');
+                roleGroup.classList.add('hidden');
+            }
+        }
+
         async function markAllNotificationsRead() {
             try {
                 const res = await fetch('/notifications/read-all', {

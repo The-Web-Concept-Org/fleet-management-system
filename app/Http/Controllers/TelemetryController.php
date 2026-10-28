@@ -71,61 +71,117 @@ class TelemetryController extends Controller
             ], 422);
         }
 
-        $recordedCount = 0;
-        $latestPoint = null;
-
+        $validPoints = [];
         foreach ($incomingLocations as $loc) {
             $lat = (float) ($loc['latitude'] ?? 0);
             $lng = (float) ($loc['longitude'] ?? 0);
 
-            if ($lat === 0.0 && $lng === 0.0) {
-                continue;
-            }
-
-            $speed = isset($loc['speed']) ? (float) $loc['speed'] : null;
-            $heading = isset($loc['heading']) ? (float) $loc['heading'] : null;
-            $accuracy = isset($loc['accuracy']) ? (float) $loc['accuracy'] : null;
-            $isOffline = !empty($loc['is_offline_sync']);
-
-            $recordedAt = !empty($loc['timestamp'])
-                ? Carbon::parse($loc['timestamp'])
-                : now();
-
-            if ($activeShift) {
-                ShiftLocation::create([
-                    'shift_log_id' => $activeShift->id,
-                    'bus_id' => $bus?->id,
-                    'driver_id' => $driver?->id,
+            if ($lat !== 0.0 || $lng !== 0.0) {
+                $validPoints[] = [
                     'latitude' => $lat,
                     'longitude' => $lng,
-                    'speed' => $speed,
-                    'heading' => $heading,
-                    'accuracy' => $accuracy,
-                    'recorded_at' => $recordedAt,
-                    'is_offline_sync' => $isOffline,
-                ]);
-                $recordedCount++;
+                    'speed' => isset($loc['speed']) ? (float) $loc['speed'] : null,
+                    'heading' => isset($loc['heading']) ? (float) $loc['heading'] : null,
+                    'accuracy' => isset($loc['accuracy']) ? (float) $loc['accuracy'] : null,
+                    'is_offline_sync' => !empty($loc['is_offline_sync']),
+                    'recorded_at' => !empty($loc['timestamp']) ? Carbon::parse($loc['timestamp']) : now(),
+                ];
             }
-
-            $latestPoint = [
-                'lat' => $lat,
-                'lng' => $lng,
-                'speed' => $speed,
-                'heading' => $heading,
-                'recorded_at' => $recordedAt,
-            ];
         }
 
-        // Update the vehicle's last known position and set online status
+        if (empty($validPoints)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No valid location coordinates provided.',
+            ], 422);
+        }
+
+        $latestPoint = end($validPoints);
+
+        // Update the vehicle's live position and online heartbeat
         if ($bus && $latestPoint) {
             $bus->update([
-                'last_latitude' => $latestPoint['lat'],
-                'last_longitude' => $latestPoint['lng'],
+                'last_latitude' => $latestPoint['latitude'],
+                'last_longitude' => $latestPoint['longitude'],
                 'speed' => $latestPoint['speed'] ?? $bus->speed,
                 'heading' => $latestPoint['heading'] ?? $bus->heading,
                 'is_online' => true,
                 'last_location_at' => now(),
             ]);
+        }
+
+        $recordedCount = 0;
+
+        if ($activeShift) {
+            // OPTIMIZATION: Only preserve at most 2 checkpoints per shift:
+            // Checkpoint 1: Start Location (earliest dispatch ping)
+            // Checkpoint 2: End/Current Location (latest driver ping)
+            // All intermediate pings are discarded to prevent telemetry table bloat.
+            $existingLocations = ShiftLocation::where('shift_log_id', $activeShift->id)
+                ->orderBy('id', 'asc')
+                ->get();
+
+            $startLoc = $existingLocations->first();
+
+            if (!$startLoc) {
+                // Record the very first point as the shift's START location
+                $firstPoint = reset($validPoints);
+                $startLoc = ShiftLocation::create([
+                    'shift_log_id' => $activeShift->id,
+                    'bus_id' => $bus?->id,
+                    'driver_id' => $driver?->id,
+                    'latitude' => $firstPoint['latitude'],
+                    'longitude' => $firstPoint['longitude'],
+                    'speed' => $firstPoint['speed'],
+                    'heading' => $firstPoint['heading'],
+                    'accuracy' => $firstPoint['accuracy'],
+                    'recorded_at' => $firstPoint['recorded_at'],
+                    'is_offline_sync' => $firstPoint['is_offline_sync'],
+                ]);
+                $recordedCount++;
+            }
+
+            // Handle the 2nd checkpoint (END / CURRENT location)
+            if ($latestPoint) {
+                $otherLocs = $existingLocations->where('id', '!=', $startLoc->id);
+
+                if ($otherLocs->isNotEmpty()) {
+                    // Update existing latest location in-place with latest telemetry
+                    $currentEndLoc = $otherLocs->last();
+                    $currentEndLoc->update([
+                        'bus_id' => $bus?->id,
+                        'driver_id' => $driver?->id,
+                        'latitude' => $latestPoint['latitude'],
+                        'longitude' => $latestPoint['longitude'],
+                        'speed' => $latestPoint['speed'],
+                        'heading' => $latestPoint['heading'],
+                        'accuracy' => $latestPoint['accuracy'],
+                        'recorded_at' => $latestPoint['recorded_at'],
+                        'is_offline_sync' => $latestPoint['is_offline_sync'],
+                    ]);
+                    $recordedCount++;
+
+                    // Clean up any stray intermediate rows if present
+                    ShiftLocation::where('shift_log_id', $activeShift->id)
+                        ->whereNotIn('id', [$startLoc->id, $currentEndLoc->id])
+                        ->delete();
+                } elseif (count($validPoints) > 1 || $existingLocations->isNotEmpty()) {
+                    // Create the 2nd record for current/end position
+                    ShiftLocation::create([
+                        'shift_log_id' => $activeShift->id,
+                        'bus_id' => $bus?->id,
+                        'driver_id' => $driver?->id,
+                        'latitude' => $latestPoint['latitude'],
+                        'longitude' => $latestPoint['longitude'],
+                        'speed' => $latestPoint['speed'],
+                        'heading' => $latestPoint['heading'],
+                        'accuracy' => $latestPoint['accuracy'],
+                        'recorded_at' => $latestPoint['recorded_at'],
+                        'is_offline_sync' => $latestPoint['is_offline_sync'],
+                    ]);
+                    $recordedCount++;
+                }
+            }
         }
 
         return response()->json([
