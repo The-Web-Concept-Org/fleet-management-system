@@ -17,6 +17,7 @@ class Bus extends Model
         'model',
         'operator',
         'driver_id',
+        'transit_route_id',
         'status',
         'odometer',
         'fuel_month_liters',
@@ -24,6 +25,12 @@ class Bus extends Model
         'km_per_liter',
         'next_service_km',
         'route',
+        'last_latitude',
+        'last_longitude',
+        'last_location_at',
+        'is_online',
+        'speed',
+        'heading',
     ];
 
     protected $casts = [
@@ -32,7 +39,53 @@ class Bus extends Model
         'fuel_cost' => 'decimal:2',
         'km_per_liter' => 'decimal:2',
         'next_service_km' => 'integer',
+        'last_latitude' => 'float',
+        'last_longitude' => 'float',
+        'last_location_at' => 'datetime',
+        'is_online' => 'boolean',
+        'speed' => 'float',
+        'heading' => 'float',
     ];
+
+    /**
+     * The transit route this vehicle is assigned to.
+     */
+    public function transitRoute(): BelongsTo
+    {
+        return $this->belongsTo(TransitRoute::class, 'transit_route_id');
+    }
+
+    /**
+     * Check if vehicle is live online (heartbeat within 5 minutes)
+     */
+    public function getIsLiveOnlineAttribute(): bool
+    {
+        return $this->is_online && $this->last_location_at && $this->last_location_at->gt(now()->subMinutes(5));
+    }
+
+    /**
+     * Human-readable last seen string
+     */
+    public function getLastSeenHumanAttribute(): string
+    {
+        if (!$this->last_location_at) {
+            return 'No location recorded';
+        }
+
+        if ($this->is_live_online) {
+            return 'Online now • ' . $this->last_location_at->diffForHumans();
+        }
+
+        return 'Offline • Last seen ' . $this->last_location_at->diffForHumans();
+    }
+
+    /**
+     * Current active shift log if any
+     */
+    public function activeShift(): ?ShiftLog
+    {
+        return $this->shiftLogs()->where('status', ShiftLog::STATUS_IN_PROGRESS)->latest('id')->first();
+    }
 
     /**
      * The driver currently responsible for this bus (bus side owns the link).

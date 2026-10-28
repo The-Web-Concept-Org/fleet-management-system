@@ -6,6 +6,7 @@
 
     $coreNav = [
         ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'route' => 'dashboard', 'badge' => null],
+        ['label' => 'Transit Routes', 'icon' => 'route', 'route' => 'routes.index', 'badge' => \App\Models\TransitRoute::where('status', 'active')->count() ?: null],
         ['label' => 'Buses Roster', 'icon' => 'bus', 'route' => 'buses', 'badge' => \App\Models\Bus::where('status', 'active')->count() ?: null],
         ['label' => 'Driver Shifts', 'icon' => 'clock-3', 'route' => 'shifts', 'badge' => null],
         ['label' => 'Drivers Roster', 'icon' => 'users', 'route' => 'drivers', 'badge' => null],

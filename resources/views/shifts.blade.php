@@ -7,6 +7,33 @@
     <title>Shift Management &amp; Meter Audits &bull; {{ config('app.name', 'Lancotri') }}</title>
     @include('partials.brand-styles')
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/lancotri-mark.svg') }}">
+    <!-- Leaflet CSS for Map rendering -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <style>
+        .leaflet-container { font-family: inherit; border-radius: 0.75rem; z-index: 10; }
+        .bus-marker-online {
+            width: 16px;
+            height: 16px;
+            background-color: #10B981;
+            border-radius: 50%;
+            border: 2px solid #FFFFFF;
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.4);
+            animation: bus-ping 2s infinite;
+        }
+        @keyframes bus-ping {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .bus-marker-offline {
+            width: 14px;
+            height: 14px;
+            background-color: #6B7280;
+            border-radius: 50%;
+            border: 2px solid #FFFFFF;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+    </style>
 </head>
 <body class="bg-background text-foreground antialiased min-h-screen">
     @include('partials.sidebar')
@@ -119,6 +146,52 @@
                             <span class="text-xs text-muted-foreground">Logged today</span>
                         </div>
                     </div>
+                </div>
+
+                <!-- Live Fleet Telemetry & Active Bus Map (shadcn Card) -->
+                <div class="rounded-xl border bg-card text-card-foreground shadow-xs overflow-hidden">
+                    <div class="p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/20">
+                        <div class="flex items-center gap-2.5">
+                            <span class="relative flex h-3 w-3">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                            </span>
+                            <div>
+                                <h2 class="text-sm font-bold text-foreground tracking-tight flex items-center gap-2">
+                                    <span>Live Fleet GPS Map &amp; Real-Time Bus Tracker</span>
+                                    <span class="text-[11px] font-normal text-muted-foreground font-mono">10s auto-refresh</span>
+                                </h2>
+                                <p class="text-xs text-muted-foreground">
+                                    Green markers pulse for active buses broadcasting GPS; gray markers indicate last known position when offline.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <div class="flex items-center gap-2 px-2.5 py-1 rounded-md bg-background border text-xs font-mono">
+                                <div class="flex items-center gap-1.5 text-emerald-600 font-semibold">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    <span id="mapOnlineCount">0</span> Online
+                                </div>
+                                <span class="text-muted-foreground">&bull;</span>
+                                <div class="flex items-center gap-1.5 text-muted-foreground">
+                                    <span class="w-2 h-2 rounded-full bg-muted-foreground/60"></span>
+                                    <span id="mapOfflineCount">0</span> Offline
+                                </div>
+                            </div>
+                            <button type="button" onclick="refreshFleetMap()" class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 px-2.5 text-xs font-medium hover:bg-accent text-foreground gap-1.5 shadow-xs">
+                                <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                                <span>Sync</span>
+                            </button>
+                            <button type="button" onclick="fitFleetMap()" class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 px-2.5 text-xs font-medium hover:bg-accent text-foreground gap-1.5 shadow-xs">
+                                <i data-lucide="maximize" class="w-3.5 h-3.5 text-muted-foreground"></i>
+                                <span>Center</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Map Canvas -->
+                    <div id="fleetLiveMap" class="w-full h-80 relative bg-muted/10"></div>
                 </div>
 
                 <!-- Filter Controls (shadcn Card) -->
@@ -289,12 +362,19 @@
                                                 </span>
                                             </td>
                                             <td class="p-4 align-middle text-right">
-                                                <button type="button"
-                                                        onclick="event.stopPropagation(); inspectShiftById('{{ $shift->id }}')"
-                                                        title="Inspect Shift without reload"
-                                                        class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent hover:text-accent-foreground text-muted-foreground shadow-xs transition-colors">
-                                                    <i data-lucide="eye" class="w-3.5 h-3.5"></i>
-                                                </button>
+                                                <div class="inline-flex items-center gap-1.5 justify-end">
+                                                    <button type="button"
+                                                            onclick="event.stopPropagation(); inspectShiftById('{{ $shift->id }}')"
+                                                            title="Inspect in side desk"
+                                                            class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent hover:text-accent-foreground text-muted-foreground shadow-xs transition-colors">
+                                                        <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                                                    </button>
+                                                    <a href="{{ route('shifts.show', $shift->id) }}"
+                                                       title="Open Dedicated Shift Page with GPS Map"
+                                                       class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-primary/10 hover:text-primary text-muted-foreground shadow-xs transition-colors">
+                                                        <i data-lucide="map" class="w-3.5 h-3.5"></i>
+                                                    </a>
+                                                </div>
                                             </td>
                                         </tr>
                                         <script>
@@ -320,11 +400,15 @@
                                 <i data-lucide="shield-check" class="w-4 h-4 text-primary"></i>
                                 <h3 class="text-sm font-semibold leading-none">Inspection Desk</h3>
                             </div>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-2">
                                 <span class="font-mono text-xs font-bold" id="deskShiftDisplayId">{{ $selected?->display_id ?? 'Shift #—' }}</span>
                                 <span id="deskStatusBadge" class="inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold">
                                     {{ $selected ? ($selected->status === 'verified' ? 'Verified' : ($selected->status === 'in_progress' ? 'Active' : ($selected->end_km === null ? 'Flagged' : 'Pending Audit'))) : '—' }}
                                 </span>
+                                <a id="deskFullPageLink" href="{{ $selected ? route('shifts.show', $selected->id) : '#' }}" target="_self" class="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline ml-1" title="Open Dedicated Page with Live Map">
+                                    <i data-lucide="external-link" class="w-3 h-3"></i>
+                                    <span>Full Page</span>
+                                </a>
                             </div>
                         </div>
 
@@ -686,6 +770,11 @@
             }
 
             document.getElementById('deskShiftDisplayId').textContent = shift.display_id;
+
+            const fullPageLink = document.getElementById('deskFullPageLink');
+            if (fullPageLink) {
+                fullPageLink.href = '/shifts/' + shiftId;
+            }
 
             const statusBadge = document.getElementById('deskStatusBadge');
             if (statusBadge) {
@@ -1135,7 +1224,125 @@
             if (currentInspectedShiftId) {
                 inspectShiftById(currentInspectedShiftId);
             }
+            initFleetLiveMap();
         });
+
+        // ================= Leaflet Live Fleet Map Engine =================
+        let fleetMap = null;
+        let fleetMarkers = {};
+        let fleetBounds = null;
+
+        function initFleetLiveMap() {
+            const container = document.getElementById('fleetLiveMap');
+            if (!container) return;
+
+            // Default center: Caracas / Central hub
+            fleetMap = L.map('fleetLiveMap', {
+                zoomControl: true,
+                attributionControl: false
+            }).setView([10.4806, -66.9036], 12);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(fleetMap);
+
+            refreshFleetMap();
+
+            // Auto-refresh telemetry every 10 seconds
+            setInterval(refreshFleetMap, 10000);
+        }
+
+        async function refreshFleetMap() {
+            if (!fleetMap) return;
+            try {
+                const res = await fetch('/telemetry/live', { headers: { 'Accept': 'application/json' } });
+                const data = await res.json();
+                if (!data.success || !Array.isArray(data.buses)) return;
+
+                let onlineCount = 0;
+                let offlineCount = 0;
+                const validCoords = [];
+
+                // Remove existing markers
+                Object.values(fleetMarkers).forEach(m => fleetMap.removeLayer(m));
+                fleetMarkers = {};
+
+                data.buses.forEach(bus => {
+                    const isOnline = Boolean(bus.is_online);
+                    if (isOnline) onlineCount++; else offlineCount++;
+
+                    const rawLat = bus.latitude ?? bus.last_latitude;
+                    const rawLng = bus.longitude ?? bus.last_longitude;
+                    if (!rawLat || !rawLng) return;
+
+                    const lat = parseFloat(rawLat);
+                    const lng = parseFloat(rawLng);
+                    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) return;
+                    validCoords.push([lat, lng]);
+
+                    const markerHtml = isOnline
+                        ? '<div class="bus-marker-online" title="Online pinging"></div>'
+                        : '<div class="bus-marker-offline" title="Offline last location"></div>';
+
+                    const icon = L.divIcon({
+                        className: 'custom-fleet-pin',
+                        html: markerHtml,
+                        iconSize: isOnline ? [16, 16] : [14, 14],
+                        iconAnchor: isOnline ? [8, 8] : [7, 7]
+                    });
+
+                    const marker = L.marker([lat, lng], { icon }).addTo(fleetMap);
+
+                    const popupContent = `
+                        <div style="font-family:inherit; min-width:180px; padding:2px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #E5E7EB; padding-bottom:4px; margin-bottom:6px;">
+                                <strong style="font-size:13px;">${bus.display_id}</strong>
+                                <span style="font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; ${isOnline ? 'background:#DCFCE7; color:#15803D;' : 'background:#F3F4F6; color:#6B7280;'}">
+                                    ${isOnline ? 'ONLINE' : 'OFFLINE'}
+                                </span>
+                            </div>
+                            <div style="font-size:11px; color:#4B5563; line-height:1.4;">
+                                <div><b>Plate:</b> ${bus.plate || '—'} &bull; ${bus.model || 'Bus'}</div>
+                                <div><b>Corridor:</b> ${bus.transit_route ? `<span style="color:#2563EB; font-weight:600;">${bus.transit_route.route_code}</span>` : 'Unassigned'}</div>
+                                <div><b>Driver:</b> ${bus.active_shift?.driver_name || 'No active shift'}</div>
+                                <div><b>Speed:</b> ${bus.speed ? Math.round(bus.speed) + ' km/h' : '0 km/h'}</div>
+                                <div><b>Status:</b> ${isOnline ? '<span style="color:#10B981;">Pinging Realtime</span>' : `Offline &bull; ${bus.last_seen_human || 'Unknown'}`}</div>
+                            </div>
+                            ${bus.active_shift ? `
+                                <div style="margin-top:8px; padding-top:6px; border-top:1px solid #E5E7EB;">
+                                    <a href="/shifts/${bus.active_shift.id}" style="color:#2563EB; font-weight:600; font-size:11px; text-decoration:underline;">
+                                        Inspect Active Shift &rarr;
+                                    </a>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+
+                    marker.bindPopup(popupContent);
+                    fleetMarkers[bus.id] = marker;
+                });
+
+                const onlineEl = document.getElementById('mapOnlineCount');
+                const offlineEl = document.getElementById('mapOfflineCount');
+                if (onlineEl) onlineEl.textContent = onlineCount;
+                if (offlineEl) offlineEl.textContent = offlineCount;
+
+                if (validCoords.length > 0 && !fleetBounds) {
+                    fleetBounds = L.latLngBounds(validCoords);
+                    fleetMap.fitBounds(fleetBounds, { padding: [30, 30] });
+                }
+            } catch (err) {
+                console.error('Error fetching fleet live telemetry', err);
+            }
+        }
+
+        function fitFleetMap() {
+            if (fleetMap && fleetBounds) {
+                fleetMap.fitBounds(fleetBounds, { padding: [30, 30] });
+            }
+        }
     </script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 </body>
 </html>

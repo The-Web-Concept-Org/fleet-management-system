@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Bus;
 use App\Models\Driver;
+use App\Models\TransitRoute;
 use App\Support\DriverMailer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -18,7 +19,7 @@ class BusController extends Controller
      */
     public function index(Request $request): View
     {
-        $query = Bus::with('driver.user');
+        $query = Bus::with(['driver.user', 'transitRoute']);
 
         if ($request->filled('search')) {
             $search = trim($request->input('search'));
@@ -70,6 +71,9 @@ class BusController extends Controller
             ->sortBy(fn (Driver $driver) => $driver->user->name ?? '')
             ->values();
 
+        // All managed transit routes from database
+        $transitRoutes = TransitRoute::where('status', 'active')->orderBy('route_code')->get();
+
         return view('buses', compact(
             'buses',
             'totalBuses',
@@ -78,7 +82,8 @@ class BusController extends Controller
             'outOfServiceBuses',
             'avgEfficiency',
             'drivers',
-            'routes'
+            'routes',
+            'transitRoutes'
         ));
     }
 
@@ -97,6 +102,7 @@ class BusController extends Controller
             'fuel_month_liters' => ['nullable', 'integer', 'min:0'],
             'km_per_liter' => ['nullable', 'numeric', 'min:0', 'max:99.99'],
             'next_service_km' => ['nullable', 'integer'],
+            'transit_route_id' => ['nullable', 'integer', 'exists:transit_routes,id'],
             'route' => ['nullable', 'string', 'max:150'],
             'operator' => ['nullable', 'string', 'max:100'],
         ]);
@@ -105,6 +111,17 @@ class BusController extends Controller
 
         if (Bus::where('bus_number', $busNumber)->exists()) {
             return $this->duplicateBusResponse($request, $busNumber);
+        }
+
+        $transitRouteId = !empty($validated['transit_route_id']) ? (int) $validated['transit_route_id'] : null;
+        $routeName = null;
+        if ($transitRouteId) {
+            $tr = TransitRoute::find($transitRouteId);
+            if ($tr) {
+                $routeName = "{$tr->route_code} - {$tr->corridor_name}";
+            }
+        } elseif (!empty($validated['route'])) {
+            $routeName = trim($validated['route']);
         }
 
         $bus = Bus::create([
@@ -119,7 +136,8 @@ class BusController extends Controller
             'fuel_cost' => 0,
             'km_per_liter' => $validated['km_per_liter'] ?? null,
             'next_service_km' => $validated['next_service_km'] ?? 10000,
-            'route' => $validated['route'] ?? null,
+            'transit_route_id' => $transitRouteId,
+            'route' => $routeName,
         ]);
 
         $this->notifyAssignment($bus, null);
@@ -150,6 +168,7 @@ class BusController extends Controller
             'fuel_month_liters' => ['nullable', 'integer', 'min:0'],
             'km_per_liter' => ['nullable', 'numeric', 'min:0', 'max:99.99'],
             'next_service_km' => ['nullable', 'integer'],
+            'transit_route_id' => ['nullable'],
             'route' => ['nullable', 'string', 'max:150'],
             'operator' => ['nullable', 'string', 'max:100'],
         ]);
@@ -162,6 +181,19 @@ class BusController extends Controller
 
         $previousDriverId = $bus->driver_id;
 
+        $transitRouteId = !empty($validated['transit_route_id']) ? (int) $validated['transit_route_id'] : null;
+        $routeName = null;
+        if ($transitRouteId) {
+            $tr = TransitRoute::find($transitRouteId);
+            if ($tr) {
+                $routeName = "{$tr->route_code} - {$tr->corridor_name}";
+            }
+        } elseif (array_key_exists('route', $validated)) {
+            $routeName = !empty($validated['route']) ? trim($validated['route']) : null;
+        } else {
+            $routeName = $bus->route;
+        }
+
         $bus->update([
             'bus_number' => $busNumber,
             'plate' => strtoupper(trim($validated['plate'])),
@@ -173,7 +205,8 @@ class BusController extends Controller
             'fuel_month_liters' => $validated['fuel_month_liters'] ?? $bus->fuel_month_liters,
             'km_per_liter' => $validated['km_per_liter'] ?? $bus->km_per_liter,
             'next_service_km' => array_key_exists('next_service_km', $validated) && $validated['next_service_km'] !== null ? $validated['next_service_km'] : $bus->next_service_km,
-            'route' => $validated['route'] ?? null,
+            'transit_route_id' => $transitRouteId,
+            'route' => $routeName,
         ]);
 
         $this->notifyAssignment($bus, $previousDriverId);
@@ -182,7 +215,7 @@ class BusController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "{$bus->display_id} updated successfully.",
-                'bus' => $bus->fresh(['driver.user']),
+                'bus' => $bus->fresh(['driver.user', 'transitRoute']),
             ]);
         }
 
@@ -242,11 +275,25 @@ class BusController extends Controller
     public function updateRoute(Request $request, Bus $bus): JsonResponse|RedirectResponse
     {
         $validated = $request->validate([
+            'transit_route_id' => ['nullable'],
             'route' => ['nullable', 'string', 'max:150'],
         ]);
 
+        $transitRouteId = !empty($validated['transit_route_id']) ? (int) $validated['transit_route_id'] : null;
+        $routeName = null;
+
+        if ($transitRouteId) {
+            $tr = TransitRoute::find($transitRouteId);
+            if ($tr) {
+                $routeName = "{$tr->route_code} - {$tr->corridor_name}";
+            }
+        } elseif (!empty($validated['route'])) {
+            $routeName = trim($validated['route']);
+        }
+
         $bus->update([
-            'route' => !empty($validated['route']) ? trim($validated['route']) : null,
+            'transit_route_id' => $transitRouteId,
+            'route' => $routeName,
         ]);
 
         if ($request->expectsJson() || $request->ajax()) {
@@ -254,6 +301,7 @@ class BusController extends Controller
                 'success' => true,
                 'message' => "Service route updated for {$bus->display_id}.",
                 'route' => $bus->route,
+                'transit_route_id' => $bus->transit_route_id,
             ]);
         }
 

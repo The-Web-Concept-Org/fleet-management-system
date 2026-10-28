@@ -142,16 +142,23 @@
                                 Out of Service
                             </button>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <select onchange="window.location.href = this.value" class="h-8 rounded-md border border-input bg-background px-2 text-xs focus:ring-1 focus:ring-ring text-muted-foreground">
-                                <option value="{{ route('buses') }}">All Service Routes</option>
-                                <option value="{{ route('buses', ['route' => 'unassigned']) }}" @selected(request('route') === 'unassigned')>Unassigned Route</option>
-                                @foreach($routes as $r)
+                    <div class="flex items-center gap-2">
+                        <select onchange="window.location.href = this.value" class="h-8 rounded-md border border-input bg-background px-2 text-xs focus:ring-1 focus:ring-ring text-muted-foreground">
+                            <option value="{{ route('buses') }}">All Service Routes</option>
+                            <option value="{{ route('buses', ['route' => 'unassigned']) }}" @selected(request('route') === 'unassigned')>Unassigned Route</option>
+                            @foreach($transitRoutes as $tr)
+                                <option value="{{ route('buses', ['route' => $tr->route_code]) }}" @selected(request('route') === $tr->route_code || request('route') === "{$tr->route_code} - {$tr->corridor_name}")>
+                                    {{ $tr->route_code }} · {{ $tr->corridor_name }}
+                                </option>
+                            @endforeach
+                            @foreach($routes as $r)
+                                @if(!$transitRoutes->contains('route_code', $r))
                                     <option value="{{ route('buses', ['route' => $r]) }}" @selected(request('route') === $r)>{{ $r }}</option>
-                                @endforeach
-                            </select>
-                            <span class="text-xs text-muted-foreground font-mono">Showing {{ $buses->count() }} vehicles</span>
-                        </div>
+                                @endif
+                            @endforeach
+                        </select>
+                        <span class="text-xs text-muted-foreground font-mono">Showing {{ $buses->count() }} vehicles</span>
+                    </div>
                     </div>
 
                     <!-- Table -->
@@ -192,7 +199,28 @@
                                         };
                                     @endphp
                                     <tr class="border-b transition-colors hover:bg-muted/50" data-status="{{ $bus->status }}">
-                                        <td class="p-4 align-middle font-mono font-bold">{{ $bus->display_id }}</td>
+                                        <td class="p-4 align-middle">
+                                            <div class="flex items-center gap-2">
+                                                @if($bus->is_online)
+                                                    <span class="relative flex h-2.5 w-2.5 shrink-0" title="Bus GPS is Online & Active">
+                                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                                    </span>
+                                                @else
+                                                    <span class="h-2 w-2 rounded-full bg-muted-foreground/40 shrink-0" title="Bus GPS is Offline"></span>
+                                                @endif
+                                                <span class="font-mono font-bold">{{ $bus->display_id }}</span>
+                                            </div>
+                                            @if($bus->last_latitude && $bus->last_longitude)
+                                                <div class="text-[10px] text-muted-foreground font-mono flex items-center gap-1 mt-0.5" title="GPS: {{ $bus->last_latitude }}, {{ $bus->last_longitude }}">
+                                                    <i data-lucide="navigation" class="w-2.5 h-2.5 text-primary"></i>
+                                                    <span>{{ number_format($bus->last_latitude, 3) }}, {{ number_format($bus->last_longitude, 3) }}</span>
+                                                    @if($bus->speed > 0)
+                                                        <span class="text-emerald-600 font-semibold">· {{ round($bus->speed) }} km/h</span>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        </td>
                                         <td class="p-4 align-middle">
                                             <div class="font-medium text-foreground">{{ $bus->model ?: 'Transit Bus' }}</div>
                                             @if($bus->operator)
@@ -201,9 +229,25 @@
                                         </td>
                                         <td class="p-4 align-middle font-mono text-xs">{{ $bus->plate }}</td>
                                         <td class="p-4 align-middle text-xs font-medium">
-                                            @if($bus->route)
+                                            @if($bus->transitRoute)
                                                 <button type="button"
-                                                        onclick="openAssignRouteModal({{ $bus->id }}, '{{ addslashes($bus->bus_number) }}', '{{ addslashes($bus->route) }}')"
+                                                        onclick="openAssignRouteModal({{ $bus->id }}, '{{ addslashes($bus->display_id) }}', '{{ $bus->transit_route_id }}', '{{ addslashes($bus->route ?? '') }}')"
+                                                        class="inline-flex flex-col items-start gap-0.5 text-foreground hover:text-primary transition-colors cursor-pointer group text-left"
+                                                        title="Click to change service route">
+                                                    <div class="flex items-center gap-1.5">
+                                                        <span class="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-primary/10 text-primary border border-primary/20">
+                                                            {{ $bus->transitRoute->route_code }}
+                                                        </span>
+                                                        <span class="font-semibold text-foreground group-hover:underline">{{ $bus->transitRoute->corridor_name }}</span>
+                                                        <i data-lucide="edit-2" class="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 text-muted-foreground transition-opacity"></i>
+                                                    </div>
+                                                    <span class="text-[11px] text-muted-foreground truncate max-w-[200px]">
+                                                        {{ $bus->transitRoute->origin_terminal }} &rarr; {{ $bus->transitRoute->dest_terminal }}
+                                                    </span>
+                                                </button>
+                                            @elseif($bus->route)
+                                                <button type="button"
+                                                        onclick="openAssignRouteModal({{ $bus->id }}, '{{ addslashes($bus->display_id) }}', '', '{{ addslashes($bus->route) }}')"
                                                         class="inline-flex items-center gap-1.5 text-foreground hover:text-primary transition-colors cursor-pointer group text-left"
                                                         title="Click to change service route">
                                                     <i data-lucide="map-pin" class="w-3.5 h-3.5 text-primary shrink-0"></i>
@@ -212,7 +256,7 @@
                                                 </button>
                                             @else
                                                 <button type="button"
-                                                        onclick="openAssignRouteModal({{ $bus->id }}, '{{ addslashes($bus->bus_number) }}', '')"
+                                                        onclick="openAssignRouteModal({{ $bus->id }}, '{{ addslashes($bus->display_id) }}', '', '')"
                                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-dashed border-border hover:border-primary/60 text-muted-foreground hover:text-foreground text-[11px] transition-colors cursor-pointer"
                                                         title="Assign Service Route">
                                                     <i data-lucide="plus" class="w-3 h-3 text-primary"></i>
@@ -248,7 +292,7 @@
                                         <td class="p-4 align-middle text-right">
                                             <div class="flex items-center justify-end gap-1.5">
                                                 <button type="button"
-                                                        onclick="openEditBusModal({{ $bus->id }}, '{{ addslashes($bus->bus_number) }}', '{{ addslashes($bus->plate) }}', '{{ addslashes($bus->model ?? '') }}', '{{ $bus->status }}', '{{ $bus->driver_id }}', '{{ addslashes($bus->route ?? '') }}', {{ (int) $bus->odometer }}, {{ (int) $bus->next_service_km }}, '{{ addslashes($bus->operator ?? '') }}')"
+                                                        onclick="openEditBusModal({{ $bus->id }}, '{{ addslashes($bus->bus_number) }}', '{{ addslashes($bus->plate) }}', '{{ addslashes($bus->model ?? '') }}', '{{ $bus->status }}', '{{ $bus->driver_id }}', '{{ $bus->transit_route_id ?? '' }}', '{{ addslashes($bus->route ?? '') }}', {{ (int) $bus->odometer }}, {{ (int) $bus->next_service_km }}, '{{ addslashes($bus->operator ?? '') }}')"
                                                         title="Edit Bus"
                                                         class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent hover:text-accent-foreground text-muted-foreground shadow-sm transition-colors">
                                                     <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
@@ -321,9 +365,15 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Service Route / Line</label>
-                        <input list="standardRouteOptions" name="route" placeholder="e.g. Route 42 - Downtown Loop"
-                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
+                        <label class="text-xs font-medium leading-none">Managed Transit Route</label>
+                        <select name="transit_route_id" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
+                            <option value="">-- No Route (Standby / Depot) --</option>
+                            @foreach($transitRoutes as $tr)
+                                <option value="{{ $tr->id }}">
+                                    [{{ $tr->route_code }}] {{ $tr->corridor_name }} ({{ $tr->origin_terminal }} → {{ $tr->dest_terminal }})
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="space-y-1">
                         <label class="text-xs font-medium leading-none">Depot / Fleet Division</label>
@@ -414,9 +464,15 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Service Route / Line</label>
-                        <input list="standardRouteOptions" id="editBusRoute" name="route" placeholder="e.g. Route 42 - Downtown Loop"
-                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
+                        <label class="text-xs font-medium leading-none">Managed Transit Route</label>
+                        <select id="editBusTransitRoute" name="transit_route_id" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
+                            <option value="">-- No Route (Standby / Depot) --</option>
+                            @foreach($transitRoutes as $tr)
+                                <option value="{{ $tr->id }}">
+                                    [{{ $tr->route_code }}] {{ $tr->corridor_name }} ({{ $tr->origin_terminal }} → {{ $tr->dest_terminal }})
+                                </option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="space-y-1">
                         <label class="text-xs font-medium leading-none">Depot / Fleet Division</label>
@@ -498,8 +554,8 @@
         <div class="relative w-full max-w-md rounded-xl border bg-background p-6 shadow-lg modal-content text-left">
             <div class="flex items-center justify-between pb-4 border-b">
                 <div>
-                    <h3 class="text-base font-semibold leading-none tracking-tight">Assign Service Route</h3>
-                    <p class="text-xs text-muted-foreground mt-1">Assign or change the daily operating line for <span id="assignRouteBusNumber" class="font-bold text-foreground"></span>.</p>
+                    <h3 class="text-base font-semibold leading-none tracking-tight">Assign Managed Service Route</h3>
+                    <p class="text-xs text-muted-foreground mt-1">Assign or update the operating transit route for <span id="assignRouteBusNumber" class="font-bold text-foreground"></span>.</p>
                 </div>
                 <button type="button" onclick="window.shadcnModal.close('assignRouteModal')" class="rounded-sm opacity-70 hover:opacity-100 transition-opacity">
                     <i data-lucide="x" class="w-4 h-4"></i>
@@ -509,25 +565,29 @@
             <form id="assignRouteForm" method="POST" action="" class="space-y-4 pt-4">
                 @csrf
                 <div class="space-y-1.5">
-                    <label class="text-xs font-medium leading-none">Service Route / Daily Line *</label>
-                    <input list="standardRouteOptions" id="assignRouteInput" name="route" required placeholder="e.g. Route 42 - Downtown Loop"
-                           class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-medium"/>
-                    <p class="text-[11px] text-muted-foreground">Select an existing route, pick a quick preset below, or type a new custom route.</p>
+                    <label class="text-xs font-medium leading-none">Select Managed Transit Route *</label>
+                    <select id="assignRouteSelect" name="transit_route_id" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-medium">
+                        <option value="">-- No Route Assigned (Standby / Depot) --</option>
+                        @foreach($transitRoutes as $tr)
+                            <option value="{{ $tr->id }}" data-code="{{ $tr->route_code }}">
+                                [{{ $tr->route_code }}] {{ $tr->corridor_name }} · {{ $tr->origin_terminal }} → {{ $tr->dest_terminal }} ({{ $tr->distance_km }} km)
+                            </option>
+                        @endforeach
+                    </select>
+                    <p class="text-[11px] text-muted-foreground">Select a verified route corridor from the database, or click a quick badge below.</p>
                 </div>
 
                 <!-- Quick Route Presets -->
                 <div class="space-y-1.5">
-                    <span class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Quick Presets</span>
+                    <span class="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Available Managed Routes</span>
                     <div class="flex flex-wrap gap-1.5 pt-1">
-                        @forelse($routes as $r)
-                            <button type="button" onclick="setQuickRoute('{{ addslashes($r) }}')" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-secondary/80 hover:bg-secondary text-secondary-foreground border border-border/50 transition-colors">
-                                <i data-lucide="map-pin" class="w-3 h-3 text-primary"></i>
-                                <span>{{ $r }}</span>
+                        @forelse($transitRoutes as $tr)
+                            <button type="button" onclick="selectRouteId('{{ $tr->id }}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-secondary/80 hover:bg-primary hover:text-primary-foreground text-secondary-foreground border border-border/50 transition-colors cursor-pointer">
+                                <span class="font-bold font-mono">{{ $tr->route_code }}</span>
+                                <span class="text-[11px] opacity-90">{{ $tr->corridor_name }}</span>
                             </button>
                         @empty
-                            <button type="button" onclick="setQuickRoute('Route 101 - Metro Express')" class="px-2.5 py-1 text-xs rounded-md bg-secondary/80 hover:bg-secondary text-secondary-foreground border">Route 101 - Metro Express</button>
-                            <button type="button" onclick="setQuickRoute('Route 204 - Downtown Loop')" class="px-2.5 py-1 text-xs rounded-md bg-secondary/80 hover:bg-secondary text-secondary-foreground border">Route 204 - Downtown Loop</button>
-                            <button type="button" onclick="setQuickRoute('Route 305 - Airport Direct')" class="px-2.5 py-1 text-xs rounded-md bg-secondary/80 hover:bg-secondary text-secondary-foreground border">Route 305 - Airport Direct</button>
+                            <p class="text-xs text-muted-foreground">No active transit corridors found in database.</p>
                         @endforelse
                     </div>
                 </div>
@@ -577,32 +637,32 @@
     </div>
 
     <script>
-        function openEditBusModal(id, busNumber, plate, model, status, driverId, route, odometer, nextService, operator) {
+        function openEditBusModal(id, busNumber, plate, model, status, driverId, transitRouteId, route, odometer, nextService, operator) {
             document.getElementById('editBusForm').action = '/buses/' + id;
             document.getElementById('editBusNumber').value = busNumber;
             document.getElementById('editBusPlate').value = plate;
             document.getElementById('editBusModel').value = model || '';
             document.getElementById('editBusStatus').value = status;
             document.getElementById('editBusDriver').value = driverId || '';
-            document.getElementById('editBusRoute').value = route || '';
+            document.getElementById('editBusTransitRoute').value = transitRouteId || '';
             document.getElementById('editBusOdometer').value = odometer ?? 0;
             document.getElementById('editBusNextService').value = nextService ?? 10000;
             document.getElementById('editBusOperator').value = operator || '';
             window.shadcnModal.open('editBusModal');
         }
 
-        function openAssignRouteModal(id, busNumber, currentRoute) {
+        function openAssignRouteModal(id, busNumber, transitRouteId, currentRoute) {
             document.getElementById('assignRouteForm').action = '/buses/' + id + '/route';
             document.getElementById('assignRouteBusNumber').textContent = busNumber;
-            document.getElementById('assignRouteInput').value = currentRoute || '';
+            document.getElementById('assignRouteSelect').value = transitRouteId || '';
             window.shadcnModal.open('assignRouteModal');
         }
 
-        function setQuickRoute(routeName) {
-            const input = document.getElementById('assignRouteInput');
-            if (input) {
-                input.value = routeName;
-                input.focus();
+        function selectRouteId(routeId) {
+            const select = document.getElementById('assignRouteSelect');
+            if (select) {
+                select.value = routeId;
+                select.focus();
             }
         }
 

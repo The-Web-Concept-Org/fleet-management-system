@@ -10,6 +10,8 @@ use App\Http\Controllers\OcrController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\TelemetryController;
+use App\Http\Controllers\TransitRouteController;
 use App\Http\Controllers\TripController;
 use Illuminate\Support\Facades\Route;
 
@@ -76,8 +78,17 @@ Route::middleware('auth:sanctum')->group(function (): void {
     // Shifts & Meter logs API
     Route::get('shifts', [ShiftController::class, 'apiIndex']);
     Route::get('shifts/current', [ShiftController::class, 'current']);
+    Route::get('shifts/{shift}', [ShiftController::class, 'show'])->whereNumber('shift');
     Route::post('shifts/start', [ShiftController::class, 'start']);
     Route::post('shifts/end', [ShiftController::class, 'end']);
+
+    // GPS Telemetry & Live Fleet Tracking API
+    Route::post('telemetry/location', [TelemetryController::class, 'updateLocation']);
+    Route::get('telemetry/buses', [TelemetryController::class, 'getLiveBuses']);
+
+    // Transit Routes API (for Mobile Navigation & Route Polylines)
+    Route::get('routes', [TransitRouteController::class, 'apiIndex']);
+    Route::get('routes/{route}', [TransitRouteController::class, 'apiShow'])->whereNumber('route');
 
     // Fuel records API: list recent fill-ups & store new fill-up
     Route::get('fuel', [FuelController::class, 'apiIndex']);

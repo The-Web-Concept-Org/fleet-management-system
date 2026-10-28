@@ -4,6 +4,8 @@ use App\Http\Controllers\BusController;
 use App\Http\Controllers\FuelController;
 use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\TelemetryController;
+use App\Http\Controllers\TransitRouteController;
 use App\Http\Controllers\TripController;
 use App\Http\Controllers\WebAuthController;
 use Illuminate\Support\Facades\Route;
@@ -19,7 +21,14 @@ Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/telemetry/live', [\App\Http\Controllers\DashboardController::class, 'liveTelemetry'])->name('telemetry.live');
+    Route::get('/telemetry/live', [TelemetryController::class, 'getLiveBuses'])->name('telemetry.live');
+
+    // Transit Routes Management (Dedicated Admin Page)
+    Route::get('/routes', [TransitRouteController::class, 'index'])->name('routes.index');
+    Route::post('/routes', [TransitRouteController::class, 'store'])->name('routes.store');
+    Route::put('/routes/{route}', [TransitRouteController::class, 'update'])->name('routes.update');
+    Route::delete('/routes/{route}', [TransitRouteController::class, 'destroy'])->name('routes.destroy');
+    Route::post('/routes/{route}/assign', [TransitRouteController::class, 'assignBuses'])->name('routes.assign');
 
     Route::get('/buses', [BusController::class, 'index'])->name('buses');
     Route::post('/buses', [BusController::class, 'store'])->name('buses.store');

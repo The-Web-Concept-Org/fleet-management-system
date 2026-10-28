@@ -41,12 +41,22 @@ class ShiftController extends Controller
      */
     public function show(Request $request, ShiftLog $shift): View|HttpResponse|JsonResponse
     {
-        $shift->load(['bus', 'driver.user', 'trip']);
+        $shift->load(['bus.transitRoute', 'driver.user', 'trip', 'locations']);
 
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,
-                'shift' => $shift->toApiArray(),
+                'shift' => array_merge($shift->toApiArray(), [
+                    'locations' => $shift->locations->map(fn (\App\Models\ShiftLocation $loc) => [
+                        'latitude' => $loc->latitude,
+                        'longitude' => $loc->longitude,
+                        'speed' => $loc->speed,
+                        'heading' => $loc->heading,
+                        'accuracy' => $loc->accuracy,
+                        'recorded_at' => $loc->recorded_at?->toIso8601String(),
+                        'is_offline_sync' => $loc->is_offline_sync,
+                    ])->values(),
+                ]),
             ]);
         }
 
@@ -54,7 +64,12 @@ class ShiftController extends Controller
             return response()->view('partials.shift-detail', ['shift' => $shift]);
         }
 
-        return $this->renderShiftsBoard($request, $shift);
+        if ($request->has('board')) {
+            return $this->renderShiftsBoard($request, $shift);
+        }
+
+        // Dedicated Shift Detail separate page with full breadcrumbs and map!
+        return view('shift-detail-page', compact('shift'));
     }
 
     /**

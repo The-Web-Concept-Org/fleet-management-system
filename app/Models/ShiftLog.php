@@ -67,6 +67,11 @@ class ShiftLog extends Model
         return $this->belongsTo(Trip::class);
     }
 
+    public function locations(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ShiftLocation::class)->orderBy('recorded_at');
+    }
+
     public function getIsActiveAttribute(): bool
     {
         return $this->status === self::STATUS_IN_PROGRESS;
@@ -142,6 +147,8 @@ class ShiftLog extends Model
                 'destination' => $trip->destination,
                 'status' => $trip->status,
             ] : null,
+            'route' => $bus?->transitRoute ? $bus->transitRoute->toApiArray() : null,
+            'location_points_count' => $this->locations()->count(),
             'start_km' => $this->start_km,
             'end_km' => $this->end_km,
             'distance_km' => $this->distance_km !== null ? (float) $this->distance_km : null,
