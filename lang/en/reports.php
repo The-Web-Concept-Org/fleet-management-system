@@ -1,0 +1,92 @@
+<?php
+
+return [
+    'nav_title' => 'Fuel Reports',
+    'title' => 'FUEL CONSUMPTION DETAIL LANCOMTRI SA',
+    'subtitle' => 'JANUARY - SEPTEMBER :year',
+    'custom_period' => ':start - :end :year',
+    'full_year' => 'JANUARY - DECEMBER :year',
+    'weekly_subtitle' => ':month :year &bull; WEEKLY BREAKDOWN',
+    'daily_subtitle' => ':month :year &bull; DAILY BREAKDOWN (:period)',
+
+    // View Modes
+    'view_mode' => 'Report Frequency',
+    'mode_monthly' => 'Monthly',
+    'mode_weekly' => 'Weekly',
+    'mode_daily' => 'Daily',
+
+    // Column Group Headers
+    'unit' => 'UNIT',
+    'monthly_detail' => 'MONTHLY BREAKDOWN',
+    'weekly_detail' => 'WEEKLY BREAKDOWN',
+    'daily_detail' => 'DAILY BREAKDOWN',
+    'general_totals' => 'GENERAL TOTALS',
+    'subtotals' => 'SUBTOTALS',
+    'vat' => 'VAT',
+    'vat_rate' => 'VAT :rate%',
+    'totals' => 'TOTALS',
+    'excess' => 'EXCESS',
+
+    // Bottom Summary
+    'subtotal' => 'SUBTOTAL',
+    'total' => 'TOTAL',
+    'media' => 'AVERAGE',
+    'below_media' => 'BELOW AVERAGE',
+    'above_media' => 'ABOVE AVERAGE',
+
+    // Weeks & Days
+    'week' => 'Week',
+    'week_num' => 'Wk :num',
+    'week_short' => 'Wk :num (:start-:end)',
+    'day' => 'Day',
+    'day_short' => 'D:num',
+
+    // Months
+    'months' => [
+        1 => 'JANUARY',
+        2 => 'FEBRUARY',
+        3 => 'MARCH',
+        4 => 'APRIL',
+        5 => 'MAY',
+        6 => 'JUNE',
+        7 => 'JULY',
+        8 => 'AUGUST',
+        9 => 'SEPTEMBER',
+        10 => 'OCTOBER',
+        11 => 'NOVEMBER',
+        12 => 'DECEMBER',
+    ],
+
+    // UI Controls
+    'export_pdf' => 'Export PDF',
+    'export_pdf_desc' => 'Download identical report in landscape PDF format',
+    'print' => 'Print',
+    'year' => 'Year',
+    'month' => 'Month',
+    'period' => 'Period',
+    'from_month' => 'Start Month',
+    'to_month' => 'End Month',
+    'language' => 'Language',
+    'spanish' => 'Spanish',
+    'english' => 'English',
+    'tax_rate' => 'VAT Rate',
+    'filter' => 'Filter Report',
+    'reset_filter' => 'Reset',
+    'daily_range' => 'Day Range',
+    'days_1_15' => 'Days 1 to 15 (1st Half)',
+    'days_16_end' => 'Days 16 to End of Month (2nd Half)',
+    'days_full' => 'Full Month (1 to :max)',
+    'quick_presets' => 'Quick Presets',
+    'current_month' => 'Current Month',
+    'kpi_total_spent' => 'Total Fleet Expense',
+    'kpi_subtotal' => 'Net Subtotal',
+    'kpi_vat' => 'Total VAT (15%)',
+    'kpi_average' => 'Average per Unit',
+    'kpi_above' => 'Above Average',
+    'kpi_below' => 'Below Average',
+    'active_units' => 'Active Units',
+    'fleet_statement' => 'Official Fleet Fuel Consumption Audit Statement',
+    'generated_on' => 'Generated on :date by Fleet Management System',
+    'page' => 'Page',
+    'of' => 'of',
+];

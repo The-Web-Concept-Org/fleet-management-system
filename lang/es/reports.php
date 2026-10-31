@@ -1,0 +1,92 @@
+<?php
+
+return [
+    'nav_title' => 'Reportes de Combustible',
+    'title' => 'DETALLE DE COMBUSTIBLE LANCOMTRI SA',
+    'subtitle' => 'ENERO - SEPTIEMBRE :year',
+    'custom_period' => ':start - :end :year',
+    'full_year' => 'ENERO - DICIEMBRE :year',
+    'weekly_subtitle' => ':month :year &bull; DESGLOSE SEMANAL',
+    'daily_subtitle' => ':month :year &bull; DESGLOSE DIARIO (:period)',
+
+    // View Modes
+    'view_mode' => 'Frecuencia del Reporte',
+    'mode_monthly' => 'Mensual',
+    'mode_weekly' => 'Semanal',
+    'mode_daily' => 'Diario',
+
+    // Column Group Headers
+    'unit' => 'UNIDAD',
+    'monthly_detail' => 'DETALLE MENSUAL',
+    'weekly_detail' => 'DETALLE SEMANAL',
+    'daily_detail' => 'DETALLE DIARIO',
+    'general_totals' => 'TOTALES GENERALES',
+    'subtotals' => 'SUBTOTALES',
+    'vat' => 'IVA',
+    'vat_rate' => 'IVA :rate%',
+    'totals' => 'TOTALES',
+    'excess' => 'EXCEDENTE',
+
+    // Bottom Summary
+    'subtotal' => 'SUBTOTAL',
+    'total' => 'TOTAL',
+    'media' => 'MEDIA',
+    'below_media' => 'INFERIOR A LA MEDIA',
+    'above_media' => 'SUPERIOR A LA MEDIA',
+
+    // Weeks & Days
+    'week' => 'Semana',
+    'week_num' => 'Sem :num',
+    'week_short' => 'Sem :num (:start-:end)',
+    'day' => 'Día',
+    'day_short' => 'D:num',
+
+    // Months
+    'months' => [
+        1 => 'ENERO',
+        2 => 'FEBRERO',
+        3 => 'MARZO',
+        4 => 'ABRIL',
+        5 => 'MAYO',
+        6 => 'JUNIO',
+        7 => 'JULIO',
+        8 => 'AGOSTO',
+        9 => 'SEPTIEMBRE',
+        10 => 'OCTUBRE',
+        11 => 'NOVIEMBRE',
+        12 => 'DICIEMBRE',
+    ],
+
+    // UI Controls
+    'export_pdf' => 'Exportar PDF',
+    'export_pdf_desc' => 'Descargar reporte idéntico en formato PDF apaisado',
+    'print' => 'Imprimir',
+    'year' => 'Año',
+    'month' => 'Mes',
+    'period' => 'Período',
+    'from_month' => 'Mes Desde',
+    'to_month' => 'Mes Hasta',
+    'language' => 'Idioma',
+    'spanish' => 'Español',
+    'english' => 'Inglés',
+    'tax_rate' => 'Tasa de IVA',
+    'filter' => 'Filtrar Reporte',
+    'reset_filter' => 'Restablecer',
+    'daily_range' => 'Rango de Días',
+    'days_1_15' => 'Días 1 a 15 (1ra Quincena)',
+    'days_16_end' => 'Días 16 al fin de mes (2da Quincena)',
+    'days_full' => 'Mes Completo (1 a :max)',
+    'quick_presets' => 'Accesos Rápidos',
+    'current_month' => 'Mes Actual',
+    'kpi_total_spent' => 'Gasto Total Flota',
+    'kpi_subtotal' => 'Subtotal Neto',
+    'kpi_vat' => 'Total IVA (15%)',
+    'kpi_average' => 'Promedio por Unidad',
+    'kpi_above' => 'Sobre la Media',
+    'kpi_below' => 'Bajo la Media',
+    'active_units' => 'Unidades Activas',
+    'fleet_statement' => 'Declaración Oficial de Consumo de Combustible',
+    'generated_on' => 'Generado el :date por el Sistema de Gestión de Flota',
+    'page' => 'Página',
+    'of' => 'de',
+];

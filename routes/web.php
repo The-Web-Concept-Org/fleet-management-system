@@ -63,6 +63,10 @@ Route::middleware(['auth'])->group(function () {
         ->whereNumber('fuelLog')
         ->name('fuel.status');
 
+    // Fuel Statements & Analytical Reports (Bilingual ES & EN with Landscape PDF Export)
+    Route::get('/reports/fuel', [\App\Http\Controllers\ReportController::class, 'fuel'])->name('reports.fuel');
+    Route::get('/reports/fuel/pdf', [\App\Http\Controllers\ReportController::class, 'exportPdf'])->name('reports.fuel.pdf');
+
     Route::get('/maintenance', [MaintenanceController::class, 'index'])->name('maintenance');
     Route::post('/maintenance/{maintenanceLog}/status', [MaintenanceController::class, 'updateStatus'])
         ->whereNumber('maintenanceLog')
