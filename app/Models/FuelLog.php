@@ -103,6 +103,21 @@ class FuelLog extends Model
         return StorageUrl::for($this->image);
     }
 
+    public function getCostAttribute(): float
+    {
+        return (float) ($this->total_cost ?? 0);
+    }
+
+    public function getPriceAttribute(): float
+    {
+        return (float) ($this->total_cost ?? 0);
+    }
+
+    public function getStationNameAttribute(): string
+    {
+        return $this->station ?: 'Depot Pump';
+    }
+
     public function getDisplayIdAttribute(): string
     {
         if ($this->reference) {
@@ -149,6 +164,8 @@ class FuelLog extends Model
             'type' => $this->fuel_type,
             'liters' => $this->liters !== null ? (float) $this->liters : null,
             'price' => $this->total_cost !== null ? (float) $this->total_cost : null,
+            'total_cost' => $this->total_cost !== null ? (float) $this->total_cost : null,
+            'cost' => $this->total_cost !== null ? (float) $this->total_cost : null,
             'currency' => $this->currency,
             'unit_price' => $this->unit_price !== null ? (float) $this->unit_price : null,
             'image' => $this->formatImage($this->image),

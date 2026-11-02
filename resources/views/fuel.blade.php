@@ -53,6 +53,12 @@
                                    class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
                         </div>
 
+                        <button type="button" onclick="openAddFuelModal()"
+                                class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 h-9 px-4 py-2 gap-2 cursor-pointer">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                            <span>Add Fuel Entry</span>
+                        </button>
+
                         <button id="exportFuelCsvBtn" type="button" onclick="window.toast?.success('Fuel Log Exported', 'CSV report downloaded.')"
                                 class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 gap-2">
                             <i data-lucide="download" class="w-3.5 h-3.5 text-muted-foreground"></i>
@@ -203,7 +209,7 @@
                                         </td>
                                         <td class="p-4 align-middle font-mono text-xs font-bold">{{ number_format($log->liters, 1) }} L</td>
                                         <td class="p-4 align-middle font-mono text-xs">${{ number_format($log->unit_price, 2) }}/L</td>
-                                        <td class="p-4 align-middle font-mono text-xs font-bold text-emerald-600">${{ number_format($log->cost, 2) }}</td>
+                                        <td class="p-4 align-middle font-mono text-xs font-bold text-emerald-600">${{ number_format($log->total_cost, 2) }}</td>
                                         <td class="p-4 align-middle text-xs">{{ $log->station_name ?: 'Depot Pump' }}</td>
                                         <td class="p-4 align-middle">
                                             @php
@@ -238,7 +244,7 @@
                                                     <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
                                                 </button>
                                                 @if($log->image)
-                                                    <button type="button" onclick="openReceiptModal('{{ $log->image_url }}', '{{ $log->display_id }}', '{{ number_format($log->cost, 2) }}')"
+                                                    <button type="button" onclick="openReceiptModal('{{ $log->image_url }}', '{{ $log->display_id }}', '{{ number_format($log->total_cost, 2) }}')"
                                                             class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent hover:text-accent-foreground text-muted-foreground shadow-sm transition-colors" title="View Dispenser Receipt">
                                                         <i data-lucide="receipt" class="w-3.5 h-3.5"></i>
                                                     </button>
@@ -325,7 +331,120 @@
         </div>
     </div>
 
+    <!-- ================= shadcn Dialog: ADD FUEL ENTRY MODAL ================= -->
+    <div id="addFuelModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs hidden">
+        <div class="relative w-full max-w-lg rounded-xl border bg-background p-6 shadow-lg modal-content text-left max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b">
+                <div>
+                    <h3 class="text-base font-semibold leading-none tracking-tight">Log Fuel Dispensation</h3>
+                    <p class="text-xs text-muted-foreground mt-1">Record a new fuel fill-up with dispenser liters, price, and receipt.</p>
+                </div>
+                <button type="button" onclick="window.shadcnModal.close('addFuelModal')" class="text-muted-foreground hover:text-foreground">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <form id="addFuelModalForm" method="POST" action="{{ route('fuel.store') }}" enctype="multipart/form-data" class="mt-4 space-y-4">
+                @csrf
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-medium">Vehicle / Bus *</label>
+                        <select name="bus_id" required class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                            <option value="">Select bus...</option>
+                            @foreach($buses as $bus)
+                                <option value="{{ $bus->id }}">{{ $bus->display_id }}{{ $bus->plate ? ' · ' . $bus->plate : '' }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium">Fuel Type *</label>
+                        <select name="type" required class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                            <option value="diesel" selected>Diesel</option>
+                            <option value="petrol">Petrol / Regular</option>
+                            <option value="super">Super / Extra</option>
+                            <option value="cng">CNG</option>
+                            <option value="lpg">LPG</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="text-xs font-medium">Liters (Volume) *</label>
+                        <input type="number" step="0.01" min="0.01" name="liters" id="modalAddLiters" required placeholder="e.g. 50.0" oninput="recalcFromLitersOrUnit()"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring font-mono"/>
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium">Unit Price ($/L)</label>
+                        <input type="number" step="0.001" min="0" name="unit_price" id="modalAddUnitPrice" placeholder="e.g. 1.25" oninput="recalcFromLitersOrUnit()"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring font-mono"/>
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium text-emerald-600 font-semibold">Total Cost ($) *</label>
+                        <input type="number" step="0.01" min="0.01" name="price" id="modalAddTotalPrice" required placeholder="e.g. 62.50" oninput="recalcFromTotalCost()"
+                               class="flex h-9 w-full rounded-md border border-emerald-500/50 bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono font-bold text-emerald-600"/>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-medium">Station Name</label>
+                        <input type="text" name="station" placeholder="e.g. Central Depot, Shell #104"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"/>
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium">Receipt / Invoice #</label>
+                        <input type="text" name="receipt_number" placeholder="e.g. RCP-98214"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring font-mono"/>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-medium">Fill-up Date &amp; Time</label>
+                        <input type="datetime-local" name="added_at" value="{{ now()->format('Y-m-d\TH:i') }}"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"/>
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium">Dispenser Receipt Photo</label>
+                        <input type="file" name="image" accept="image/*"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-xs shadow-sm file:border-0 file:bg-transparent file:text-xs file:font-medium"/>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t">
+                    <button type="button" onclick="window.shadcnModal.close('addFuelModal')" class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+                        Cancel
+                    </button>
+                    <button type="submit" class="rounded-md bg-primary text-primary-foreground px-4 py-1.5 text-xs font-semibold hover:bg-primary/90 shadow-xs cursor-pointer">
+                        Record Fill-up
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
+        function openAddFuelModal() {
+            window.shadcnModal.open('addFuelModal');
+            if (window.lucide) window.lucide.createIcons();
+        }
+
+        function recalcFromLitersOrUnit() {
+            const liters = parseFloat(document.getElementById('modalAddLiters')?.value) || 0;
+            const unit = parseFloat(document.getElementById('modalAddUnitPrice')?.value) || 0;
+            if (liters > 0 && unit > 0) {
+                document.getElementById('modalAddTotalPrice').value = (liters * unit).toFixed(2);
+            }
+        }
+
+        function recalcFromTotalCost() {
+            const liters = parseFloat(document.getElementById('modalAddLiters')?.value) || 0;
+            const total = parseFloat(document.getElementById('modalAddTotalPrice')?.value) || 0;
+            if (liters > 0 && total > 0) {
+                document.getElementById('modalAddUnitPrice').value = (total / liters).toFixed(3);
+            }
+        }
+
         function openReceiptModal(url, ref, total) {
             document.getElementById('receiptImg').src = url;
             document.getElementById('receiptRef').textContent = ref;

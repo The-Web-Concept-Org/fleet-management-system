@@ -72,6 +72,7 @@ Route::middleware(['auth'])->group(function () {
         ->name('shifts.trip');
 
     Route::get('/fuel', [FuelController::class, 'index'])->name('fuel');
+    Route::post('/fuel', [FuelController::class, 'store'])->name('fuel.store');
     Route::post('/fuel/{fuelLog}/status', [FuelController::class, 'updateStatus'])
         ->whereNumber('fuelLog')
         ->name('fuel.status');

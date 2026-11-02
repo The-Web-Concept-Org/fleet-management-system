@@ -182,15 +182,21 @@ class FuelController extends Controller
 
         $filledAt = $this->parseDateTime($validated['added_at'] ?? null);
 
+        $totalCost = (float) $validated['price'];
+        $liters = (float) $validated['liters'];
+        $unitPrice = $request->filled('unit_price') && (float) $request->input('unit_price') > 0
+            ? round((float) $request->input('unit_price'), 2)
+            : ($liters > 0 ? round($totalCost / $liters, 2) : 0);
+
         $log = FuelLog::create([
             'reference' => $this->generateReference(),
             'bus_id' => $busId,
             'driver_id' => $bus?->driver_id ?? $request->user()?->driver?->id,
             'trip_id' => $validated['trip_id'] ?? null,
             'fuel_type' => $this->normalizeType($validated['type']),
-            'liters' => $validated['liters'],
-            'total_cost' => $validated['price'],
-            'unit_price' => round((float) $validated['price'] / (float) $validated['liters'], 2),
+            'liters' => $liters,
+            'total_cost' => $totalCost,
+            'unit_price' => $unitPrice,
             'image' => $imagePath,
             'station' => $validated['station'] ?? null,
             'receipt_number' => $validated['receipt_number'] ?? null,
@@ -228,7 +234,11 @@ class FuelController extends Controller
                 . '. Accepted names include added_at, added_datetime, datetime, date_time, date, filled_at.';
         }
 
-        return response()->json($response, 201);
+        if ($request->wantsJson() || $request->ajax() || $request->is('api/*')) {
+            return response()->json($response, 201);
+        }
+
+        return redirect()->route('fuel')->with('success', "Fuel record {$log->display_id} added successfully (\${$log->total_cost}).");
     }
 
     /**
@@ -256,8 +266,18 @@ class FuelController extends Controller
         }
 
         $price = $this->findInput($request, ['price', 'amount', 'total_cost', 'totalCost', 'total_price', 'totalPrice', 'cost']);
+        $unitPrice = $this->findInput($request, ['unit_price', 'unitPrice', 'rate', 'price_per_liter', 'pricePerLiter']);
+
+        // Auto-compute price if unit_price and liters are provided but price is 0 or missing
+        if (($price === null || (float)$price <= 0) && $unitPrice !== null && (float)$unitPrice > 0 && $liters !== null && (float)$liters > 0) {
+            $price = round((float)$unitPrice * (float)$liters, 2);
+        }
+
         if ($price !== null) {
             $aliases['price'] = $price;
+        }
+        if ($unitPrice !== null) {
+            $aliases['unit_price'] = $unitPrice;
         }
 
         $addedAt = $this->findInput($request, [

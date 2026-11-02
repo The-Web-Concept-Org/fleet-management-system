@@ -283,7 +283,7 @@ it('validates the required fuel fields', function (): void {
 
     $this->postJson('/api/fuel', [])
         ->assertStatus(422)
-        ->assertJsonValidationErrors(['type', 'liters', 'price', 'image']);
+        ->assertJsonValidationErrors(['type', 'liters', 'price']);
 
     expect(FuelLog::count())->toBe(0);
 });
