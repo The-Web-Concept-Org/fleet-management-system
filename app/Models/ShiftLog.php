@@ -67,6 +67,42 @@ class ShiftLog extends Model
         return $this->belongsTo(Trip::class);
     }
 
+    public function getEffectiveTripAttribute(): ?Trip
+    {
+        if ($this->relationLoaded('trip') && $this->getRelation('trip')) {
+            return $this->getRelation('trip');
+        }
+
+        if ($this->trip_id) {
+            return $this->trip;
+        }
+
+        if ($this->bus_id) {
+            $query = Trip::where('bus_id', $this->bus_id);
+            if ($this->status === self::STATUS_IN_PROGRESS) {
+                $active = (clone $query)->where('status', 'in_progress')->latest('id')->first();
+                if ($active) {
+                    return $active;
+                }
+                $sched = (clone $query)->where('status', 'scheduled')
+                    ->whereDate('trip_date', '<=', now()->toDateString())
+                    ->orderBy('trip_date')
+                    ->orderBy('departure_time')
+                    ->first();
+                if ($sched) {
+                    return $sched;
+                }
+            } elseif ($this->started_at) {
+                $dated = (clone $query)->whereDate('trip_date', $this->started_at->toDateString())->latest('id')->first();
+                if ($dated) {
+                    return $dated;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public function locations(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ShiftLocation::class)->orderBy('recorded_at');
@@ -121,7 +157,7 @@ class ShiftLog extends Model
     {
         $bus = $this->bus;
         $driver = $this->driver;
-        $trip = $this->trip;
+        $trip = $this->effective_trip;
 
         return [
             'id' => $this->id,

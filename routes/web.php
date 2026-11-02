@@ -19,6 +19,16 @@ Route::get('/login', [WebAuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [WebAuthController::class, 'login']);
 Route::post('/logout', [WebAuthController::class, 'logout'])->name('logout');
 
+// Language / Locale switcher (ES / EN)
+Route::get('/locale/{lang}', function (string $lang) {
+    $lang = strtolower($lang);
+    if (in_array($lang, ['es', 'en'], true)) {
+        session(['locale' => $lang]);
+        \Illuminate\Support\Facades\App::setLocale($lang);
+    }
+    return redirect()->back();
+})->name('locale.switch');
+
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/telemetry/live', [TelemetryController::class, 'getLiveBuses'])->name('telemetry.live');
@@ -57,6 +67,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/shifts/{shift}/mileage', [ShiftController::class, 'adjustMileage'])
         ->whereNumber('shift')
         ->name('shifts.mileage');
+    Route::post('/shifts/{shift}/trip', [ShiftController::class, 'assignTrip'])
+        ->whereNumber('shift')
+        ->name('shifts.trip');
 
     Route::get('/fuel', [FuelController::class, 'index'])->name('fuel');
     Route::post('/fuel/{fuelLog}/status', [FuelController::class, 'updateStatus'])

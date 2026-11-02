@@ -1,13 +1,13 @@
 {{--
-    shadcn/ui Shared Application Topbar with Real-Time Fleet Indicators
+    shadcn/ui Shared Application Topbar with Real-Time Fleet Indicators & Bilingual Language Switcher
 --}}
 @php
-    $searchPlaceholder = $topbarSearchPlaceholder ?? 'Search bus, driver, or shift...';
+    $searchPlaceholder = $topbarSearchPlaceholder ?? __('app.search_placeholder');
     $searchId = $topbarSearchId ?? 'topNavSearch';
 
     $user = auth()->user();
     $userName = $user->name ?? 'Dispatcher Admin';
-    $userRole = $user && $user->role ? \Illuminate\Support\Str::headline($user->role) : 'Administrator';
+    $userRole = $user && $user->role ? \Illuminate\Support\Str::headline($user->role) : __('app.settings');
     $initials = strtoupper(substr(trim($userName), 0, 2));
 
     $activeBusesCount = \App\Models\Bus::where('status', 'active')->count();
@@ -15,6 +15,7 @@
     $userNotifications = $user ? \App\Models\AppNotification::where('user_id', $user->id)->latest()->take(6)->get() : collect();
     $unreadNotificationCount = $user ? \App\Models\AppNotification::where('user_id', $user->id)->whereNull('read_at')->count() : 0;
     $totalAlertCount = $unreadNotificationCount + ($alertBusesCount > 0 ? 1 : 0);
+    $currentLang = app()->getLocale();
 @endphp
 
 <header class="fixed top-0 left-64 right-0 h-16 bg-card/90 backdrop-blur-md border-b border-border z-40 px-6 flex items-center justify-between gap-4 shadow-xs">
@@ -41,17 +42,31 @@
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span class="font-semibold text-foreground text-xs">{{ config('app.name', 'Lancotri') }} Online</span>
+            <span class="font-semibold text-foreground text-xs">{{ config('app.name', 'Lancotri') }} {{ __('app.online') }}</span>
             <span class="text-muted-foreground text-[10px]">&bull;</span>
             <span class="text-muted-foreground text-xs font-mono" id="topbarTelemetryStatus">
-                <span data-telemetry-key="activeBuses">{{ $activeBusesCount }}</span> active vehicles
+                <span data-telemetry-key="activeBuses">{{ $activeBusesCount }}</span> {{ __('app.active_vehicles') }}
             </span>
+        </div>
+
+        <!-- Language Switcher Pill (ES / EN) -->
+        <div class="inline-flex items-center rounded-lg border border-input bg-card p-0.5 shadow-xs text-xs font-medium" title="{{ __('app.language') }}">
+            <a href="{{ route('locale.switch', 'es') }}"
+               class="px-2 py-1 rounded-md transition-colors {{ $currentLang === 'es' ? 'bg-primary text-primary-foreground font-semibold shadow-xs' : 'text-muted-foreground hover:text-foreground' }}"
+               title="Español">
+                ES
+            </a>
+            <a href="{{ route('locale.switch', 'en') }}"
+               class="px-2 py-1 rounded-md transition-colors {{ $currentLang === 'en' ? 'bg-primary text-primary-foreground font-semibold shadow-xs' : 'text-muted-foreground hover:text-foreground' }}"
+               title="English">
+                EN
+            </a>
         </div>
 
         <!-- Telemetry Refresh Button -->
         <button type="button"
                 onclick="window.fleetRealtime?.syncNow(true)"
-                title="Force Telemetry Sync"
+                title="{{ __('app.sync_now') }}"
                 class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-input bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shadow-xs">
             <i data-lucide="refresh-cw" class="w-4 h-4"></i>
         </button>
@@ -61,7 +76,7 @@
             <button type="button"
                     onclick="toggleNotificationsPopover()"
                     class="relative inline-flex items-center justify-center w-9 h-9 rounded-lg border border-input bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shadow-xs"
-                    title="Real-time Notifications">
+                    title="{{ __('app.notifications') }}">
                 <i data-lucide="bell" class="w-4 h-4"></i>
                 <span id="topbarNotificationPing" class="{{ $totalAlertCount > 0 ? '' : 'hidden' }} absolute top-1.5 right-1.5 flex h-2 w-2">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
@@ -74,14 +89,14 @@
                  class="hidden absolute right-0 mt-2 w-84 rounded-xl border border-border bg-card p-3 shadow-xl z-50 text-left">
                 <div class="flex items-center justify-between pb-2 mb-2 border-b border-border/60">
                     <div class="flex items-center gap-1.5">
-                        <span class="text-xs font-semibold text-foreground">Fleet Notifications</span>
+                        <span class="text-xs font-semibold text-foreground">{{ __('app.fleet_notifications') }}</span>
                         <span id="topbarUnreadBadge" class="text-[10px] font-mono px-1.5 py-0.2 rounded-full {{ $unreadNotificationCount > 0 ? 'bg-primary/10 text-primary font-bold' : 'bg-muted text-muted-foreground' }}">
-                            {{ $unreadNotificationCount }} unread
+                            {{ $unreadNotificationCount }} {{ __('app.unread') }}
                         </span>
                     </div>
                     @if($unreadNotificationCount > 0)
                         <button type="button" onclick="markAllNotificationsRead()" class="text-[10px] text-muted-foreground hover:text-primary hover:underline transition-colors">
-                            Mark all read
+                            {{ __('app.mark_all_read') }}
                         </button>
                     @endif
                 </div>
@@ -91,9 +106,9 @@
                         <div class="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-700 dark:text-rose-400 flex items-start gap-2">
                             <i data-lucide="alert-triangle" class="w-3.5 h-3.5 shrink-0 mt-0.5"></i>
                             <div class="flex-1 min-w-0">
-                                <p class="font-semibold">{{ $alertBusesCount }} vehicle(s) require review</p>
-                                <p class="text-[11px] text-muted-foreground mt-0.5">Check Buses roster for out-of-service or overdue inspection units.</p>
-                                <a href="{{ route('buses') }}" class="text-[10px] font-medium text-rose-600 dark:text-rose-400 hover:underline block mt-1">Review Vehicles &rarr;</a>
+                                <p class="font-semibold">{{ __('app.vehicles_require_review', ['count' => $alertBusesCount]) }}</p>
+                                <p class="text-[11px] text-muted-foreground mt-0.5">{{ __('app.vehicles_require_review_desc') }}</p>
+                                <a href="{{ route('buses') }}" class="text-[10px] font-medium text-rose-600 dark:text-rose-400 hover:underline block mt-1">{{ __('app.review_vehicles') }} &rarr;</a>
                             </div>
                         </div>
                     @endif
@@ -126,7 +141,7 @@
                                 </div>
                                 <p class="text-[11px] text-muted-foreground mt-0.5 leading-snug">{{ $notif->message }}</p>
                                 @if($notif->link)
-                                    <a href="{{ $notif->link }}" class="text-[10px] font-medium text-primary hover:underline inline-block mt-1">View Details &rarr;</a>
+                                    <a href="{{ $notif->link }}" class="text-[10px] font-medium text-primary hover:underline inline-block mt-1">{{ __('app.details') }} &rarr;</a>
                                 @endif
                             </div>
                         </div>
@@ -134,7 +149,7 @@
                         @if($alertBusesCount === 0)
                             <div class="p-4 text-center text-xs text-muted-foreground">
                                 <i data-lucide="check-circle" class="w-5 h-5 mx-auto text-emerald-500 mb-1.5 opacity-80"></i>
-                                All clear — no active alerts or pending notifications
+                                {{ __('app.no_notifications') }}
                             </div>
                         @endif
                     @endforelse
@@ -142,17 +157,17 @@
 
                 <div class="pt-2 mt-2 border-t border-border/60 text-center flex items-center justify-between px-1">
                     <a href="{{ route('shifts') }}" class="text-[11px] font-medium text-muted-foreground hover:text-foreground">
-                        Shifts Desk
+                        {{ __('app.shifts_desk') }}
                     </a>
                     <a href="{{ route('buses') }}" class="text-[11px] font-medium text-primary hover:underline">
-                        Buses Roster &rarr;
+                        {{ __('app.buses_roster') }} &rarr;
                     </a>
                 </div>
             </div>
         </div>
 
         <!-- User Profile Pill (Links to Settings) -->
-        <a href="{{ route('settings') }}" class="flex items-center gap-2 pl-2 border-l border-border hover:opacity-80 transition-opacity" title="Account Settings">
+        <a href="{{ route('settings') }}" class="flex items-center gap-2 pl-2 border-l border-border hover:opacity-80 transition-opacity" title="{{ __('app.settings') }}">
             <div class="w-8 h-8 rounded-full bg-primary text-primary-foreground font-semibold flex items-center justify-center text-xs shadow-xs">
                 {{ $initials }}
             </div>
@@ -185,14 +200,14 @@
             if (res.ok) {
                 const badge = document.getElementById('topbarUnreadBadge');
                 if (badge) {
-                    badge.textContent = '0 unread';
+                    badge.textContent = '0 {{ __('app.unread') }}';
                     badge.className = 'text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-muted text-muted-foreground';
                 }
                 const ping = document.getElementById('topbarNotificationPing');
                 if (ping) {
                     ping.classList.add('hidden');
                 }
-                window.toast?.success('Updated', 'All notifications marked as read.');
+                window.toast?.success('{{ __('app.status') }}', '{{ __('app.mark_all_read') }}');
             }
         } catch (e) {
             console.error('Failed to mark notifications read', e);

@@ -60,7 +60,7 @@
             $route = $bus?->transitRoute;
             $driver = $shift->driver;
             $driverUser = $driver?->user;
-            $trip = $shift->trip;
+            $trip = $shift->effective_trip;
 
             $statusBadgeClass = match($shift->status) {
                 'verified' => 'border-emerald-500/30 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
@@ -200,8 +200,16 @@
                                 <i data-lucide="route" class="w-6 h-6"></i>
                             </div>
                             <div>
-                                <div class="text-xs font-mono uppercase text-muted-foreground">Assigned Transit Corridor</div>
-                                @if($route)
+                                <div class="text-xs font-mono uppercase text-muted-foreground">Assigned Transit Route / Trip</div>
+                                @if($trip)
+                                    <div class="text-base font-bold text-foreground leading-snug flex items-center gap-1.5">
+                                        <span class="font-mono text-primary">{{ $trip->display_id }}</span>
+                                        <span class="truncate">{{ $trip->origin }} &rarr; {{ $trip->destination }}</span>
+                                    </div>
+                                    <div class="text-xs text-muted-foreground truncate mt-0.5">
+                                        {{ $trip->route_label ?: ($route ? $route->name : 'Scheduled Timetable') }} &bull; Dep: {{ $trip->departure_time ? substr($trip->departure_time, 0, 5) : '08:00' }}
+                                    </div>
+                                @elseif($route)
                                     <div class="text-base font-bold text-foreground leading-snug flex items-center gap-1.5">
                                         <span class="font-mono text-primary">{{ $route->route_code }}</span>
                                         <span class="truncate">{{ $route->name }}</span>

@@ -104,12 +104,35 @@ class TripController extends Controller
             'notes' => $validated['notes'] ?? null,
         ]);
 
+        // Automatically link this trip to any active shift currently running on this bus
+        if (!empty($validated['bus_id'])) {
+            $activeShift = ShiftLog::where('bus_id', $validated['bus_id'])
+                ->where('status', ShiftLog::STATUS_IN_PROGRESS)
+                ->latest('id')
+                ->first();
+            if ($activeShift && !$activeShift->trip_id) {
+                $activeShift->update(['trip_id' => $trip->id]);
+            }
+        }
+
+        if ($request->filled('shift_id')) {
+            $shift = ShiftLog::find($request->input('shift_id'));
+            if ($shift && !$shift->trip_id) {
+                $shift->update(['trip_id' => $trip->id]);
+            }
+        }
+
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
                 'message' => "{$trip->display_id} scheduled successfully.",
                 'trip' => $trip->load('bus.driver.user'),
             ]);
+        }
+
+        if ($request->input('redirect_to') === 'shifts') {
+            return redirect()->route('shifts', ['shift_id' => $request->input('shift_id')])
+                ->with('success', "{$trip->display_id} scheduled and linked successfully.");
         }
 
         return redirect()->route('trips')->with('success', "{$trip->display_id} scheduled successfully.");
@@ -226,7 +249,7 @@ class TripController extends Controller
     /**
      * Sequential, human readable trip reference (TRP-0001, TRP-0002, ...).
      */
-    private function generateTripNumber(): string
+    public function generateTripNumber(): string
     {
         $next = (int) (Trip::max('id') ?? 0) + 1;
 
@@ -305,6 +328,39 @@ class TripController extends Controller
     }
 
     /**
+     * Start the next scheduled trip for the authenticated driver's assigned bus.
+     *
+     * POST /api/trips/start
+     */
+    public function startNextTrip(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $bus = $user->driver?->bus;
+
+        if (!$bus) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No vehicle is assigned to your driver account.',
+            ], 422);
+        }
+
+        $nextTrip = Trip::where('bus_id', $bus->id)
+            ->where('status', 'scheduled')
+            ->orderBy('trip_date')
+            ->orderBy('departure_time')
+            ->first();
+
+        if (!$nextTrip) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No scheduled trip found for your assigned vehicle.',
+            ], 404);
+        }
+
+        return $this->startTrip($request, $nextTrip);
+    }
+
+    /**
      * Start a scheduled trip: marks it in_progress and links to the active shift.
      *
      * POST /api/trips/{trip}/start
@@ -365,6 +421,31 @@ class TripController extends Controller
             'message' => "{$trip->display_id} started successfully. Drive safely!",
             'trip' => $this->formatTripForApi($trip->fresh('bus')),
         ]);
+    }
+
+    /**
+     * Complete the active in-progress trip for the authenticated driver's bus.
+     *
+     * POST /api/trips/complete
+     */
+    public function completeActiveTrip(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $bus = $user->driver?->bus;
+
+        $activeTrip = Trip::where('status', 'in_progress')
+            ->when($bus, fn ($q) => $q->where('bus_id', $bus->id))
+            ->latest('id')
+            ->first();
+
+        if (!$activeTrip) {
+            return response()->json([
+                'success' => true,
+                'message' => 'No active trip in progress.',
+            ]);
+        }
+
+        return $this->completeTrip($request, $activeTrip);
     }
 
     /**

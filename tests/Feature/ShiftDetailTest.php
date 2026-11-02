@@ -62,12 +62,12 @@ class ShiftDetailTest extends TestCase
         $response = $this->actingAs($admin)->get(route('shifts.show', ['shift' => $shift->id]));
 
         $response->assertOk();
-        $response->assertSee('Shift Management &amp; Meter Audits', false);
-        $response->assertSee('Inspection Desk');
+        $response->assertSee('Shift Detail');
+        $response->assertSee('Shifts Roster');
         $response->assertSee($shift->display_id);
         $response->assertSee('Carlos Ray');
-        $response->assertSee('125,000 km');
-        $response->assertSee('125,140 km');
+        $response->assertSee('125,000');
+        $response->assertSee('125,140');
     }
 
     public function test_shift_detail_json_response(): void

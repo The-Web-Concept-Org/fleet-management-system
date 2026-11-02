@@ -82,6 +82,12 @@
                                    class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
                         </div>
 
+                        <button type="button" onclick="openCreateTripModal()"
+                                class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2 gap-1.5">
+                            <i data-lucide="plus" class="w-3.5 h-3.5 text-primary"></i>
+                            <span>Schedule Trip</span>
+                        </button>
+
                         <button type="button" onclick="window.toast?.success('Shift Report Exported', 'CSV/PDF meter audit log generated successfully.')"
                                 class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 gap-2">
                             <i data-lucide="download" class="w-3.5 h-3.5 text-muted-foreground"></i>
@@ -369,7 +375,7 @@
                                                             class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent hover:text-accent-foreground text-muted-foreground shadow-xs transition-colors">
                                                         <i data-lucide="eye" class="w-3.5 h-3.5"></i>
                                                     </button>
-                                                    <a href="{{ route('shifts.show', $shift->id) }}"
+                                                    <a href="{{ route('shifts.show', ['shift' => $shift->id, 'detail' => 1]) }}"
                                                        title="Open Dedicated Shift Page with GPS Map"
                                                        class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-primary/10 hover:text-primary text-muted-foreground shadow-xs transition-colors">
                                                         <i data-lucide="map" class="w-3.5 h-3.5"></i>
@@ -405,7 +411,7 @@
                                 <span id="deskStatusBadge" class="inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold">
                                     {{ $selected ? ($selected->status === 'verified' ? 'Verified' : ($selected->status === 'in_progress' ? 'Active' : ($selected->end_km === null ? 'Flagged' : 'Pending Audit'))) : '—' }}
                                 </span>
-                                <a id="deskFullPageLink" href="{{ $selected ? route('shifts.show', $selected->id) : '#' }}" target="_self" class="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline ml-1" title="Open Dedicated Page with Live Map">
+                                <a id="deskFullPageLink" href="{{ $selected ? route('shifts.show', ['shift' => $selected->id, 'detail' => 1]) : '#' }}" target="_self" class="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline ml-1" title="Open Dedicated Page with Live Map">
                                     <i data-lucide="external-link" class="w-3 h-3"></i>
                                     <span>Full Page</span>
                                 </a>
@@ -474,7 +480,12 @@
                                     </span>
                                 </div>
                                 <div class="flex justify-between items-center py-1 border-b border-border/40">
-                                    <span class="text-muted-foreground">Assigned Route:</span>
+                                    <span class="text-muted-foreground flex items-center gap-1.5">
+                                        <span>Assigned Route:</span>
+                                        <button type="button" onclick="openAssignTripModal()" title="Assign or Change Trip for this Shift" class="inline-flex items-center text-primary hover:text-primary/80 transition-colors p-0.5 rounded hover:bg-muted">
+                                            <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                                        </button>
+                                    </span>
                                     <span class="font-medium text-foreground text-right" id="deskRouteLabel">
                                         {{ $selected?->trip ? ($selected->trip->origin . ' → ' . $selected->trip->destination) : 'Depot Service Round' }}
                                     </span>
@@ -731,6 +742,182 @@
         </div>
     </div>
 
+    <!-- ================= shadcn Dialog: ASSIGN / ATTACH TRIP TO SHIFT ================= -->
+    <div id="assignTripModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs hidden">
+        <div class="relative w-full max-w-md rounded-xl border bg-background p-6 shadow-lg modal-content text-left">
+            <div class="flex items-center justify-between pb-3 border-b">
+                <div>
+                    <h3 class="text-base font-semibold leading-none tracking-tight">Assign Trip to Shift</h3>
+                    <p class="text-xs text-muted-foreground mt-1" id="assignTripShiftRef">Link route timetable to shift</p>
+                </div>
+                <button type="button" onclick="window.shadcnModal.close('assignTripModal')" class="text-muted-foreground hover:text-foreground">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <form onsubmit="submitAssignTrip(event)" class="mt-4 space-y-4">
+                <div class="space-y-2">
+                    <label class="text-xs font-medium">Assignment Method</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer hover:bg-muted/50 bg-background text-xs">
+                            <input type="radio" name="tripAssignMode" value="existing" checked onchange="toggleTripAssignMode(this.value)"/>
+                            <span class="font-medium">Existing Scheduled</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer hover:bg-muted/50 bg-background text-xs">
+                            <input type="radio" name="tripAssignMode" value="new" onchange="toggleTripAssignMode(this.value)"/>
+                            <span class="font-medium">Quick Create New</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Mode A: Existing Scheduled Trip -->
+                <div id="tripAssignModeExisting" class="space-y-2">
+                    <label class="text-xs font-medium">Select Scheduled Trip</label>
+                    <select id="assignExistingTripSelect" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring">
+                        <option value="">-- Choose a scheduled trip --</option>
+                        @isset($tripsList)
+                            @foreach($tripsList as $t)
+                                <option value="{{ $t->id }}">
+                                    {{ $t->display_id }}: {{ $t->origin }} → {{ $t->destination }} ({{ $t->departure_time ? substr($t->departure_time, 0, 5) : '08:00' }} &bull; {{ $t->bus?->display_id ?? 'Unassigned' }})
+                                </option>
+                            @endforeach
+                        @endisset
+                    </select>
+                </div>
+
+                <!-- Mode B: Quick Create New Trip -->
+                <div id="tripAssignModeNew" class="space-y-3 hidden">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-xs font-medium">Origin Terminal</label>
+                            <input id="quickTripOrigin" placeholder="e.g. Central Depot"
+                                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring"/>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium">Destination</label>
+                            <input id="quickTripDest" placeholder="e.g. Uptown Terminal"
+                                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring"/>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-xs font-medium">Departure Time</label>
+                            <input id="quickTripTime" type="time" value="{{ now()->format('H:i') }}"
+                                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring"/>
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium">Est. Distance (km)</label>
+                            <input id="quickTripDistance" type="number" step="0.1" placeholder="45.0"
+                                   class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring font-mono"/>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2 border-t">
+                    <button type="button" onclick="window.shadcnModal.close('assignTripModal')" class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted">
+                        Cancel
+                    </button>
+                    <button type="submit" id="assignTripSubmitBtn" class="rounded-md bg-primary text-primary-foreground px-4 py-1.5 text-xs font-semibold hover:bg-primary/90 shadow-xs inline-flex items-center gap-1.5">
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                        <span>Attach to Shift</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= shadcn Dialog: SCHEDULE NEW TRIP ================= -->
+    <div id="createTripModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs hidden">
+        <div class="relative w-full max-w-lg rounded-xl border bg-background p-6 shadow-lg modal-content text-left">
+            <div class="flex items-center justify-between pb-3 border-b">
+                <div>
+                    <h3 class="text-base font-semibold leading-none tracking-tight">Schedule New Transit Trip</h3>
+                    <p class="text-xs text-muted-foreground mt-1">Create a route timetable and link to fleet vehicle</p>
+                </div>
+                <button type="button" onclick="window.shadcnModal.close('createTripModal')" class="text-muted-foreground hover:text-foreground">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <form id="createTripForm" onsubmit="submitCreateTrip(event)" class="mt-4 space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-xs font-medium leading-none">Trip Number</label>
+                        <input name="trip_number" required placeholder="e.g. TR-204" value="TR-{{ rand(100, 999) }}"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs font-mono focus:ring-1 focus:ring-ring"/>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-medium leading-none">Route Code</label>
+                        <input name="route_label" placeholder="e.g. Line 14 Express"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring"/>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-xs font-medium leading-none">Origin Terminal</label>
+                        <input name="origin" required placeholder="e.g. Central Depot"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring"/>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-medium leading-none">Destination</label>
+                        <input name="destination" required placeholder="e.g. North Terminal"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring"/>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-xs font-medium leading-none">Date</label>
+                        <input name="trip_date" type="date" required value="{{ date('Y-m-d') }}"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring"/>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-medium leading-none">Departure</label>
+                        <input name="departure_time" type="time" required value="{{ now()->format('H:i') }}"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring"/>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-medium leading-none">Est. Distance (km)</label>
+                        <input name="distance_km" type="number" step="0.1" placeholder="45.0"
+                               class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs font-mono focus:ring-1 focus:ring-ring"/>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                        <label class="text-xs font-medium leading-none">Assigned Bus</label>
+                        <select name="bus_id" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring">
+                            <option value="">-- Unassigned (Standby) --</option>
+                            @foreach($buses as $b)
+                                <option value="{{ $b->id }}">{{ $b->display_id }} ({{ $b->plate }}) - {{ $b->driver?->user?->name ?? 'No Driver' }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-xs font-medium leading-none">Status</label>
+                        <select name="status" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring">
+                            <option value="scheduled">Scheduled</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-3 border-t">
+                    <button type="button" onclick="window.shadcnModal.close('createTripModal')"
+                            class="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-muted">
+                        Cancel
+                    </button>
+                    <button type="submit" id="createTripSubmitBtn"
+                            class="rounded-md bg-primary text-primary-foreground px-4 py-1.5 text-xs font-semibold shadow hover:bg-primary/90 inline-flex items-center gap-1.5">
+                        <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                        <span>Schedule Trip</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         let currentInspectedShiftId = '{{ $selected?->id }}';
         const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
@@ -773,7 +960,7 @@
 
             const fullPageLink = document.getElementById('deskFullPageLink');
             if (fullPageLink) {
-                fullPageLink.href = '/shifts/' + shiftId;
+                fullPageLink.href = '/shifts/' + shiftId + '?detail=1';
             }
 
             const statusBadge = document.getElementById('deskStatusBadge');
@@ -909,8 +1096,10 @@
             // Refresh icons if lucide exists
             if (window.lucide) window.lucide.createIcons();
 
-            // 3. Update browser history cleanly without full page refresh
-            window.history.replaceState(null, '', '/shifts/' + shift.id);
+            // 3. Keep URL route clean without shift ID for table detail
+            if (window.location.pathname !== '/shifts') {
+                window.history.replaceState(null, '', '/shifts');
+            }
         }
 
         function openPhotoModal(imgSrc, title, odo) {
@@ -1219,10 +1408,187 @@
             }
         }
 
+        // ================= Trip Assignment & Scheduling Handlers =================
+        function toggleTripAssignMode(mode) {
+            const existingBox = document.getElementById('tripAssignModeExisting');
+            const newBox = document.getElementById('tripAssignModeNew');
+            if (mode === 'existing') {
+                if (existingBox) existingBox.classList.remove('hidden');
+                if (newBox) newBox.classList.add('hidden');
+            } else {
+                if (existingBox) existingBox.classList.add('hidden');
+                if (newBox) newBox.classList.remove('hidden');
+            }
+        }
+
+        function openAssignTripModal() {
+            if (!currentInspectedShiftId) {
+                window.toast?.error('No Shift Selected', 'Please select a shift from the table first.');
+                return;
+            }
+            const shift = (window.__shiftsRegistry && window.__shiftsRegistry[currentInspectedShiftId]) || null;
+            const refEl = document.getElementById('assignTripShiftRef');
+            if (refEl && shift) {
+                refEl.textContent = `${shift.display_id} • Bus ${shift.bus_id || '—'}`;
+            }
+            window.shadcnModal.open('assignTripModal');
+        }
+
+        async function submitAssignTrip(e) {
+            e.preventDefault();
+            if (!currentInspectedShiftId) return;
+
+            const mode = document.querySelector('input[name="tripAssignMode"]:checked')?.value || 'existing';
+            const payload = {};
+
+            if (mode === 'existing') {
+                const tripSelect = document.getElementById('assignExistingTripSelect');
+                if (!tripSelect?.value) {
+                    window.toast?.error('Selection Required', 'Please select an existing scheduled trip.');
+                    return;
+                }
+                payload.trip_id = tripSelect.value;
+            } else {
+                const origin = document.getElementById('quickTripOrigin')?.value;
+                const dest = document.getElementById('quickTripDest')?.value;
+                const depTime = document.getElementById('quickTripTime')?.value;
+                const dist = document.getElementById('quickTripDistance')?.value;
+
+                if (!origin || !dest) {
+                    window.toast?.error('Missing Fields', 'Please specify origin and destination.');
+                    return;
+                }
+                payload.origin = origin;
+                payload.destination = dest;
+                payload.departure_time = depTime;
+                payload.distance_km = dist;
+            }
+
+            const btn = document.getElementById('assignTripSubmitBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i><span>Saving...</span>';
+                if (window.lucide) window.lucide.createIcons();
+            }
+
+            try {
+                const res = await fetch(`/shifts/${currentInspectedShiftId}/trip`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || 'Failed to assign trip');
+                }
+
+                // Update UI instantly in real time without full reload
+                document.getElementById('deskRouteLabel').textContent = data.route_label;
+                if (window.__shiftsRegistry && window.__shiftsRegistry[currentInspectedShiftId]) {
+                    window.__shiftsRegistry[currentInspectedShiftId].route_label = data.route_label;
+                }
+
+                // Update table row if route column is present
+                const row = document.getElementById('shift-row-' + currentInspectedShiftId);
+                if (row) {
+                    const rowRouteEl = row.querySelector('.route-label-display');
+                    if (rowRouteEl) rowRouteEl.textContent = data.route_label;
+                }
+
+                window.shadcnModal.close('assignTripModal');
+                window.toast?.success('Trip Attached', data.message || 'Trip attached to shift in real time.');
+                if (window.lucide) window.lucide.createIcons();
+            } catch (err) {
+                window.toast?.error('Assignment Failed', err.message || 'Error attaching trip');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i data-lucide="check" class="w-3.5 h-3.5"></i><span>Attach to Shift</span>';
+                    if (window.lucide) window.lucide.createIcons();
+                }
+            }
+        }
+
+        function openCreateTripModal() {
+            window.shadcnModal.open('createTripModal');
+        }
+
+        async function submitCreateTrip(e) {
+            e.preventDefault();
+            const form = document.getElementById('createTripForm');
+            const formData = new FormData(form);
+
+            if (currentInspectedShiftId) {
+                formData.append('shift_id', currentInspectedShiftId);
+            }
+
+            const btn = document.getElementById('createTripSubmitBtn');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i><span>Scheduling...</span>';
+                if (window.lucide) window.lucide.createIcons();
+            }
+
+            try {
+                const res = await fetch('/trips', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                    },
+                    body: formData,
+                });
+                const data = await res.json();
+                if (!res.ok || !data.success) {
+                    throw new Error(data.message || 'Failed to schedule trip');
+                }
+
+                const trip = data.trip;
+                const newRouteLabel = trip.origin + ' → ' + trip.destination + ' (' + (trip.display_id || trip.trip_number) + ')';
+
+                // Real-time update on inspected shift UI
+                const currentShift = window.__shiftsRegistry && window.__shiftsRegistry[currentInspectedShiftId];
+                if (currentShift) {
+                    document.getElementById('deskRouteLabel').textContent = newRouteLabel;
+                    currentShift.route_label = newRouteLabel;
+                }
+
+                // Add to existing trip select dropdown
+                const assignSelect = document.getElementById('assignExistingTripSelect');
+                if (assignSelect) {
+                    const opt = document.createElement('option');
+                    opt.value = trip.id;
+                    opt.textContent = `${trip.display_id || trip.trip_number}: ${trip.origin} → ${trip.destination} (${trip.departure_time ? trip.departure_time.substring(0, 5) : '08:00'})`;
+                    assignSelect.prepend(opt);
+                }
+
+                window.shadcnModal.close('createTripModal');
+                form.reset();
+                window.toast?.success('Trip Scheduled', `Trip ${trip.display_id || trip.trip_number} created and linked!`);
+                if (window.lucide) window.lucide.createIcons();
+            } catch (err) {
+                window.toast?.error('Failed to Schedule', err.message || 'Could not schedule trip');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i data-lucide="plus" class="w-3.5 h-3.5"></i><span>Schedule Trip</span>';
+                    if (window.lucide) window.lucide.createIcons();
+                }
+            }
+        }
+
         // Initialize first inspection if selected
         document.addEventListener('DOMContentLoaded', () => {
             if (currentInspectedShiftId) {
                 inspectShiftById(currentInspectedShiftId);
+            }
+            // Clean URL if visited via /shifts/{id} so table reload stays on shifts
+            if (window.location.pathname.match(/^\/shifts\/\d+$/) && !window.location.search.includes('detail')) {
+                window.history.replaceState(null, '', '/shifts');
             }
             initFleetLiveMap();
         });

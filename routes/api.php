@@ -23,6 +23,14 @@ Route::prefix('ocr')->group(function (): void {
     Route::post('fuel', [OcrController::class, 'extractFuel']);
 });
 
+// Lightweight connectivity heartbeat endpoint for mobile & offline sync
+Route::get('ping', function () {
+    return response()->json(['status' => 'ok', 'timestamp' => now()->timestamp]);
+});
+Route::match(['head', 'options'], 'ping', function () {
+    return response()->noContent();
+});
+
 // Direct endpoints and /auth prefix endpoints
 Route::post('login', [AuthController::class, 'login']);
 Route::post('register', [AuthController::class, 'register']);
@@ -102,6 +110,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
     // Trips & Transit Routes API
     Route::get('trips', [TripController::class, 'apiIndex']);
     Route::get('trips/current', [TripController::class, 'currentTrip']);
+    Route::post('trips/start', [TripController::class, 'startNextTrip']);
+    Route::post('trips/complete', [TripController::class, 'completeActiveTrip']);
     Route::post('trips/{trip}/start', [TripController::class, 'startTrip'])->whereNumber('trip');
     Route::post('trips/{trip}/complete', [TripController::class, 'completeTrip'])->whereNumber('trip');
+
+    // Revoke current session & tokens
+    Route::post('logout', [AuthController::class, 'logout']);
 });

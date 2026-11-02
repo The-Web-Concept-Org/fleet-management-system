@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>Sign In &bull; Lancotri &bull; Fleet Operations</title>
+    <title>{{ __('app.sign_in') }} &bull; {{ config('app.name', 'Lancotri') }} &bull; {{ __('app.nav_operations') }}</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/lancotri-mark.svg') }}">
 
     <!-- Google Font: Roboto -->
@@ -20,7 +20,14 @@
     <!-- Topbar navigation minimal -->
     <header class="h-16 border-b px-6 flex items-center justify-between">
         @include('partials.brand-logo', ['logoLink' => route('login'), 'logoMarkHeight' => '2rem'])
-        <span class="text-xs font-mono text-muted-foreground">{{ config('app.name', 'Lancotri') }}</span>
+        <div class="flex items-center gap-3">
+            @php $currentLang = app()->getLocale(); @endphp
+            <div class="inline-flex items-center rounded-lg border border-input bg-card p-0.5 shadow-xs text-xs font-medium">
+                <a href="{{ route('locale.switch', 'es') }}" class="px-2 py-1 rounded-md transition-colors {{ $currentLang === 'es' ? 'bg-primary text-primary-foreground font-semibold shadow-xs' : 'text-muted-foreground hover:text-foreground' }}" title="Español">ES</a>
+                <a href="{{ route('locale.switch', 'en') }}" class="px-2 py-1 rounded-md transition-colors {{ $currentLang === 'en' ? 'bg-primary text-primary-foreground font-semibold shadow-xs' : 'text-muted-foreground hover:text-foreground' }}" title="English">EN</a>
+            </div>
+            <span class="text-xs font-mono text-muted-foreground hidden sm:inline">{{ config('app.name', 'Lancotri') }}</span>
+        </div>
     </header>
 
     <!-- Main Container: Centered shadcn Card -->
@@ -29,9 +36,9 @@
 
             <!-- Card Header -->
             <div class="flex flex-col space-y-1.5 text-center">
-                <h2 class="text-2xl font-bold tracking-tight">Sign In</h2>
+                <h2 class="text-2xl font-bold tracking-tight">{{ __('app.sign_in') }}</h2>
                 <p class="text-xs text-muted-foreground">
-                    Enter your email and credentials to access Fleet Operations.
+                    {{ __('app.sign_in_desc') }}
                 </p>
             </div>
 
@@ -60,7 +67,7 @@
 
                 <!-- Email -->
                 <div class="space-y-1.5 text-left">
-                    <label for="email" class="text-xs font-medium leading-none">Email Address</label>
+                    <label for="email" class="text-xs font-medium leading-none">{{ __('app.email') }}</label>
                     <input type="email"
                            id="email"
                            name="email"
@@ -74,10 +81,10 @@
                 <!-- Password -->
                 <div class="space-y-1.5 text-left">
                     <div class="flex items-center justify-between">
-                        <label for="password" class="text-xs font-medium leading-none">Password</label>
-                        <a href="javascript:void(0)" onclick="window.toast?.info('Contact Administrator', 'Please reach out to the depot IT admin to reset credentials.')"
+                        <label for="password" class="text-xs font-medium leading-none">{{ __('app.password') }}</label>
+                        <a href="javascript:void(0)" onclick="window.toast?.info('Lancotri', '{{ __('passwords.user') }}')"
                            class="text-xs text-primary hover:underline">
-                            Forgot?
+                            {{ __('app.forgot_password') }}
                         </a>
                     </div>
                     <div class="relative">
@@ -99,7 +106,7 @@
                 <!-- Submit Button (shadcn Button) -->
                 <button type="submit" id="submit-btn"
                         class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 w-full transition-all">
-                    Sign In to Console
+                    {{ __('app.sign_in_button') }}
                 </button>
             </form>
 
@@ -110,7 +117,7 @@
     </main>
 
     <footer class="h-12 border-t px-6 flex items-center justify-center text-xs text-muted-foreground">
-        &copy; {{ date('Y') }} {{ config('app.name', 'Lancotri') }}. All rights reserved.
+        &copy; {{ date('Y') }} {{ config('app.name', 'Lancotri') }}. {{ __('app.all_rights_reserved') }}
     </footer>
 
     <script>

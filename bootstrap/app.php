@@ -16,7 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(function (Request $request): ?string {
             return $request->is('api/*') ? null : route('login');
         });
+        $middleware->web(append: [
+            \App\Http\Middleware\SetLocale::class,
+        ]);
         $middleware->api(append: [
+            \App\Http\Middleware\SetLocale::class,
             \App\Http\Middleware\CacheResponse::class,
         ]);
     })

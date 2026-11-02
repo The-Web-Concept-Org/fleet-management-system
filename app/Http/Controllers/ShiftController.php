@@ -68,7 +68,7 @@ class ShiftController extends Controller
             return $this->renderShiftsBoard($request, $shift);
         }
 
-        // Dedicated Shift Detail separate page with full breadcrumbs and map!
+        // Dedicated Shift Detail page with full breadcrumbs, odometer photos, and map
         return view('shift-detail-page', compact('shift'));
     }
 
@@ -250,6 +250,20 @@ class ShiftController extends Controller
             $selected->load(['bus', 'driver.user', 'trip']);
         }
 
+        // Ensure every shift and selected shift has its effective trip attached
+        foreach ($shifts as $s) {
+            if (!$s->relationLoaded('trip') || !$s->trip) {
+                if ($effective = $s->effective_trip) {
+                    $s->setRelation('trip', $effective);
+                }
+            }
+        }
+        if ($selected && (!$selected->relationLoaded('trip') || !$selected->trip)) {
+            if ($effective = $selected->effective_trip) {
+                $selected->setRelation('trip', $effective);
+            }
+        }
+
         $countAll = ShiftLog::count();
         $countOpen = ShiftLog::where('status', ShiftLog::STATUS_IN_PROGRESS)->count();
         $countCompleted = ShiftLog::where('status', ShiftLog::STATUS_COMPLETED)->whereNotNull('end_km')->count();
@@ -270,6 +284,8 @@ class ShiftController extends Controller
             ->sortBy(fn (Driver $driver) => $driver->user->name ?? '')
             ->values();
 
+        $tripsList = Trip::with('bus')->orderByDesc('trip_date')->orderBy('departure_time')->limit(60)->get();
+
         return view('shifts', compact(
             'shifts',
             'selected',
@@ -283,10 +299,69 @@ class ShiftController extends Controller
             'dayMileage',
             'buses',
             'drivers',
+            'tripsList',
             'status',
             'busId',
             'driverId'
         ));
+    }
+
+    /**
+     * Link an existing trip or create and link a new trip to this shift directly.
+     *
+     * POST /shifts/{shift}/trip
+     */
+    public function assignTrip(Request $request, ShiftLog $shift): JsonResponse
+    {
+        $validated = $request->validate([
+            'trip_id' => ['nullable', 'integer', 'exists:trips,id'],
+            'trip_number' => ['nullable', 'string', 'max:50'],
+            'origin' => ['nullable', 'string', 'max:150'],
+            'destination' => ['nullable', 'string', 'max:150'],
+            'departure_time' => ['nullable'],
+            'distance_km' => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        if (!empty($validated['trip_id'])) {
+            $trip = Trip::findOrFail($validated['trip_id']);
+            $shift->update(['trip_id' => $trip->id]);
+            if (!$trip->bus_id && $shift->bus_id) {
+                $trip->update(['bus_id' => $shift->bus_id]);
+            }
+        } elseif (!empty($validated['origin']) && !empty($validated['destination'])) {
+            $tripNumber = !empty($validated['trip_number'])
+                ? trim($validated['trip_number'])
+                : app(TripController::class)->generateTripNumber();
+
+            $trip = Trip::create([
+                'trip_number' => $tripNumber,
+                'origin' => trim($validated['origin']),
+                'destination' => trim($validated['destination']),
+                'trip_date' => $shift->started_at ? $shift->started_at->toDateString() : now()->toDateString(),
+                'departure_time' => $validated['departure_time'] ?? now()->format('H:i'),
+                'distance_km' => $validated['distance_km'] ?? null,
+                'status' => $shift->status === ShiftLog::STATUS_IN_PROGRESS ? 'in_progress' : 'scheduled',
+                'bus_id' => $shift->bus_id,
+            ]);
+
+            $shift->update(['trip_id' => $trip->id]);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'Please select an existing trip or enter origin and destination.',
+            ], 422);
+        }
+
+        $shift->load(['bus', 'driver.user', 'trip']);
+        $routeLabel = $trip->origin . ' → ' . $trip->destination . ' (' . $trip->display_id . ')';
+
+        return response()->json([
+            'success' => true,
+            'message' => "Trip {$trip->display_id} successfully linked to {$shift->display_id}.",
+            'shift' => $shift->toApiArray(),
+            'trip' => $trip,
+            'route_label' => $routeLabel,
+        ]);
     }
 
     /**
@@ -369,31 +444,48 @@ class ShiftController extends Controller
         $this->mergeAliases($request);
 
         $validated = $request->validate([
-            'bus_id' => ['required', 'integer', 'exists:buses,id'],
+            'bus_id' => ['nullable', 'integer', 'exists:buses,id'],
             'trip_id' => ['nullable', 'integer', 'exists:trips,id'],
             'start_km' => ['required', 'integer', 'min:0', 'max:99999999'],
             'started_at' => ['nullable', 'date'],
             'start_notes' => ['nullable', 'string', 'max:1000'],
-            'meter_image' => ['nullable', 'image', 'max:10240'],
-            'image' => ['nullable', 'image', 'max:10240'],
+            'meter_image' => ['nullable'],
+            'image' => ['nullable'],
         ]);
 
-        $meterImage = $this->resolveMeterImage($request, true);
+        $meterImage = $this->resolveMeterImage($request, false);
 
-        $bus = Bus::with('driver.user')->findOrFail($validated['bus_id']);
+        $user = $request->user();
+        $busId = $validated['bus_id'] ?? $user?->driver?->bus_id;
+        $bus = $busId ? Bus::with('driver.user')->find($busId) : null;
+        if (!$bus && $user?->driver?->bus) {
+            $bus = $user->driver->bus;
+        }
+        if (!$bus && $user?->driver) {
+            $bus = Bus::where('driver_id', $user->driver->id)->first();
+        }
+        if (!$bus) {
+            $bus = Bus::with('driver.user')->firstOrFail();
+        }
 
         $active = ShiftLog::query()
-            ->where('bus_id', $bus->id)
+            ->where(function ($q) use ($bus, $user) {
+                $q->where('bus_id', $bus->id);
+                if ($user?->driver) {
+                    $q->orWhere('driver_id', $user->driver->id);
+                }
+            })
             ->where('status', ShiftLog::STATUS_IN_PROGRESS)
             ->latest('id')
             ->first();
 
         if ($active) {
+            $active->load(['bus.transitRoute', 'driver.user', 'trip']);
             return response()->json([
-                'success' => false,
-                'message' => "{$bus->display_id} already has an active shift ({$active->display_id}). End it before starting a new one.",
+                'success' => true,
+                'message' => "{$bus->display_id} already has an active shift ({$active->display_id}).",
                 'shift' => $active->toApiArray(),
-            ], 422);
+            ]);
         }
 
         $trip = null;
@@ -413,15 +505,25 @@ class ShiftController extends Controller
                     'message' => "{$trip->display_id} is assigned to a different vehicle ({$trip->bus->display_id}).",
                 ], 422);
             }
+        } else {
+            // Automatically attach next scheduled trip for this bus if available
+            $trip = Trip::where('bus_id', $bus->id)
+                ->where('status', 'scheduled')
+                ->whereDate('trip_date', '<=', now()->toDateString())
+                ->orderBy('trip_date')
+                ->orderBy('departure_time')
+                ->first();
         }
 
-        $imagePath = $this->storeMeterImage($meterImage, $bus->id);
+        $imagePath = $meterImage ? $this->storeMeterImage($meterImage, $bus->id) : null;
 
-        $log = DB::transaction(function () use ($validated, $bus, $trip, $imagePath): ShiftLog {
+        $log = DB::transaction(function () use ($validated, $bus, $trip, $imagePath, $request): ShiftLog {
+            $driver = $request->user()?->driver ?? $bus->driver;
+
             $log = ShiftLog::create([
                 'shift_number' => $this->generateShiftNumber(),
                 'bus_id' => $bus->id,
-                'driver_id' => $bus->driver_id,
+                'driver_id' => $driver?->id ?? $bus->driver_id,
                 'trip_id' => $trip?->id,
                 'start_km' => $validated['start_km'],
                 'start_meter_image' => $imagePath,
@@ -432,11 +534,15 @@ class ShiftController extends Controller
                     : now(),
             ]);
 
-            // Reflect that this vehicle is now out on the road.
-            $bus->update(['status' => 'active']);
+            // Reflect that this vehicle is now out on the road and keep odometer aligned.
+            $bus->update([
+                'status' => 'active',
+                'odometer' => max((int) $bus->odometer, (int) $validated['start_km']),
+                'driver_id' => $driver?->id ?? $bus->driver_id,
+            ]);
 
-            if ($bus->driver) {
-                $bus->driver->update(['duty_status' => 'on_route']);
+            if ($driver) {
+                $driver->update(['duty_status' => 'on_route']);
             }
 
             // The linked scheduled trip is now running.
@@ -455,7 +561,7 @@ class ShiftController extends Controller
                 \App\Models\ShiftLocation::create([
                     'shift_log_id' => $log->id,
                     'bus_id' => $bus->id,
-                    'driver_id' => $bus->driver_id,
+                    'driver_id' => $driver?->id ?? $bus->driver_id,
                     'latitude' => $startLat,
                     'longitude' => $startLng,
                     'speed' => (float) ($request->input('speed') ?? 0),
@@ -491,6 +597,8 @@ class ShiftController extends Controller
             );
         }
 
+        $log->load(['bus.transitRoute', 'driver.user', 'trip']);
+
         return response()->json([
             'success' => true,
             'message' => "{$log->display_id} started for {$bus->display_id}.",
@@ -513,52 +621,70 @@ class ShiftController extends Controller
         $this->mergeAliases($request, end: true);
 
         $validated = $request->validate([
-            'bus_id' => ['required', 'integer', 'exists:buses,id'],
+            'bus_id' => ['nullable', 'integer', 'exists:buses,id'],
             'trip_id' => ['nullable', 'integer', 'exists:trips,id'],
             'end_km' => ['required', 'integer', 'min:0', 'max:99999999'],
             'ended_at' => ['nullable', 'date'],
             'end_notes' => ['nullable', 'string', 'max:1000'],
-            'meter_image' => ['nullable', 'image', 'max:10240'],
-            'image' => ['nullable', 'image', 'max:10240'],
+            'meter_image' => ['nullable'],
+            'image' => ['nullable'],
         ]);
 
-        $meterImage = $this->resolveMeterImage($request, true);
+        $meterImage = $this->resolveMeterImage($request, false);
 
-        $bus = Bus::with('driver.user')->findOrFail($validated['bus_id']);
+        $user = $request->user();
+        $busId = $validated['bus_id'] ?? $user?->driver?->bus_id;
+        $bus = $busId ? Bus::with('driver.user')->find($busId) : null;
+        if (!$bus && $user?->driver?->bus) {
+            $bus = $user->driver->bus;
+        }
 
-        $log = ShiftLog::query()
-            ->where('bus_id', $bus->id)
-            ->where('status', ShiftLog::STATUS_IN_PROGRESS)
-            ->latest('id')
-            ->first();
+        $logQuery = ShiftLog::query()->where('status', ShiftLog::STATUS_IN_PROGRESS);
+        if ($bus) {
+            $logQuery->where(function ($q) use ($bus, $user) {
+                $q->where('bus_id', $bus->id);
+                if ($user?->driver) {
+                    $q->orWhere('driver_id', $user->driver->id);
+                }
+            });
+        } elseif ($user?->driver) {
+            $logQuery->where('driver_id', $user->driver->id);
+        }
+
+        $log = $logQuery->latest('id')->first();
 
         if (!$log) {
             return response()->json([
                 'success' => false,
-                'message' => "No active shift found for {$bus->display_id}. Start a shift before ending one.",
+                'message' => 'No active shift found to conclude.',
             ], 422);
         }
 
-        if ($validated['end_km'] < $log->start_km) {
-            throw ValidationException::withMessages([
-                'end_km' => "The ending meter reading ({$validated['end_km']} KM) cannot be lower than the starting reading ({$log->start_km} KM).",
-            ]);
+        if (!$bus) {
+            $bus = $log->bus ?? Bus::with('driver.user')->find($log->bus_id);
         }
 
-        $distance = $validated['end_km'] - $log->start_km;
-        $imagePath = $this->storeMeterImage($meterImage, $bus->id);
+        if ($validated['end_km'] < $log->start_km) {
+            $distance = 0;
+            $endNotes = ($validated['end_notes'] ?? '') . " [Audit: end meter {$validated['end_km']} KM lower than start {$log->start_km} KM]";
+        } else {
+            $distance = $validated['end_km'] - $log->start_km;
+            $endNotes = $validated['end_notes'] ?? null;
+        }
+
+        $imagePath = $meterImage ? $this->storeMeterImage($meterImage, $bus->id) : null;
 
         // Prefer the trip linked at start; fall back to one sent with the end call.
         $tripId = $log->trip_id ?? $validated['trip_id'] ?? null;
         $trip = $tripId ? Trip::find($tripId) : null;
 
-        DB::transaction(function () use ($log, $bus, $validated, $imagePath, $distance, $trip, $tripId): void {
+        DB::transaction(function () use ($log, $bus, $validated, $imagePath, $distance, $trip, $tripId, $endNotes, $request): void {
             $log->update([
                 'end_km' => $validated['end_km'],
                 'distance_km' => $distance,
                 'trip_id' => $tripId,
                 'end_meter_image' => $imagePath,
-                'end_notes' => $validated['end_notes'] ?? null,
+                'end_notes' => $endNotes,
                 'status' => ShiftLog::STATUS_COMPLETED,
                 'ended_at' => !empty($validated['ended_at']) ? Carbon::parse($validated['ended_at']) : now(),
             ]);
@@ -629,6 +755,8 @@ class ShiftController extends Controller
                 route('shifts')
             );
         }
+
+        $log->load(['bus.transitRoute', 'driver.user', 'trip']);
 
         return response()->json([
             'success' => true,

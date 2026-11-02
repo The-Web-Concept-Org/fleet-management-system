@@ -42,10 +42,10 @@ class ReportController extends Controller
         $endMonth = (int) $request->input('end_month', max(10, $currentMonth));
         $dayRange = $request->input('day_range', '1-15');
         $taxRate = (float) $request->input('tax_rate', 0.0);
-        $lang = $request->input('lang', 'es');
+        $lang = $request->input('lang', App::getLocale() ?: 'es');
 
         if (!in_array($lang, ['es', 'en'], true)) {
-            $lang = 'es';
+            $lang = App::getLocale() ?: 'es';
         }
 
         App::setLocale($lang);
@@ -97,10 +97,10 @@ class ReportController extends Controller
         $endMonth = (int) $request->input('end_month', max(10, $currentMonth));
         $dayRange = $request->input('day_range', '1-15');
         $taxRate = (float) $request->input('tax_rate', 0.0);
-        $lang = $request->input('lang', 'es');
+        $lang = $request->input('lang', App::getLocale() ?: 'es');
 
         if (!in_array($lang, ['es', 'en'], true)) {
-            $lang = 'es';
+            $lang = App::getLocale() ?: 'es';
         }
 
         App::setLocale($lang);

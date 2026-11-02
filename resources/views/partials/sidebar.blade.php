@@ -1,26 +1,26 @@
 {{--
-    shadcn/ui Application Sidebar with Real-Time Telemetry status
+    shadcn/ui Application Sidebar with Real-Time Telemetry status & Multi-Language Support
 --}}
 @php
     $currentRoute = request()->route()?->getName();
 
     $coreNav = [
-        ['label' => 'Dashboard', 'icon' => 'layout-dashboard', 'route' => 'dashboard', 'badge' => null],
-        ['label' => 'Transit Routes', 'icon' => 'route', 'route' => 'routes.index', 'badge' => \App\Models\TransitRoute::where('status', 'active')->count() ?: null],
-        ['label' => 'Buses Roster', 'icon' => 'bus', 'route' => 'buses', 'badge' => \App\Models\Bus::where('status', 'active')->count() ?: null],
-        ['label' => 'Driver Shifts', 'icon' => 'clock-3', 'route' => 'shifts', 'badge' => null],
-        ['label' => 'Drivers Roster', 'icon' => 'users', 'route' => 'drivers', 'badge' => null],
+        ['label' => __('app.dashboard'), 'icon' => 'layout-dashboard', 'route' => 'dashboard', 'badge' => null],
+        ['label' => __('app.transit_routes'), 'icon' => 'route', 'route' => 'routes.index', 'badge' => \App\Models\TransitRoute::where('status', 'active')->count() ?: null],
+        ['label' => __('app.buses'), 'icon' => 'bus', 'route' => 'buses', 'badge' => \App\Models\Bus::where('status', 'active')->count() ?: null],
+        ['label' => __('app.shifts'), 'icon' => 'clock-3', 'route' => 'shifts', 'badge' => null],
+        ['label' => __('app.drivers'), 'icon' => 'users', 'route' => 'drivers', 'badge' => null],
     ];
 
     $logNav = [
-        ['label' => 'Fuel Logs', 'icon' => 'fuel', 'route' => 'fuel', 'badge' => null],
-        ['label' => 'Fuel Reports', 'icon' => 'file-bar-chart', 'route' => 'reports.fuel', 'badge' => null],
-        ['label' => 'Maintenance', 'icon' => 'wrench', 'route' => 'maintenance', 'badge' => null],
-        ['label' => 'Notifications', 'icon' => 'bell', 'route' => 'notifications', 'badge' => \App\Models\AppNotification::where('user_id', auth()->id())->whereNull('read_at')->count() ?: null],
+        ['label' => __('app.fuel_logs'), 'icon' => 'fuel', 'route' => 'fuel', 'badge' => null],
+        ['label' => __('app.fuel_reports'), 'icon' => 'file-bar-chart', 'route' => 'reports.fuel', 'badge' => null],
+        ['label' => __('app.maintenance'), 'icon' => 'wrench', 'route' => 'maintenance', 'badge' => null],
+        ['label' => __('app.notifications'), 'icon' => 'bell', 'route' => 'notifications', 'badge' => \App\Models\AppNotification::where('user_id', auth()->id())->whereNull('read_at')->count() ?: null],
     ];
 
     $sysNav = [
-        ['label' => 'Account Settings', 'icon' => 'settings', 'route' => 'settings', 'badge' => null],
+        ['label' => __('app.settings'), 'icon' => 'settings', 'route' => 'settings', 'badge' => null],
     ];
 
     $user = auth()->user();
@@ -46,7 +46,7 @@
                     </span>
                     <span class="font-medium text-foreground">{{ config('app.name', 'Lancotri') }}</span>
                 </div>
-                <span class="text-[10px] text-emerald-600 font-mono font-medium">Online</span>
+                <span class="text-[10px] text-emerald-600 font-mono font-medium">{{ __('app.online') }}</span>
             </div>
         </div>
 
@@ -55,7 +55,7 @@
             <!-- Group 1: Core Operations -->
             <div>
                 <div class="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 font-mono">
-                    Operations
+                    {{ __('app.nav_operations') }}
                 </div>
                 <nav class="space-y-1">
                     @foreach($coreNav as $item)
@@ -82,7 +82,7 @@
             <!-- Group 2: Logs & Monitoring -->
             <div>
                 <div class="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 font-mono">
-                    Telemetry &amp; Logs
+                    {{ __('app.nav_telemetry') }}
                 </div>
                 <nav class="space-y-1">
                     @foreach($logNav as $item)
@@ -104,7 +104,7 @@
             <!-- Group 3: System & Security -->
             <div>
                 <div class="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80 font-mono">
-                    System
+                    {{ __('app.nav_system') }}
                 </div>
                 <nav class="space-y-1">
                     @foreach($sysNav as $item)
@@ -135,18 +135,18 @@
                     <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
                 <div class="flex flex-col min-w-0">
-                    <span class="text-[11px] font-semibold text-foreground truncate">GPS Feed Synced</span>
-                    <span class="text-[10px] text-muted-foreground font-mono" id="telemetryLastSync">Synced just now</span>
+                    <span class="text-[11px] font-semibold text-foreground truncate">{{ __('app.gps_synced') }}</span>
+                    <span class="text-[10px] text-muted-foreground font-mono" id="telemetryLastSync">{{ __('app.synced_just_now') }}</span>
                 </div>
             </div>
-            <button type="button" id="telemetrySyncBtn" title="Sync Telemetry Now" class="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">
+            <button type="button" id="telemetrySyncBtn" title="{{ __('app.sync_now') }}" class="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0">
                 <i data-lucide="refresh-cw" id="telemetrySyncIcon" class="w-3.5 h-3.5"></i>
             </button>
         </div>
 
         <!-- User Profile Strip (Clickable to Settings) -->
         <div class="flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-muted/50 transition-colors">
-            <a href="{{ route('settings') }}" class="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-80 transition-opacity" title="Open Settings">
+            <a href="{{ route('settings') }}" class="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-80 transition-opacity" title="{{ __('app.settings') }}">
                 <div class="w-8 h-8 rounded-full bg-primary text-primary-foreground font-semibold flex items-center justify-center text-xs shrink-0 shadow-xs">
                     {{ $initials }}
                 </div>
@@ -156,12 +156,12 @@
                 </div>
             </a>
             <div class="flex items-center gap-1">
-                <a href="{{ route('settings') }}" title="Account Settings" class="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <a href="{{ route('settings') }}" title="{{ __('app.settings') }}" class="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                     <i data-lucide="settings" class="w-3.5 h-3.5"></i>
                 </a>
                 <form method="POST" action="{{ route('logout') }}" class="inline">
                     @csrf
-                    <button type="submit" title="Sign Out" class="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
+                    <button type="submit" title="{{ __('app.logout') }}" class="p-1.5 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors">
                         <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
                     </button>
                 </form>

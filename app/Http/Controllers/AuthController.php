@@ -147,14 +147,22 @@ class AuthController extends Controller
         $user = $request->user();
 
         if ($user) {
-            // Revoke the token that authenticated this request.
+            // Revoke the current access token
             $user->currentAccessToken()?->delete();
 
-            // Revoke every refresh token so the session cannot be silently renewed.
-            $user->tokens()->where('name', 'like', 'refresh-%')->delete();
+            // Revoke all personal access tokens and refresh tokens so user is signed out completely from server
+            $user->tokens()->delete();
+        } else {
+            $bearer = $request->bearerToken();
+            if ($bearer) {
+                PersonalAccessToken::findToken($bearer)?->delete();
+            }
         }
 
-        return response()->json(['message' => 'Logged out successfully.']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Logged out successfully.',
+        ]);
     }
 
     public function me(Request $request): JsonResponse

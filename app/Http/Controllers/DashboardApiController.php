@@ -24,19 +24,31 @@ class DashboardApiController extends Controller
     {
         $user = $request->user();
         $driver = $user->driver;
-        $bus = $driver?->bus;
+        $bus = $driver?->bus ?? Bus::where('driver_id', $driver?->id)->first() ?? Bus::first();
 
         // If user is admin without assigned bus, return fleet overview
         if (!$driver || !$bus) {
             return $this->adminFleetOverview($request);
         }
 
-        // Active shift (if any) currently running on this vehicle
-        $activeShift = ShiftLog::with(['bus', 'driver.user', 'trip'])
-            ->where('bus_id', $bus->id)
+        // Active shift (if any) currently running on this vehicle or for this driver
+        $activeShift = ShiftLog::with(['bus.transitRoute', 'driver.user', 'trip'])
             ->where('status', ShiftLog::STATUS_IN_PROGRESS)
+            ->where(function ($q) use ($bus, $driver) {
+                if ($bus) {
+                    $q->where('bus_id', $bus->id);
+                }
+                if ($driver) {
+                    $q->orWhere('driver_id', $driver->id);
+                }
+            })
             ->latest('id')
             ->first();
+
+        // Keep vehicle in sync with active shift bus if available
+        if ($activeShift && $activeShift->bus) {
+            $bus = $activeShift->bus;
+        }
 
         // Calculate real elapsed time if shift is active
         $elapsedSeconds = 0;
@@ -156,7 +168,8 @@ class DashboardApiController extends Controller
             ->latest('ended_at')
             ->first();
 
-        $yesterdayOdometer = $lastCompletedShift?->end_km ?? max(0, $bus->odometer - 120);
+        $yesterdayOdometer = $lastCompletedShift?->end_km ?? ($activeShift ? (int) $activeShift->start_km : max(0, $bus->odometer - 120));
+        $currentBusOdo = $activeShift ? max((int) $bus->odometer, (int) $activeShift->start_km) : (int) $bus->odometer;
 
         return response()->json([
             'success' => true,
@@ -180,7 +193,7 @@ class DashboardApiController extends Controller
                 'plate' => $bus->plate,
                 'model' => $bus->model,
                 'status' => $bus->status,
-                'odometer' => $bus->odometer,
+                'odometer' => $currentBusOdo,
                 'yesterday_close_odometer' => $yesterdayOdometer,
                 'route' => $bus->route,
                 'fuel_month_liters' => $fuelMonthLiters,

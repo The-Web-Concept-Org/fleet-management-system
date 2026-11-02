@@ -356,22 +356,8 @@
                         </div>
                     </div>
 
-                    <!-- Right Controls: Language Switcher, Export PDF, Print -->
+                    <!-- Right Controls: Export PDF, Print -->
                     <div class="flex flex-wrap items-center gap-2.5">
-                        <!-- Bilingual Language Switcher -->
-                        <div class="inline-flex items-center rounded-lg border border-border bg-card p-1 shadow-xs">
-                            <a href="{{ request()->fullUrlWithQuery(['lang' => 'es']) }}"
-                               class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition-all {{ $lang === 'es' ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground' }}">
-                                <span>🇪🇸</span>
-                                <span>{{ trans('reports.spanish', [], $lang) }}</span>
-                            </a>
-                            <a href="{{ request()->fullUrlWithQuery(['lang' => 'en']) }}"
-                               class="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-md transition-all {{ $lang === 'en' ? 'bg-primary text-primary-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground' }}">
-                                <span>🇺🇸</span>
-                                <span>{{ trans('reports.english', [], $lang) }}</span>
-                            </a>
-                        </div>
-
                         <!-- Print Button -->
                         <button type="button" onclick="window.print()"
                                 class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3.5 gap-2">
