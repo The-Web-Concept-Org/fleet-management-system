@@ -88,7 +88,7 @@ class DashboardApiController extends Controller
         }
 
         // On-time rate calculation
-        $onTimePercentage = $completedShiftsCount > 0 ? 98.4 : 100.0;
+        $onTimePercentage = 100.0;
 
         // Active running trip for this bus (if any)
         $activeTrip = Trip::where('bus_id', $bus->id)
@@ -136,7 +136,7 @@ class DashboardApiController extends Controller
 
         $fuelMonthLiters = $dbFuelLiters > 0 ? $dbFuelLiters : (float) ($bus->fuel_month_liters ?? 0);
         $fuelMonthCost = $dbFuelCost > 0 ? $dbFuelCost : (float) ($bus->fuel_cost ?? 0);
-        $maintMonthCost = $dbMaintCost > 0 ? $dbMaintCost : 240.00;
+        $maintMonthCost = $dbMaintCost > 0 ? $dbMaintCost : 0.00;
 
         // Recent fuel logs (last 5)
         $recentFuel = FuelLog::with(['bus', 'driver.user', 'trip'])
@@ -168,7 +168,7 @@ class DashboardApiController extends Controller
             ->latest('ended_at')
             ->first();
 
-        $yesterdayOdometer = $lastCompletedShift?->end_km ?? ($activeShift ? (int) $activeShift->start_km : max(0, $bus->odometer - 120));
+        $yesterdayOdometer = $lastCompletedShift?->end_km ? (int) $lastCompletedShift->end_km : null;
         $currentBusOdo = $activeShift ? max((int) $bus->odometer, (int) $activeShift->start_km) : (int) $bus->odometer;
 
         return response()->json([

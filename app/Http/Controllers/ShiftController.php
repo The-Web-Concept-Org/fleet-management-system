@@ -623,6 +623,7 @@ class ShiftController extends Controller
         $validated = $request->validate([
             'bus_id' => ['nullable', 'integer', 'exists:buses,id'],
             'trip_id' => ['nullable', 'integer', 'exists:trips,id'],
+            'start_km' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'end_km' => ['required', 'integer', 'min:0', 'max:99999999'],
             'ended_at' => ['nullable', 'date'],
             'end_notes' => ['nullable', 'string', 'max:1000'],
@@ -664,6 +665,10 @@ class ShiftController extends Controller
             $bus = $log->bus ?? Bus::with('driver.user')->find($log->bus_id);
         }
 
+        if ($request->filled('start_km') && (int) $request->input('start_km') > 0) {
+            $log->start_km = (int) $request->input('start_km');
+        }
+
         if ($validated['end_km'] < $log->start_km) {
             $distance = 0;
             $endNotes = ($validated['end_notes'] ?? '') . " [Audit: end meter {$validated['end_km']} KM lower than start {$log->start_km} KM]";
@@ -680,6 +685,7 @@ class ShiftController extends Controller
 
         DB::transaction(function () use ($log, $bus, $validated, $imagePath, $distance, $trip, $tripId, $endNotes, $request): void {
             $log->update([
+                'start_km' => $log->start_km,
                 'end_km' => $validated['end_km'],
                 'distance_km' => $distance,
                 'trip_id' => $tripId,

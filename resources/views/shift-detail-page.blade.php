@@ -261,7 +261,7 @@
                             {{ number_format($shift->start_km) }} <span class="text-xs font-normal text-muted-foreground">KM</span>
                         </div>
                         <div class="text-xs text-muted-foreground mt-1">
-                            {{ $shift->started_at ? $shift->started_at->format('M d, Y &bull; H:i') : '—' }}
+                            {{ $shift->started_at ? $shift->started_at->format('M d, Y • H:i') : '—' }}
                         </div>
                     </div>
 
@@ -278,7 +278,7 @@
                             @endif
                         </div>
                         <div class="text-xs text-muted-foreground mt-1">
-                            {{ $shift->ended_at ? $shift->ended_at->format('M d, Y &bull; H:i') : 'Shift is ongoing' }}
+                            {{ $shift->ended_at ? $shift->ended_at->format('M d, Y • H:i') : 'Shift is ongoing' }}
                         </div>
                     </div>
 
