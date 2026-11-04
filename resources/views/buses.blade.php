@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <meta name="csrf-token" content="{{ csrf_token() }}"/>
-    <title>Fleet Buses Roster &bull; Lancotri</title>
+    <title>{{ __('Fleet Buses Roster') }} &bull; {{ config('app.name', 'Lancotri') }}</title>
     @include('partials.brand-styles')
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/lancotri-mark.svg') }}">
 </head>
@@ -12,7 +12,7 @@
     @include('partials.sidebar')
 
     <div class="pl-64 flex flex-col min-h-screen">
-        @include('partials.topbar', ['topbarStatus' => $activeBuses . ' active vehicles'])
+        @include('partials.topbar', ['topbarStatus' => $activeBuses . ' ' . __('active_vehicles')])
 
         <main class="w-full pt-16 flex-1 px-8 py-8 bg-background">
             <div class="flex flex-col w-full gap-6 max-w-7xl mx-auto">
@@ -23,7 +23,7 @@
                         <div class="flex items-center gap-2 text-xs text-muted-foreground font-mono">
                             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted border">
                                 <i data-lucide="radio" class="w-3.5 h-3.5 text-primary"></i>
-                                <span>TERMINAL 4 TELEMETRY</span>
+                                <span>{{ __('TERMINAL 4 TELEMETRY') }}</span>
                             </span>
                             <span>&bull;</span>
                             <span class="inline-flex items-center gap-1.5 text-emerald-600 font-medium">
@@ -31,12 +31,12 @@
                                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                     <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                 </span>
-                                Real-Time Tracking
+                                {{ __('Real-Time Tracking') }}
                             </span>
                         </div>
                         <div>
-                            <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Fleet Buses Roster</h1>
-                            <p class="text-xs text-muted-foreground mt-2 leading-relaxed max-w-2xl">Manage and track company buses, assign drivers, and monitor service telemetry.</p>
+                            <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{{ __('Fleet Buses Roster') }}</h1>
+                            <p class="text-xs text-muted-foreground mt-2 leading-relaxed max-w-2xl">{{ __('Manage and track company buses, assign drivers, and monitor service telemetry.') }}</p>
                         </div>
                     </div>
 
@@ -45,20 +45,20 @@
                             <i data-lucide="search" class="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                             <input id="rosterSearch"
                                    data-shadcn-table-search="busesRosterTable"
-                                   placeholder="Search bus #, plate, model..."
+                                   placeholder="{{ __('Search bus #, plate, model...') }}"
                                    class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
                         </div>
 
                         <button id="exportCsvBtn" type="button"
                                 class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 gap-2">
                             <i data-lucide="download" class="w-3.5 h-3.5 text-muted-foreground"></i>
-                            <span>Export</span>
+                            <span>{{ __('Export') }}</span>
                         </button>
 
                         <button id="addBusModalTrigger" type="button" onclick="window.shadcnModal.open('addBusModal')"
                                 class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2 gap-2 transition-all">
                             <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                            <span>Add New Bus</span>
+                            <span>{{ __('Add New Bus') }}</span>
                         </button>
                     </div>
                 </div>
@@ -67,56 +67,56 @@
                 <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                     <div class="rounded-xl border bg-card text-card-foreground shadow-sm p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-muted-foreground">Total Fleet</span>
+                            <span class="text-xs font-mono uppercase text-muted-foreground">{{ __('Total Fleet') }}</span>
                             <i data-lucide="bus" class="w-4 h-4 text-primary"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono">{{ $totalBuses }}</div>
-                            <span class="text-xs text-muted-foreground">Registered units</span>
+                            <span class="text-xs text-muted-foreground">{{ __('Registered units') }}</span>
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-sm p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-emerald-600">Active on Shift</span>
+                            <span class="text-xs font-mono uppercase text-emerald-600">{{ __('Active on Shift') }}</span>
                             <i data-lucide="navigation" class="w-4 h-4 text-emerald-600"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono text-emerald-600">{{ $activeBuses }}</div>
-                            <span class="text-xs text-muted-foreground">En route</span>
+                            <span class="text-xs text-muted-foreground">{{ __('En route') }}</span>
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-sm p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-muted-foreground">Depot &amp; Garage</span>
+                            <span class="text-xs font-mono uppercase text-muted-foreground">{{ __('Depot & Garage') }}</span>
                             <i data-lucide="warehouse" class="w-4 h-4 text-muted-foreground"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono">{{ $depotBuses }}</div>
-                            <span class="text-xs text-muted-foreground">Standby / Bays</span>
+                            <span class="text-xs text-muted-foreground">{{ __('Standby / Bays') }}</span>
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-sm p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-destructive">Out of Service</span>
+                            <span class="text-xs font-mono uppercase text-destructive">{{ __('Out of Service') }}</span>
                             <i data-lucide="alert-octagon" class="w-4 h-4 text-destructive"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono text-destructive">{{ $outOfServiceBuses }}</div>
-                            <span class="text-xs text-muted-foreground">Flagged</span>
+                            <span class="text-xs text-muted-foreground">{{ __('Flagged') }}</span>
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-sm p-4 flex flex-col justify-between col-span-2 md:col-span-1">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-muted-foreground">Avg Fuel Econ</span>
+                            <span class="text-xs font-mono uppercase text-muted-foreground">{{ __('Avg Fuel Econ') }}</span>
                             <i data-lucide="gauge" class="w-4 h-4 text-blue-600"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono">{{ $avgEfficiency ?: '0.0' }} <span class="text-xs font-normal text-muted-foreground">KM/L</span></div>
-                            <span class="text-xs text-muted-foreground">Active fleet metric</span>
+                            <span class="text-xs text-muted-foreground">{{ __('Active fleet metric') }}</span>
                         </div>
                     </div>
                 </div>
@@ -127,25 +127,25 @@
                     <div class="p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-muted/20">
                         <div class="flex items-center gap-2" data-shadcn-filter-group="busesRosterTable">
                             <button type="button" data-filter="all" class="filter-pill px-3 py-1.5 rounded-md text-xs font-semibold bg-foreground text-background shadow-sm transition-colors">
-                                All ({{ $totalBuses }})
+                                {{ __('All') }} ({{ $totalBuses }})
                             </button>
                             <button type="button" data-filter="active" class="filter-pill px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-                                Active ({{ $activeBuses }})
+                                {{ __('Active') }} ({{ $activeBuses }})
                             </button>
                             <button type="button" data-filter="standby" class="filter-pill px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-                                Standby
+                                {{ __('Standby') }}
                             </button>
                             <button type="button" data-filter="depot" class="filter-pill px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-                                Depot
+                                {{ __('Depot') }}
                             </button>
                             <button type="button" data-filter="out_of_service" class="filter-pill px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-                                Out of Service
+                                {{ __('Out of Service') }}
                             </button>
                         </div>
                     <div class="flex items-center gap-2">
                         <select onchange="window.location.href = this.value" class="h-8 rounded-md border border-input bg-background px-2 text-xs focus:ring-1 focus:ring-ring text-muted-foreground">
-                            <option value="{{ route('buses') }}">All Service Routes</option>
-                            <option value="{{ route('buses', ['route' => 'unassigned']) }}" @selected(request('route') === 'unassigned')>Unassigned Route</option>
+                            <option value="{{ route('buses') }}">{{ __('All Service Routes') }}</option>
+                            <option value="{{ route('buses', ['route' => 'unassigned']) }}" @selected(request('route') === 'unassigned')>{{ __('Unassigned Route') }}</option>
                             @foreach($transitRoutes as $tr)
                                 <option value="{{ route('buses', ['route' => $tr->route_code]) }}" @selected(request('route') === $tr->route_code || request('route') === "{$tr->route_code} - {$tr->corridor_name}")>
                                     {{ $tr->route_code }} · {{ $tr->corridor_name }}
@@ -157,7 +157,7 @@
                                 @endif
                             @endforeach
                         </select>
-                        <span class="text-xs text-muted-foreground font-mono">Showing {{ $buses->count() }} vehicles</span>
+                        <span class="text-xs text-muted-foreground font-mono">{{ __('Showing') }} {{ $buses->count() }} {{ __('vehicles') }}</span>
                     </div>
                     </div>
 
@@ -166,15 +166,15 @@
                         <table class="w-full caption-bottom text-sm" id="busesRosterTable">
                             <thead>
                                 <tr class="border-b bg-muted/50 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                                    <th class="h-10 px-4 text-left align-middle font-medium">Bus #</th>
-                                    <th class="h-10 px-4 text-left align-middle font-medium">Chassis / Model</th>
-                                    <th class="h-10 px-4 text-left align-middle font-medium">Plate</th>
-                                    <th class="h-10 px-4 text-left align-middle font-medium">Service Route</th>
-                                    <th class="h-10 px-4 text-left align-middle font-medium">Assigned Driver</th>
-                                    <th class="h-10 px-4 text-left align-middle font-medium">Status</th>
-                                    <th class="h-10 px-4 text-left align-middle font-medium">Odometer</th>
-                                    <th class="h-10 px-4 text-left align-middle font-medium">Next Service</th>
-                                    <th class="h-10 px-4 text-right align-middle font-medium">Actions</th>
+                                    <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Bus #') }}</th>
+                                    <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Chassis / Model') }}</th>
+                                    <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Plate') }}</th>
+                                    <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Service Route') }}</th>
+                                    <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Assigned Driver') }}</th>
+                                    <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Status') }}</th>
+                                    <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Odometer') }}</th>
+                                    <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Next Service') }}</th>
+                                    <th class="h-10 px-4 text-right align-middle font-medium">{{ __('Actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y text-foreground">
@@ -190,11 +190,11 @@
                                             default => 'border-transparent bg-secondary text-secondary-foreground'
                                         };
                                         $statusLabel = match($bus->status) {
-                                            'active' => 'Active Shift',
-                                            'standby' => 'Standby',
-                                            'depot' => 'In Depot',
-                                            'maintenance' => 'In Maintenance',
-                                            'out_of_service' => 'Out of Service',
+                                            'active' => __('Active Shift'),
+                                            'standby' => __('Standby'),
+                                            'depot' => __('In Depot'),
+                                            'maintenance' => __('In Maintenance'),
+                                            'out_of_service' => __('Out of Service'),
                                             default => ucfirst($bus->status)
                                         };
                                     @endphp
@@ -258,9 +258,9 @@
                                                 <button type="button"
                                                         onclick="openAssignRouteModal({{ $bus->id }}, '{{ addslashes($bus->display_id) }}', '', '')"
                                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-dashed border-border hover:border-primary/60 text-muted-foreground hover:text-foreground text-[11px] transition-colors cursor-pointer"
-                                                        title="Assign Service Route">
+                                                        title="{{ __('Assign Route') }}">
                                                     <i data-lucide="plus" class="w-3 h-3 text-primary"></i>
-                                                    <span>Assign Route</span>
+                                                    <span>{{ __('Assign Route') }}</span>
                                                 </button>
                                             @endif
                                         </td>
@@ -273,7 +273,7 @@
                                                     <span class="font-medium text-xs">{{ $driverName }}</span>
                                                 </div>
                                             @else
-                                                <span class="text-muted-foreground italic text-xs">Unassigned</span>
+                                                <span class="text-muted-foreground italic text-xs">{{ __('Unassigned') }}</span>
                                             @endif
                                         </td>
                                         <td class="p-4 align-middle">
@@ -284,7 +284,7 @@
                                         <td class="p-4 align-middle font-mono text-xs">{{ number_format($bus->odometer) }} km</td>
                                         <td class="p-4 align-middle font-mono text-xs">
                                             @if($bus->next_service_km < 0)
-                                                <span class="text-destructive font-semibold">{{ number_format(abs($bus->next_service_km)) }} km overdue</span>
+                                                <span class="text-destructive font-semibold">{{ number_format(abs($bus->next_service_km)) }} km {{ __('overdue') }}</span>
                                             @else
                                                 <span>{{ number_format($bus->next_service_km) }} km</span>
                                             @endif
@@ -293,13 +293,13 @@
                                             <div class="flex items-center justify-end gap-1.5">
                                                 <button type="button"
                                                         onclick="openEditBusModal({{ $bus->id }}, '{{ addslashes($bus->bus_number) }}', '{{ addslashes($bus->plate) }}', '{{ addslashes($bus->model ?? '') }}', '{{ $bus->status }}', '{{ $bus->driver_id }}', '{{ $bus->transit_route_id ?? '' }}', '{{ addslashes($bus->route ?? '') }}', {{ (int) $bus->odometer }}, {{ (int) $bus->next_service_km }}, '{{ addslashes($bus->operator ?? '') }}')"
-                                                        title="Edit Bus"
+                                                        title="{{ __('Edit Bus Details') }}"
                                                         class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent hover:text-accent-foreground text-muted-foreground shadow-sm transition-colors">
                                                     <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
                                                 </button>
                                                 <button type="button"
                                                         onclick="openDeleteBusModal({{ $bus->id }}, '{{ addslashes($bus->display_id) }}', '{{ addslashes($bus->plate) }}')"
-                                                        title="Delete Bus"
+                                                        title="{{ __('Delete Bus') }}"
                                                         class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-destructive/10 hover:text-destructive text-muted-foreground shadow-sm transition-colors">
                                                     <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                                                 </button>
@@ -309,7 +309,7 @@
                                 @empty
                                     <tr class="empty-row">
                                         <td colspan="9" class="p-8 text-center text-muted-foreground">
-                                            No buses found matching your criteria.
+                                            {{ __('No fleet buses found') }}
                                         </td>
                                     </tr>
                                 @endforelse
@@ -322,24 +322,24 @@
         </main>
     </div>
 
-    <!-- ================= shadcn Dialog: ADD NEW BUS ================= -->
+    <!-- ================= Dialog: ADD NEW BUS ================= -->
     <div id="addBusModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs hidden">
         <div class="relative w-full max-w-lg rounded-xl border bg-background p-6 shadow-lg modal-content text-left">
             <div class="flex flex-col space-y-1.5 pb-3 border-b">
-                <h3 class="text-lg font-semibold leading-none tracking-tight">Provision New Vehicle</h3>
-                <p class="text-xs text-muted-foreground mt-1">Register a new transit bus into the active fleet roster.</p>
+                <h3 class="text-lg font-semibold leading-none tracking-tight">{{ __('Add New Bus') }}</h3>
+                <p class="text-xs text-muted-foreground mt-1">{{ __('Register a new transit bus into the active fleet roster.') }}</p>
             </div>
 
             <form method="POST" action="{{ route('buses.store') }}" class="space-y-3 pt-3">
                 @csrf
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Bus Number</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Bus Number') }}</label>
                         <input name="bus_number" required placeholder="e.g. 45"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">License Plate</label>
+                        <label class="text-xs font-medium leading-none">{{ __('License Plate') }}</label>
                         <input name="plate" required placeholder="e.g. YT-901-XZ"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"/>
                     </div>
@@ -347,27 +347,27 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Chassis Model / Type *</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Chassis Model / Make') }} *</label>
                         <input list="chassisModelPresets" name="model" required placeholder="Type custom or select (e.g. Scania, Yutong, Volvo...)"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Operational Status *</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Vehicle Status') }} *</label>
                         <select name="status" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
-                            <option value="standby">Ready / Standby</option>
-                            <option value="active">Active Shift</option>
-                            <option value="depot">In Depot</option>
-                            <option value="maintenance">In Maintenance</option>
-                            <option value="out_of_service">Out of Service</option>
+                            <option value="standby">{{ __('Ready / Standby') }}</option>
+                            <option value="active">{{ __('Active Shift') }}</option>
+                            <option value="depot">{{ __('In Depot') }}</option>
+                            <option value="maintenance">{{ __('In Maintenance') }}</option>
+                            <option value="out_of_service">{{ __('Out of Service') }}</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Managed Transit Route</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Service Route') }}</label>
                         <select name="transit_route_id" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
-                            <option value="">-- No Route (Standby / Depot) --</option>
+                            <option value="">-- {{ __('Unassigned Route') }} --</option>
                             @foreach($transitRoutes as $tr)
                                 <option value="{{ $tr->id }}">
                                     [{{ $tr->route_code }}] {{ $tr->corridor_name }} ({{ $tr->origin_terminal }} → {{ $tr->dest_terminal }})
@@ -376,7 +376,7 @@
                         </select>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Depot / Fleet Division</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Depot & Garage') }}</label>
                         <input name="operator" placeholder="e.g. Central Depot, Bay 4"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
                     </div>
@@ -384,21 +384,21 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Current Odometer (km)</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Current Meter') }} (km)</label>
                         <input type="number" name="odometer" min="0" value="0" placeholder="0"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"/>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Next Service Interval (km)</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Next Service') }} (km)</label>
                         <input type="number" name="next_service_km" value="10000" placeholder="10000"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"/>
                     </div>
                 </div>
 
                 <div class="space-y-1">
-                    <label class="text-xs font-medium leading-none">Assigned Driver</label>
+                    <label class="text-xs font-medium leading-none">{{ __('Assigned Driver') }}</label>
                     <select name="driver_id" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
-                        <option value="">-- Assign Driver Later (Standby) --</option>
+                        <option value="">-- {{ __('Unassigned') }} --</option>
                         @foreach($drivers as $driver)
                             @continue($driver->bus)
                             <option value="{{ $driver->id }}">{{ $driver->user->name ?? 'Driver' }} ({{ $driver->display_id }})</option>
@@ -409,23 +409,23 @@
                 <div class="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pt-4 border-t">
                     <button type="button" onclick="window.shadcnModal.close('addBusModal')"
                             class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
-                        Cancel
+                        {{ __('Cancel') }}
                     </button>
                     <button type="submit"
                             class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2">
-                        Save Bus
+                        {{ __('Save Bus') }}
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- ================= shadcn Dialog: EDIT BUS ================= -->
+    <!-- ================= Dialog: EDIT BUS ================= -->
     <div id="editBusModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs hidden">
         <div class="relative w-full max-w-lg rounded-xl border bg-background p-6 shadow-lg modal-content text-left">
             <div class="flex flex-col space-y-1.5 pb-3 border-b">
-                <h3 class="text-lg font-semibold leading-none tracking-tight">Edit Vehicle Details</h3>
-                <p class="text-xs text-muted-foreground mt-1">Update registration, status, custom chassis model, route, or driver assignment.</p>
+                <h3 class="text-lg font-semibold leading-none tracking-tight">{{ __('Edit Bus Details') }}</h3>
+                <p class="text-xs text-muted-foreground mt-1">{{ __('Manage and track company buses, assign drivers, and monitor service telemetry.') }}</p>
             </div>
 
             <form id="editBusForm" method="POST" action="" class="space-y-3 pt-3">
@@ -433,12 +433,12 @@
                 @method('PUT')
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Bus Number</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Bus Number') }}</label>
                         <input id="editBusNumber" name="bus_number" required
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">License Plate</label>
+                        <label class="text-xs font-medium leading-none">{{ __('License Plate') }}</label>
                         <input id="editBusPlate" name="plate" required
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"/>
                     </div>
@@ -446,27 +446,27 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Chassis Model / Type *</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Chassis Model / Make') }} *</label>
                         <input list="chassisModelPresets" id="editBusModel" name="model" required placeholder="Type custom or select model"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Operational Status *</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Vehicle Status') }} *</label>
                         <select id="editBusStatus" name="status" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
-                            <option value="standby">Ready / Standby</option>
-                            <option value="active">Active Shift</option>
-                            <option value="depot">In Depot</option>
-                            <option value="maintenance">In Maintenance</option>
-                            <option value="out_of_service">Out of Service</option>
+                            <option value="standby">{{ __('Ready / Standby') }}</option>
+                            <option value="active">{{ __('Active Shift') }}</option>
+                            <option value="depot">{{ __('In Depot') }}</option>
+                            <option value="maintenance">{{ __('In Maintenance') }}</option>
+                            <option value="out_of_service">{{ __('Out of Service') }}</option>
                         </select>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Managed Transit Route</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Service Route') }}</label>
                         <select id="editBusTransitRoute" name="transit_route_id" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
-                            <option value="">-- No Route (Standby / Depot) --</option>
+                            <option value="">-- {{ __('Unassigned Route') }} --</option>
                             @foreach($transitRoutes as $tr)
                                 <option value="{{ $tr->id }}">
                                     [{{ $tr->route_code }}] {{ $tr->corridor_name }} ({{ $tr->origin_terminal }} → {{ $tr->dest_terminal }})
@@ -475,7 +475,7 @@
                         </select>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Depot / Fleet Division</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Depot & Garage') }}</label>
                         <input id="editBusOperator" name="operator" placeholder="e.g. Central Depot, Bay 4"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
                     </div>
@@ -483,21 +483,21 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Current Odometer (km)</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Current Meter') }} (km)</label>
                         <input type="number" id="editBusOdometer" name="odometer" min="0" placeholder="0"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"/>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Next Service Interval (km)</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Next Service') }} (km)</label>
                         <input type="number" id="editBusNextService" name="next_service_km" placeholder="10000"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"/>
                     </div>
                 </div>
 
                 <div class="space-y-1">
-                    <label class="text-xs font-medium leading-none">Assigned Driver</label>
+                    <label class="text-xs font-medium leading-none">{{ __('Assigned Driver') }}</label>
                     <select id="editBusDriver" name="driver_id" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
-                        <option value="">-- No Driver Assigned (Standby) --</option>
+                        <option value="">-- {{ __('Unassigned') }} --</option>
                         @foreach($drivers as $driver)
                             <option value="{{ $driver->id }}">{{ $driver->user->name ?? 'Driver' }} ({{ $driver->display_id }})</option>
                         @endforeach
@@ -507,13 +507,16 @@
                 <div class="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pt-4 border-t">
                     <button type="button" onclick="window.shadcnModal.close('editBusModal')"
                             class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
-                        Cancel
+                        {{ __('Cancel') }}
                     </button>
                     <button type="submit"
                             class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2">
-                        Update Bus
+                        {{ __('Update Bus') }}
                     </button>
                 </div>
+            </form>
+        </div>
+    </div>
             </form>
         </div>
     </div>

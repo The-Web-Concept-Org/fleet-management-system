@@ -16,13 +16,13 @@
     $needsReview = $shift->status === \App\Models\ShiftLog::STATUS_COMPLETED && $shift->end_km === null;
 
     if ($needsReview) {
-        $statusLabel = 'Needs Review';
+        $statusLabel = __('Needs Review');
         $statusClasses = 'bg-danger-critical text-on-error';
     } elseif ($isOpen) {
-        $statusLabel = 'In Progress';
+        $statusLabel = __('In Progress');
         $statusClasses = 'bg-surface-container-high text-primary';
     } else {
-        $statusLabel = 'Approved';
+        $statusLabel = __('Approved');
         $statusClasses = 'bg-secondary-fixed/40 text-secondary';
     }
 
@@ -57,12 +57,12 @@
         <div class="flex flex-col">
             <div class="flex items-center gap-1.5 text-primary-container">
                 <span class="material-symbols-outlined text-sm">verified</span>
-                <span class="font-label-caps text-label-caps">INSPECTION DESK</span>
+                <span class="font-label-caps text-label-caps">{{ __('INSPECTION DESK') }}</span>
             </div>
-            <h2 class="font-headline-md text-headline-md text-on-surface">Meter Audit: {{ $shift->display_id }}</h2>
+            <h2 class="font-headline-md text-headline-md text-on-surface">{{ __('Meter Audit') }}: {{ $shift->display_id }}</h2>
             <span class="font-body-sm text-body-sm text-outline">
-                {{ $driverName ?? 'Unassigned driver' }}@if($driver?->badge_id) ({{ $driver->display_id }})@endif
-                &bull; {{ $bus ? $bus->display_id : 'No vehicle' }}
+                {{ $driverName ?? __('Unassigned driver') }}@if($driver?->badge_id) ({{ $driver->display_id }})@endif
+                &bull; {{ $bus ? $bus->display_id : __('No vehicle') }}
             </span>
         </div>
         <span class="px-2.5 py-1 rounded-md font-label-caps text-label-caps uppercase font-bold {{ $statusClasses }}">{{ $statusLabel }}</span>
@@ -76,12 +76,12 @@
                 @if($trip)
                     {{ $trip->display_id }}: {{ $trip->origin }} &rarr; {{ $trip->destination }}
                 @else
-                    No scheduled trip linked to this shift
+                    {{ __('No scheduled trip linked to this shift') }}
                 @endif
             </span>
         </div>
         <span class="font-label-caps text-label-caps text-outline">
-            {{ $duration ? $duration . ' logged' : 'Open shift' }}
+            {{ $duration ? $duration . ' ' . __('logged') : __('Open shift') }}
         </span>
     </div>
 
@@ -90,8 +90,8 @@
         <!-- Start Meter Verification Box -->
         <div class="flex flex-col gap-space-xs bg-surface-container-lowest p-space-sm rounded-xl shadow-sm">
             <div class="flex items-center justify-between">
-                <span class="font-label-caps text-label-caps text-outline uppercase">Start Shift Reading</span>
-                <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">{{ $startTime ?? '—' }} &bull; Depot Gate</span>
+                <span class="font-label-caps text-label-caps text-outline uppercase">{{ __('Start Shift Reading') }}</span>
+                <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">{{ $startTime ?? '—' }} &bull; {{ __('Depot Gate') }}</span>
             </div>
             <div class="relative w-full h-44 rounded-lg overflow-hidden group shadow-inner">
                 @if($startImage)
@@ -105,7 +105,7 @@
                 @else
                     <div class="w-full h-full bg-surface-container-low flex flex-col items-center justify-center gap-1 text-outline">
                         <span class="material-symbols-outlined text-2xl">photo_camera</span>
-                        <span class="font-body-sm text-body-sm">No start meter photo captured</span>
+                        <span class="font-body-sm text-body-sm">{{ __('No start meter photo captured') }}</span>
                     </div>
                     <div class="absolute inset-0 bg-gradient-to-t from-on-surface/70 via-transparent to-transparent flex items-end p-space-sm">
                         <span class="px-2 py-0.5 rounded bg-surface-card/90 text-on-surface font-label-numeric text-body-sm backdrop-blur">{{ number_format($shift->start_km) }} KM</span>
@@ -117,8 +117,8 @@
         <!-- End Meter Verification Box -->
         <div class="flex flex-col gap-space-xs bg-surface-container-lowest p-space-sm rounded-xl shadow-sm">
             <div class="flex items-center justify-between">
-                <span class="font-label-caps text-label-caps {{ $shift->end_km !== null ? 'text-primary' : 'text-outline' }} uppercase font-bold">End Shift Reading</span>
-                <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">{{ $endTime ? $endTime . ' • Depot Bay' : 'Awaiting return' }}</span>
+                <span class="font-label-caps text-label-caps {{ $shift->end_km !== null ? 'text-primary' : 'text-outline' }} uppercase font-bold">{{ __('End Shift Reading') }}</span>
+                <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">{{ $endTime ? $endTime . ' • ' . __('Depot Bay') : __('Awaiting return') }}</span>
             </div>
             <div class="relative w-full h-44 rounded-lg overflow-hidden group shadow-inner">
                 @if($endImage)
@@ -132,7 +132,7 @@
                 @elseif($shift->end_km !== null)
                     <div class="w-full h-full bg-surface-container-low flex flex-col items-center justify-center gap-1 text-outline">
                         <span class="material-symbols-outlined text-2xl">photo_camera</span>
-                        <span class="font-body-sm text-body-sm">No end meter photo captured</span>
+                        <span class="font-body-sm text-body-sm">{{ __('No end meter photo captured') }}</span>
                     </div>
                     <div class="absolute inset-0 bg-gradient-to-t from-on-surface/70 via-transparent to-transparent flex items-end p-space-sm">
                         <span class="px-2 py-0.5 rounded bg-surface-card/90 text-on-surface font-label-numeric text-body-sm backdrop-blur font-bold">{{ number_format($shift->end_km) }} KM</span>
@@ -140,7 +140,7 @@
                 @else
                     <div class="w-full h-full bg-surface-container-low flex flex-col items-center justify-center gap-1 text-outline">
                         <span class="material-symbols-outlined text-2xl animate-spin">timelapse</span>
-                        <span class="font-body-sm text-body-sm">Vehicle still in route</span>
+                        <span class="font-body-sm text-body-sm">{{ __('Vehicle still in route') }}</span>
                     </div>
                 @endif
             </div>
@@ -150,34 +150,34 @@
     <!-- Calculated Mileage Differential Breakout -->
     <div class="bg-surface-container-high rounded-xl p-space-md flex flex-col gap-space-xs">
         <div class="flex items-center justify-between">
-            <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">Meter Delta:</span>
+            <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">{{ __('Meter Delta:') }}</span>
             <span class="font-label-numeric text-label-numeric text-on-surface font-bold">
                 @if($shift->end_km !== null)
                     {{ number_format($shift->end_km) }} - {{ number_format($shift->start_km) }} = {{ number_format($distance ?? ($shift->end_km - $shift->start_km), 1) }} KM
                 @else
-                    Pending end reading
+                    {{ __('Pending end reading') }}
                 @endif
             </span>
         </div>
         <div class="flex items-center justify-between">
-            <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">Scheduled Route:</span>
+            <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">{{ __('Scheduled Route:') }}</span>
             <span class="font-label-numeric text-body-md text-secondary font-bold">
                 {{ $trip && $trip->distance_km !== null ? number_format((float) $trip->distance_km, 1) . ' KM' : '—' }}
             </span>
         </div>
         <div class="flex items-center justify-between pt-1">
-            <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">Shift Duration:</span>
-            <span class="font-body-md text-body-md text-on-surface font-semibold">{{ $duration ?? 'In progress' }}</span>
+            <span class="font-body-sm text-body-sm text-on-surface-variant font-medium">{{ __('Shift Duration:') }}</span>
+            <span class="font-body-md text-body-md text-on-surface font-semibold">{{ $duration ?? __('In progress') }}</span>
         </div>
     </div>
 
     @if($shift->start_notes || $shift->end_notes)
         <div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1">
             @if($shift->start_notes)
-                <span class="font-body-sm text-body-sm text-on-surface-variant"><span class="font-semibold text-on-surface">Start note:</span> {{ $shift->start_notes }}</span>
+                <span class="font-body-sm text-body-sm text-on-surface-variant"><span class="font-semibold text-on-surface">{{ __('Start note:') }}</span> {{ $shift->start_notes }}</span>
             @endif
             @if($shift->end_notes)
-                <span class="font-body-sm text-body-sm text-on-surface-variant"><span class="font-semibold text-on-surface">End note:</span> {{ $shift->end_notes }}</span>
+                <span class="font-body-sm text-body-sm text-on-surface-variant"><span class="font-semibold text-on-surface">{{ __('End note:') }}</span> {{ $shift->end_notes }}</span>
             @endif
         </div>
     @endif
@@ -186,16 +186,16 @@
     <div class="flex flex-col gap-space-sm pt-space-xs">
         <button class="w-full h-14 rounded-xl bg-primary-container text-on-primary font-label-action text-label-action flex items-center justify-center gap-2 hover:opacity-95 shadow-md active:translate-y-0.5 transition-all">
             <span class="material-symbols-outlined text-2xl">check_circle</span>
-            <span>Approve Shift Mileage</span>
+            <span>{{ __('Approve Shift Mileage') }}</span>
         </button>
         <div class="grid grid-cols-2 gap-space-sm">
             <button class="h-12 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md font-semibold hover:bg-surface-container transition-colors flex items-center justify-center gap-1">
                 <span class="material-symbols-outlined text-lg">flag</span>
-                <span>Flag Recount</span>
+                <span>{{ __('Flag Recount') }}</span>
             </button>
             <button class="h-12 rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md font-semibold hover:bg-surface-container transition-colors flex items-center justify-center gap-1">
                 <span class="material-symbols-outlined text-lg">edit_note</span>
-                <span>Manual Entry</span>
+                <span>{{ __('Manual Entry') }}</span>
             </button>
         </div>
     </div>
@@ -203,16 +203,16 @@
     <!-- Audit History Log Strip -->
     <div class="pt-space-xs flex items-center gap-space-xs text-outline font-body-sm text-body-sm">
         <span class="material-symbols-outlined text-base">history</span>
-        <span>Logged by {{ auth()->user()->name ?? 'System' }} &bull; Auto-validated via Depot OCR Gateway</span>
+        <span>{{ __('Logged by') }} {{ auth()->user()->name ?? __('System') }} &bull; {{ __('Auto-validated via Depot OCR Gateway') }}</span>
     </div>
 </div>
 
 <!-- Linked Route Tile -->
 <div class="bg-surface-card rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm">
     <div class="flex items-center justify-between">
-        <span class="font-label-caps text-label-caps text-outline uppercase">Linked Route</span>
+        <span class="font-label-caps text-label-caps text-outline uppercase">{{ __('Linked Route') }}</span>
         <span class="font-body-sm text-body-sm text-primary font-semibold">
-            {{ $trip?->route_label ?? ($bus ? $bus->display_id . ' depot round' : 'Unassigned route') }}
+            {{ $trip?->route_label ?? ($bus ? $bus->display_id . ' ' . __('depot round') : __('Unassigned route')) }}
         </span>
     </div>
     <div class="w-full h-36 bg-surface-container-low rounded-lg relative overflow-hidden shadow-inner flex items-end p-space-sm">
@@ -220,9 +220,9 @@
             <span class="w-2 h-2 rounded-full {{ $isOpen ? 'bg-primary-container animate-pulse' : 'bg-sync-active' }}"></span>
             <span>
                 @if($shift->ended_at)
-                    Returned {{ $shift->ended_at->format('M d, h:i A') }}
+                    {{ __('Returned') }} {{ $shift->ended_at->format('M d, h:i A') }}
                 @else
-                    Departed {{ optional($shift->started_at)->format('M d, h:i A') ?? '—' }} &bull; still in route
+                    {{ __('Departed') }} {{ optional($shift->started_at)->format('M d, h:i A') ?? '—' }} &bull; {{ __('still in route') }}
                 @endif
             </span>
         </div>

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <meta name="csrf-token" content="{{ csrf_token() }}"/>
-    <title>Transit Routes &bull; {{ config('app.name', 'Lancotri') }}</title>
+    <title>{{ __('Transit Routes & Corridors') }} &bull; {{ config('app.name', 'Lancotri') }}</title>
     @include('partials.brand-styles')
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/lancotri-mark.svg') }}">
     <!-- Leaflet CSS for Map rendering -->
@@ -22,9 +22,9 @@
 
     <div class="pl-64 flex flex-col min-h-screen">
         @include('partials.topbar', [
-            'topbarSearchPlaceholder' => 'Search transit route code, name, or terminal...',
+            'topbarSearchPlaceholder' => __('Search transit route code, name, or terminal...'),
             'topbarSearchId' => 'routeNavSearch',
-            'topbarStatus' => $activeRoutes . ' active corridors',
+            'topbarStatus' => $activeRoutes . ' ' . __('active corridors'),
         ])
 
         <main class="w-full pt-16 flex-1 px-8 py-8 bg-background">
@@ -36,7 +36,7 @@
                         <div class="flex items-center gap-2 text-xs text-muted-foreground font-mono">
                             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted border">
                                 <i data-lucide="route" class="w-3.5 h-3.5 text-primary"></i>
-                                <span>TRANSIT NETWORK MANAGEMENT</span>
+                                <span>{{ __('TRANSIT NETWORK MANAGEMENT') }}</span>
                             </span>
                             <span>&bull;</span>
                             <span class="inline-flex items-center gap-1.5 text-emerald-600 font-medium">
@@ -44,13 +44,13 @@
                                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                     <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                 </span>
-                                Live Map Corridors
+                                {{ __('Live Map Corridors') }}
                             </span>
                         </div>
                         <div>
-                            <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Transit Routes &amp; Corridors</h1>
+                            <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{{ __('Transit Routes & Corridors') }}</h1>
                             <p class="text-xs text-muted-foreground mt-2 leading-relaxed max-w-2xl">
-                                Define bus corridors, manage waypoints, map paths, and assign vehicles to scheduled routes with live GPS sync.
+                                {{ __('Define bus corridors, manage waypoints, map paths, and assign vehicles to scheduled routes with live GPS sync.') }}
                             </p>
                         </div>
                     </div>
@@ -59,14 +59,14 @@
                         <div class="relative w-64">
                             <i data-lucide="search" class="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                             <input id="routeSearch"
-                                   placeholder="Search route code, name..."
+                                   placeholder="{{ __('Search route code, name...') }}"
                                    class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
                         </div>
 
                         <button type="button" onclick="openAddRouteModal()"
                                 class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-9 px-4 py-2 gap-2">
                             <i data-lucide="plus" class="w-4 h-4"></i>
-                            <span>Create Route</span>
+                            <span>{{ __('Create Route') }}</span>
                         </button>
                     </div>
                 </div>
@@ -75,45 +75,45 @@
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-muted-foreground">Total Routes</span>
+                            <span class="text-xs font-mono uppercase text-muted-foreground">{{ __('Total Routes') }}</span>
                             <i data-lucide="route" class="w-4 h-4 text-primary"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono text-foreground">{{ $totalRoutes }}</div>
-                            <span class="text-xs text-muted-foreground">Configured lines</span>
+                            <span class="text-xs text-muted-foreground">{{ __('Configured lines') }}</span>
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-muted-foreground">Active Corridors</span>
+                            <span class="text-xs font-mono uppercase text-muted-foreground">{{ __('Active Corridors') }}</span>
                             <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono text-emerald-600">{{ $activeRoutes }}</div>
-                            <span class="text-xs text-muted-foreground">In daily service</span>
+                            <span class="text-xs text-muted-foreground">{{ __('In daily service') }}</span>
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-muted-foreground">Total Track Distance</span>
+                            <span class="text-xs font-mono uppercase text-muted-foreground">{{ __('Total Track Distance') }}</span>
                             <i data-lucide="navigation-2" class="w-4 h-4 text-blue-500"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono text-foreground">{{ $totalDistance }} <span class="text-sm font-normal text-muted-foreground">km</span></div>
-                            <span class="text-xs text-muted-foreground">Combined network</span>
+                            <span class="text-xs text-muted-foreground">{{ __('Combined network') }}</span>
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-muted-foreground">Assigned Vehicles</span>
+                            <span class="text-xs font-mono uppercase text-muted-foreground">{{ __('Assigned Vehicles') }}</span>
                             <i data-lucide="bus" class="w-4 h-4 text-amber-500"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono text-amber-500">{{ $assignedBusesCount }}</div>
-                            <span class="text-xs text-muted-foreground">Buses en route</span>
+                            <span class="text-xs text-muted-foreground">{{ __('Buses en route') }}</span>
                         </div>
                     </div>
                 </div>
@@ -127,18 +127,18 @@
                             </div>
                             <div>
                                 <h3 class="font-semibold text-sm text-foreground flex items-center gap-2">
-                                    <span>Interactive Corridor Map</span>
+                                    <span>{{ __('Interactive Corridor Map') }}</span>
                                     <span id="activeRouteBadge" class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                                        All Routes
+                                        {{ __('All Routes') }}
                                     </span>
                                 </h3>
-                                <p class="text-xs text-muted-foreground">Click any route in the table below to zoom and highlight its corridor path and assigned buses.</p>
+                                <p class="text-xs text-muted-foreground">{{ __('Click any route in the table below to zoom and highlight its corridor path and assigned buses.') }}</p>
                             </div>
                         </div>
 
                         <div class="flex items-center gap-2">
                             <button type="button" onclick="resetRouteMap()" class="text-xs font-medium px-2.5 py-1.5 rounded-md border bg-background hover:bg-muted text-muted-foreground transition">
-                                Reset View
+                                {{ __('Reset View') }}
                             </button>
                         </div>
                     </div>
@@ -152,22 +152,22 @@
                     <div class="p-4 border-b flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <i data-lucide="list" class="w-4 h-4 text-primary"></i>
-                            <h2 class="text-sm font-semibold tracking-tight">Configured Routes ({{ $routes->count() }})</h2>
+                            <h2 class="text-sm font-semibold tracking-tight">{{ __('Configured Routes') }} ({{ $routes->count() }})</h2>
                         </div>
-                        <span class="text-xs text-muted-foreground font-mono">Real-time GPS Integrated</span>
+                        <span class="text-xs text-muted-foreground font-mono">{{ __('Real-time GPS Integrated') }}</span>
                     </div>
 
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-xs border-collapse">
                             <thead>
                                 <tr class="border-b bg-muted/40 font-mono text-muted-foreground text-[11px]">
-                                    <th class="py-3 px-4">CODE</th>
-                                    <th class="py-3 px-4">ROUTE NAME</th>
-                                    <th class="py-3 px-4">FROM &bull; TO</th>
-                                    <th class="py-3 px-4">DISTANCE &bull; TIME</th>
-                                    <th class="py-3 px-4">ASSIGNED BUSES</th>
-                                    <th class="py-3 px-4">STATUS</th>
-                                    <th class="py-3 px-4 text-right">ACTIONS</th>
+                                    <th class="py-3 px-4">{{ __('CODE') }}</th>
+                                    <th class="py-3 px-4">{{ __('ROUTE NAME') }}</th>
+                                    <th class="py-3 px-4">{{ __('FROM • TO') }}</th>
+                                    <th class="py-3 px-4">{{ __('DISTANCE • TIME') }}</th>
+                                    <th class="py-3 px-4">{{ __('ASSIGNED BUSES') }}</th>
+                                    <th class="py-3 px-4">{{ __('STATUS') }}</th>
+                                    <th class="py-3 px-4 text-right">{{ __('ACTIONS') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-border">
@@ -208,23 +208,23 @@
                                                 <div class="flex flex-wrap gap-1">
                                                     @foreach($busList as $b)
                                                         <span class="px-2 py-0.5 rounded-md font-mono text-[10px] bg-primary/10 text-primary border border-primary/20">
-                                                            Bus #{{ $b->bus_number }}
+                                                            {{ __('Bus') }} #{{ $b->bus_number }}
                                                         </span>
                                                     @endforeach
                                                 </div>
                                             @else
-                                                <span class="text-muted-foreground italic text-[11px]">No bus assigned</span>
+                                                <span class="text-muted-foreground italic text-[11px]">{{ __('No bus assigned') }}</span>
                                             @endif
                                         </td>
                                         <td class="py-3.5 px-4">
                                             @if($route->status === 'active')
                                                 <span class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                                    Active
+                                                    {{ __('Active') }}
                                                 </span>
                                             @else
                                                 <span class="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground bg-muted border px-2 py-0.5 rounded-full">
-                                                    Inactive
+                                                    {{ __('Inactive') }}
                                                 </span>
                                             @endif
                                         </td>
@@ -232,19 +232,19 @@
                                             <div class="flex items-center justify-end gap-1.5">
                                                 <button type="button"
                                                         onclick="openAssignBusModal({{ $route->id }}, '{{ $route->route_code }}', {{ json_encode($busList->pluck('id')) }})"
-                                                        title="Assign Buses"
+                                                        title="{{ __('Assign Buses') }}"
                                                         class="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition">
                                                     <i data-lucide="bus" class="w-4 h-4"></i>
                                                 </button>
                                                 <button type="button"
                                                         onclick="editRoute({{ json_encode($route) }})"
-                                                        title="Edit Route"
+                                                        title="{{ __('Edit Route') }}"
                                                         class="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition">
                                                     <i data-lucide="pencil" class="w-4 h-4"></i>
                                                 </button>
                                                 <button type="button"
                                                         onclick="deleteRoute({{ $route->id }}, '{{ $route->route_code }}')"
-                                                        title="Delete Route"
+                                                        title="{{ __('Delete Route') }}"
                                                         class="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition">
                                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                                 </button>
@@ -256,9 +256,9 @@
                                         <td colspan="8" class="text-center py-12 text-muted-foreground">
                                             <div class="flex flex-col items-center justify-center gap-2">
                                                 <i data-lucide="route" class="w-8 h-8 text-muted-foreground/50"></i>
-                                                <p class="font-medium">No transit routes found.</p>
+                                                <p class="font-medium">{{ __('No transit routes found.') }}</p>
                                                 <button type="button" onclick="openAddRouteModal()" class="text-xs text-primary font-medium hover:underline">
-                                                    Create your first corridor now &rarr;
+                                                    {{ __('Create your first corridor now →') }}
                                                 </button>
                                             </div>
                                         </td>
@@ -279,7 +279,7 @@
             <div class="p-4 border-b flex items-center justify-between bg-muted/30">
                 <div class="flex items-center gap-2">
                     <i data-lucide="route" class="w-5 h-5 text-primary"></i>
-                    <h3 id="modalTitle" class="font-bold text-base text-foreground">Create Transit Corridor</h3>
+                    <h3 id="modalTitle" class="font-bold text-base text-foreground">{{ __('Create Transit Corridor') }}</h3>
                 </div>
                 <button type="button" onclick="closeRouteModal()" class="p-1 rounded-md text-muted-foreground hover:text-foreground">
                     <i data-lucide="x" class="w-5 h-5"></i>
@@ -294,13 +294,13 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold mb-1 text-foreground">Route Code *</label>
+                        <label class="block text-xs font-semibold mb-1 text-foreground">{{ __('Route Code') }} *</label>
                         <input type="text" name="route_code" id="input_route_code" required placeholder="e.g. RT-101"
                                class="w-full text-xs font-mono px-3 py-2 rounded-md border bg-background text-foreground focus:ring-1 focus:ring-primary"/>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold mb-1 text-foreground">Corridor Name *</label>
-                        <input type="text" name="name" id="input_name" required placeholder="e.g. Airport Express Line"
+                        <label class="block text-xs font-semibold mb-1 text-foreground">{{ __('Corridor Name') }} *</label>
+                        <input type="text" name="name" id="input_name" required placeholder="{{ __('e.g. Airport Express Line') }}"
                                class="w-full text-xs px-3 py-2 rounded-md border bg-background text-foreground focus:ring-1 focus:ring-primary"/>
                     </div>
                 </div>
@@ -309,11 +309,11 @@
                     <!-- Origin with Google Maps-like auto-suggestions -->
                     <div class="relative">
                         <div class="flex items-center justify-between mb-1">
-                            <label class="block text-xs font-semibold text-foreground">Route From (Origin) *</label>
-                            <span class="text-[10px] text-emerald-600 font-mono">Auto-suggest &bull; GPS</span>
+                            <label class="block text-xs font-semibold text-foreground">{{ __('Route From (Origin)') }} *</label>
+                            <span class="text-[10px] text-emerald-600 font-mono">{{ __('Auto-suggest • GPS') }}</span>
                         </div>
                         <div class="relative">
-                            <input type="text" name="origin" id="input_origin" required placeholder="Type city or terminal (e.g. Central Metro)..."
+                            <input type="text" name="origin" id="input_origin" required placeholder="{{ __('Type city or terminal (e.g. Central Metro)...') }}"
                                    autocomplete="off"
                                    class="w-full text-xs px-3 py-2 rounded-md border bg-background text-foreground focus:ring-1 focus:ring-primary"/>
                             <div id="originLoader" class="absolute right-2.5 top-1/2 -translate-y-1/2 hidden">
@@ -326,11 +326,11 @@
                     <!-- Destination with Google Maps-like auto-suggestions -->
                     <div class="relative">
                         <div class="flex items-center justify-between mb-1">
-                            <label class="block text-xs font-semibold text-foreground">Route To (Destination) *</label>
-                            <span class="text-[10px] text-emerald-600 font-mono">Auto-suggest &bull; GPS</span>
+                            <label class="block text-xs font-semibold text-foreground">{{ __('Route To (Destination)') }} *</label>
+                            <span class="text-[10px] text-emerald-600 font-mono">{{ __('Auto-suggest • GPS') }}</span>
                         </div>
                         <div class="relative">
-                            <input type="text" name="destination" id="input_destination" required placeholder="Type airport or station (e.g. Airport T2)..."
+                            <input type="text" name="destination" id="input_destination" required placeholder="{{ __('Type airport or station (e.g. Airport T2)...') }}"
                                    autocomplete="off"
                                    class="w-full text-xs px-3 py-2 rounded-md border bg-background text-foreground focus:ring-1 focus:ring-primary"/>
                             <div id="destLoader" class="absolute right-2.5 top-1/2 -translate-y-1/2 hidden">
@@ -343,25 +343,25 @@
 
                 <div class="grid grid-cols-4 gap-2 text-xs">
                     <div>
-                        <label class="block font-semibold mb-1 text-muted-foreground">From Lat</label>
+                        <label class="block font-semibold mb-1 text-muted-foreground">{{ __('From Lat') }}</label>
                         <input type="number" step="0.0001" name="origin_lat" id="input_origin_lat" placeholder="24.8607"
                                onchange="calculateAutoDrivingRoute()"
                                class="w-full text-xs font-mono px-2 py-1.5 rounded-md border bg-background text-foreground"/>
                     </div>
                     <div>
-                        <label class="block font-semibold mb-1 text-muted-foreground">From Lng</label>
+                        <label class="block font-semibold mb-1 text-muted-foreground">{{ __('From Lng') }}</label>
                         <input type="number" step="0.0001" name="origin_lng" id="input_origin_lng" placeholder="67.0011"
                                onchange="calculateAutoDrivingRoute()"
                                class="w-full text-xs font-mono px-2 py-1.5 rounded-md border bg-background text-foreground"/>
                     </div>
                     <div>
-                        <label class="block font-semibold mb-1 text-muted-foreground">To Lat</label>
+                        <label class="block font-semibold mb-1 text-muted-foreground">{{ __('To Lat') }}</label>
                         <input type="number" step="0.0001" name="destination_lat" id="input_destination_lat" placeholder="24.9065"
                                onchange="calculateAutoDrivingRoute()"
                                class="w-full text-xs font-mono px-2 py-1.5 rounded-md border bg-background text-foreground"/>
                     </div>
                     <div>
-                        <label class="block font-semibold mb-1 text-muted-foreground">To Lng</label>
+                        <label class="block font-semibold mb-1 text-muted-foreground">{{ __('To Lng') }}</label>
                         <input type="number" step="0.0001" name="destination_lng" id="input_destination_lng" placeholder="67.1608"
                                onchange="calculateAutoDrivingRoute()"
                                class="w-full text-xs font-mono px-2 py-1.5 rounded-md border bg-background text-foreground"/>
@@ -373,10 +373,10 @@
                     <div class="px-3 py-1.5 bg-muted/40 border-b flex items-center justify-between text-xs">
                         <div class="flex items-center gap-1.5 text-muted-foreground">
                             <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span class="font-semibold text-foreground text-[11px]">Auto Driving Route Preview</span>
+                            <span class="font-semibold text-foreground text-[11px]">{{ __('Auto Driving Route Preview') }}</span>
                         </div>
                         <span id="routeCalcBadge" class="text-[10px] font-mono text-primary font-semibold">
-                            Enter endpoints to calculate road path
+                            {{ __('Enter endpoints to calculate road path') }}
                         </span>
                     </div>
                     <div id="modalRouteMap" class="w-full h-32 relative bg-muted/10"></div>
@@ -384,38 +384,38 @@
 
                 <div class="grid grid-cols-3 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold mb-1 text-foreground">Distance (km)</label>
+                        <label class="block text-xs font-semibold mb-1 text-foreground">{{ __('Distance (km)') }}</label>
                         <input type="number" step="0.01" name="distance_km" id="input_distance_km" placeholder="28.5"
                                class="w-full text-xs font-mono px-3 py-2 rounded-md border bg-background text-foreground"/>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold mb-1 text-foreground">Est. Duration (mins)</label>
+                        <label class="block text-xs font-semibold mb-1 text-foreground">{{ __('Est. Duration (mins)') }}</label>
                         <input type="number" name="estimated_minutes" id="input_estimated_minutes" placeholder="45"
                                class="w-full text-xs font-mono px-3 py-2 rounded-md border bg-background text-foreground"/>
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold mb-1 text-foreground">Status</label>
+                        <label class="block text-xs font-semibold mb-1 text-foreground">{{ __('Status') }}</label>
                         <select name="status" id="input_status" class="w-full text-xs px-3 py-2 rounded-md border bg-background text-foreground">
-                            <option value="active">Active</option>
-                            <option value="inactive">Inactive</option>
+                            <option value="active">{{ __('Active') }}</option>
+                            <option value="inactive">{{ __('Inactive') }}</option>
                         </select>
                     </div>
                 </div>
 
                 <div>
-                    <label class="block text-xs font-semibold mb-1 text-foreground">Route Notes &amp; Dispatch Instructions</label>
-                    <textarea name="notes" id="input_notes" rows="2" placeholder="Express route, avoids downtown congestion during peak hours..."
+                    <label class="block text-xs font-semibold mb-1 text-foreground">{{ __('Route Notes & Dispatch Instructions') }}</label>
+                    <textarea name="notes" id="input_notes" rows="2" placeholder="{{ __('Express route, avoids downtown congestion during peak hours...') }}"
                               class="w-full text-xs px-3 py-2 rounded-md border bg-background text-foreground"></textarea>
                 </div>
 
                 <div class="pt-2 border-t flex items-center justify-end gap-2">
                     <button type="button" onclick="closeRouteModal()"
                             class="px-4 py-2 text-xs font-medium rounded-md border bg-background hover:bg-muted text-muted-foreground">
-                        Cancel
+                        {{ __('Cancel') }}
                     </button>
                     <button type="submit"
                             class="px-4 py-2 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90">
-                        Save Corridor
+                        {{ __('Save Corridor') }}
                     </button>
                 </div>
             </form>
@@ -428,7 +428,7 @@
             <div class="p-4 border-b flex items-center justify-between bg-muted/30">
                 <div class="flex items-center gap-2">
                     <i data-lucide="bus" class="w-5 h-5 text-primary"></i>
-                    <h3 class="font-bold text-base text-foreground">Assign Fleet Buses</h3>
+                    <h3 class="font-bold text-base text-foreground">{{ __('Assign Fleet Buses') }}</h3>
                 </div>
                 <button type="button" onclick="closeAssignBusModal()" class="p-1 rounded-md text-muted-foreground hover:text-foreground">
                     <i data-lucide="x" class="w-5 h-5"></i>
@@ -438,7 +438,7 @@
             <form id="assignBusForm" method="POST" class="p-5 space-y-4">
                 @csrf
                 <p class="text-xs text-muted-foreground">
-                    Select the buses to deploy on route <strong id="assignRouteCode" class="text-foreground font-mono"></strong>.
+                    {{ __('Select the buses to deploy on route') }} <strong id="assignRouteCode" class="text-foreground font-mono"></strong>.
                 </p>
 
                 <div class="max-h-60 overflow-y-auto space-y-2 border rounded-lg p-3 bg-muted/20">
@@ -447,11 +447,11 @@
                             <div class="flex items-center gap-2.5">
                                 <input type="checkbox" name="bus_ids[]" value="{{ $b->id }}"
                                        class="rounded border-input text-primary focus:ring-primary bus-checkbox-{{ $b->id }}"/>
-                                <span class="font-mono font-bold text-foreground">Bus #{{ $b->bus_number }}</span>
+                                <span class="font-mono font-bold text-foreground">{{ __('Bus') }} #{{ $b->bus_number }}</span>
                                 <span class="text-muted-foreground text-[11px] font-mono">({{ $b->plate }})</span>
                             </div>
                             <span class="text-[11px] text-muted-foreground">
-                                {{ $b->driver?->user?->name ?? 'No Driver' }}
+                                {{ $b->driver?->user?->name ?? __('No Driver') }}
                             </span>
                         </label>
                     @endforeach
@@ -460,11 +460,11 @@
                 <div class="pt-2 border-t flex items-center justify-end gap-2">
                     <button type="button" onclick="closeAssignBusModal()"
                             class="px-4 py-2 text-xs font-medium rounded-md border bg-background hover:bg-muted text-muted-foreground">
-                        Cancel
+                        {{ __('Cancel') }}
                     </button>
                     <button type="submit"
                             class="px-4 py-2 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90">
-                        Update Assignments
+                        {{ __('Update Assignments') }}
                     </button>
                 </div>
             </form>

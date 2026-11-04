@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <meta name="csrf-token" content="{{ csrf_token() }}"/>
-    <title>Shift Management &amp; Meter Audits &bull; {{ config('app.name', 'Lancotri') }}</title>
+    <title>{{ __('Shift Management & Meter Audits') }} &bull; {{ config('app.name', 'Lancotri') }}</title>
     @include('partials.brand-styles')
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/lancotri-mark.svg') }}">
     <!-- Leaflet CSS for Map rendering -->
@@ -40,9 +40,9 @@
 
     <div class="pl-64 flex flex-col min-h-screen">
         @include('partials.topbar', [
-            'topbarSearchPlaceholder' => 'Search shift #, driver, or vehicle...',
+            'topbarSearchPlaceholder' => __('Search shift #, driver, or vehicle...'),
             'topbarSearchId' => 'shiftNavSearch',
-            'topbarStatus' => $activeBuses . ' active vehicles',
+            'topbarStatus' => $activeBuses . ' ' . __('active vehicles'),
         ])
 
         <main class="w-full pt-16 flex-1 px-8 py-8 bg-background">
@@ -54,7 +54,7 @@
                         <div class="flex items-center gap-2 text-xs text-muted-foreground font-mono">
                             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-muted border">
                                 <i data-lucide="shield-check" class="w-3.5 h-3.5 text-primary"></i>
-                                <span>TELEMETRY &amp; AUDIT PIPELINE</span>
+                                <span>{{ __('TELEMETRY & AUDIT PIPELINE') }}</span>
                             </span>
                             <span>&bull;</span>
                             <span class="inline-flex items-center gap-1.5 text-emerald-600 font-medium">
@@ -62,13 +62,13 @@
                                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                     <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                                 </span>
-                                Daily Meter Roster
+                                {{ __('Daily Meter Roster') }}
                             </span>
                         </div>
                         <div>
-                            <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Shift Management &amp; Meter Audits</h1>
+                            <h1 class="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{{ __('Shift Management & Meter Audits') }}</h1>
                             <p class="text-xs text-muted-foreground mt-2 leading-relaxed max-w-2xl">
-                                Verify driver start and end shift meter photos, audit mileage accuracy, and approve logs in real time without reloading.
+                                {{ __('Verify driver start and end shift meter photos, audit mileage accuracy, and approve logs in real time without reloading.') }}
                             </p>
                         </div>
                     </div>
@@ -78,20 +78,20 @@
                             <i data-lucide="search" class="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                             <input id="shiftSearch"
                                    data-shadcn-table-search="shiftsTable"
-                                   placeholder="Search shift #, bus, driver..."
+                                   placeholder="{{ __('Search shift #, bus, driver...') }}"
                                    class="flex h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-1 text-sm shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"/>
                         </div>
 
                         <button type="button" onclick="openCreateTripModal()"
                                 class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3 py-2 gap-1.5">
                             <i data-lucide="plus" class="w-3.5 h-3.5 text-primary"></i>
-                            <span>Schedule Trip</span>
+                            <span>{{ __('Schedule Trip') }}</span>
                         </button>
 
                         <button type="button" onclick="window.toast?.success('Shift Report Exported', 'CSV/PDF meter audit log generated successfully.')"
                                 class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 gap-2">
                             <i data-lucide="download" class="w-3.5 h-3.5 text-muted-foreground"></i>
-                            <span>Export Logs</span>
+                            <span>{{ __('Export Logs') }}</span>
                         </button>
                     </div>
                 </div>
@@ -100,56 +100,56 @@
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-muted-foreground">Active Shifts</span>
+                            <span class="text-xs font-mono uppercase text-muted-foreground">{{ __('Active Shifts') }}</span>
                             <i data-lucide="clock" class="w-4 h-4 text-amber-500"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono text-amber-500" id="statCountOpen">{{ $countOpen }}</div>
-                            <span class="text-xs text-muted-foreground">En route now</span>
+                            <span class="text-xs text-muted-foreground">{{ __('En route now') }}</span>
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-muted-foreground">Pending Audit</span>
+                            <span class="text-xs font-mono uppercase text-muted-foreground">{{ __('Pending Audit') }}</span>
                             <i data-lucide="inbox" class="w-4 h-4 text-blue-500"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono text-blue-600" id="statCountCompleted">{{ $countCompleted }}</div>
-                            <span class="text-xs text-muted-foreground">Awaiting approval</span>
+                            <span class="text-xs text-muted-foreground">{{ __('Awaiting approval') }}</span>
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-muted-foreground">Verified Shifts</span>
+                            <span class="text-xs font-mono uppercase text-muted-foreground">{{ __('Verified Shifts') }}</span>
                             <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono text-emerald-600" id="statCountVerified">{{ $countVerified }}</div>
-                            <span class="text-xs text-muted-foreground">Approved by desk</span>
+                            <span class="text-xs text-muted-foreground">{{ __('Approved by desk') }}</span>
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-destructive">Flagged Audits</span>
+                            <span class="text-xs font-mono uppercase text-destructive">{{ __('Flagged Audits') }}</span>
                             <i data-lucide="alert-triangle" class="w-4 h-4 text-destructive"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono text-destructive" id="statCountFlagged">{{ $countFlagged }}</div>
-                            <span class="text-xs text-muted-foreground">Needs review</span>
+                            <span class="text-xs text-muted-foreground">{{ __('Needs review') }}</span>
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4 flex flex-col justify-between col-span-2 sm:col-span-1">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-mono uppercase text-muted-foreground">Day Distance</span>
+                            <span class="text-xs font-mono uppercase text-muted-foreground">{{ __('Day Distance') }}</span>
                             <i data-lucide="gauge" class="w-4 h-4 text-primary"></i>
                         </div>
                         <div class="mt-2">
                             <div class="text-2xl font-bold font-mono">{{ number_format($dayMileage, 0) }} <span class="text-xs font-normal text-muted-foreground">KM</span></div>
-                            <span class="text-xs text-muted-foreground">Logged today</span>
+                            <span class="text-xs text-muted-foreground">{{ __('Logged today') }}</span>
                         </div>
                     </div>
                 </div>
@@ -164,11 +164,11 @@
                             </span>
                             <div>
                                 <h2 class="text-sm font-bold text-foreground tracking-tight flex items-center gap-2">
-                                    <span>Live Fleet GPS Map &amp; Real-Time Bus Tracker</span>
-                                    <span class="text-[11px] font-normal text-muted-foreground font-mono">10s auto-refresh</span>
+                                    <span>{{ __('Live Fleet GPS Map & Real-Time Bus Tracker') }}</span>
+                                    <span class="text-[11px] font-normal text-muted-foreground font-mono">{{ __('10s auto-refresh') }}</span>
                                 </h2>
                                 <p class="text-xs text-muted-foreground">
-                                    Green markers pulse for active buses broadcasting GPS; gray markers indicate last known position when offline.
+                                    {{ __('Green markers pulse for active buses broadcasting GPS; gray markers indicate last known position when offline.') }}
                                 </p>
                             </div>
                         </div>
@@ -177,21 +177,21 @@
                             <div class="flex items-center gap-2 px-2.5 py-1 rounded-md bg-background border text-xs font-mono">
                                 <div class="flex items-center gap-1.5 text-emerald-600 font-semibold">
                                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                    <span id="mapOnlineCount">0</span> Online
+                                    <span id="mapOnlineCount">0</span> {{ __('Online') }}
                                 </div>
                                 <span class="text-muted-foreground">&bull;</span>
                                 <div class="flex items-center gap-1.5 text-muted-foreground">
                                     <span class="w-2 h-2 rounded-full bg-muted-foreground/60"></span>
-                                    <span id="mapOfflineCount">0</span> Offline
+                                    <span id="mapOfflineCount">0</span> {{ __('Offline') }}
                                 </div>
                             </div>
                             <button type="button" onclick="refreshFleetMap()" class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 px-2.5 text-xs font-medium hover:bg-accent text-foreground gap-1.5 shadow-xs">
                                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-muted-foreground"></i>
-                                <span>Sync</span>
+                                <span>{{ __('Sync') }}</span>
                             </button>
                             <button type="button" onclick="fitFleetMap()" class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 px-2.5 text-xs font-medium hover:bg-accent text-foreground gap-1.5 shadow-xs">
                                 <i data-lucide="maximize" class="w-3.5 h-3.5 text-muted-foreground"></i>
-                                <span>Center</span>
+                                <span>{{ __('Center') }}</span>
                             </button>
                         </div>
                     </div>
@@ -208,10 +208,10 @@
                             <div class="w-48">
                                 <select name="bus_id" onchange="this.form.submit()"
                                         class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
-                                    <option value="">All Buses ({{ $totalBuses }})</option>
+                                    <option value="">{{ __('All Buses') }} ({{ $totalBuses }})</option>
                                     @foreach($buses as $bus)
                                         <option value="{{ $bus->id }}" @selected((string) request('bus_id') === (string) $bus->id)>
-                                            {{ $bus->display_id }}{{ $bus->plate ? ' · ' . $bus->plate : '' }}
+                                             {{ $bus->display_id }}{{ $bus->plate ? ' · ' . $bus->plate : '' }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -221,7 +221,7 @@
                             <div class="w-48">
                                 <select name="driver_id" onchange="this.form.submit()"
                                         class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:outline-none focus:ring-1 focus:ring-ring">
-                                    <option value="">All Drivers ({{ $drivers->count() }})</option>
+                                    <option value="">{{ __('All Drivers') }} ({{ $drivers->count() }})</option>
                                     @foreach($drivers as $driver)
                                         <option value="{{ $driver->id }}" @selected((string) request('driver_id') === (string) $driver->id)>
                                             {{ $driver->user->name ?? 'Driver' }} ({{ $driver->display_id }})
@@ -235,7 +235,7 @@
                                 <a href="{{ route('shifts') }}"
                                    class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3 gap-1.5 text-muted-foreground">
                                     <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-                                    <span>Reset Filters</span>
+                                    <span>{{ __('Reset Filters') }}</span>
                                 </a>
                             @endif
                         </form>
@@ -244,23 +244,23 @@
                         <div class="flex items-center gap-1.5 p-1 rounded-lg bg-muted/60 border border-border/50 text-xs overflow-x-auto" data-shadcn-filter-group="shiftsTable">
                             <button type="button" data-filter="all"
                                     class="px-3 py-1.5 rounded-md text-xs font-semibold bg-foreground text-background shadow-xs transition-all cursor-pointer">
-                                All ({{ $countAll }})
+                                {{ __('All') }} ({{ $countAll }})
                             </button>
                             <button type="button" data-filter="in_progress"
                                     class="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer">
-                                Active ({{ $countOpen }})
+                                {{ __('Active') }} ({{ $countOpen }})
                             </button>
                             <button type="button" data-filter="completed"
                                     class="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer">
-                                Pending Audit ({{ $countCompleted }})
+                                {{ __('Pending Audit') }} ({{ $countCompleted }})
                             </button>
                             <button type="button" data-filter="verified"
                                     class="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer">
-                                Verified ({{ $countVerified }})
+                                {{ __('Verified') }} ({{ $countVerified }})
                             </button>
                             <button type="button" data-filter="flagged"
                                     class="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer">
-                                Flagged ({{ $countFlagged }})
+                                {{ __('Flagged') }} ({{ $countFlagged }})
                             </button>
                         </div>
                     </div>
@@ -275,13 +275,13 @@
                             <table id="shiftsTable" class="w-full caption-bottom text-sm select-none">
                                 <thead>
                                     <tr class="border-b bg-muted/50 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                                        <th class="h-10 px-4 text-left align-middle font-medium">Shift #</th>
-                                        <th class="h-10 px-4 text-left align-middle font-medium">Vehicle / Driver</th>
-                                        <th class="h-10 px-4 text-left align-middle font-medium">Started At</th>
-                                        <th class="h-10 px-4 text-left align-middle font-medium">Odometer</th>
-                                        <th class="h-10 px-4 text-left align-middle font-medium">Distance</th>
-                                        <th class="h-10 px-4 text-left align-middle font-medium">Status</th>
-                                        <th class="h-10 px-4 text-right align-middle font-medium">Inspect</th>
+                                        <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Shift #') }}</th>
+                                        <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Vehicle / Driver') }}</th>
+                                        <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Started At') }}</th>
+                                        <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Odometer') }}</th>
+                                        <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Distance') }}</th>
+                                        <th class="h-10 px-4 text-left align-middle font-medium">{{ __('Status') }}</th>
+                                        <th class="h-10 px-4 text-right align-middle font-medium">{{ __('Inspect') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y text-foreground" id="shiftsTableBody">
@@ -304,10 +304,10 @@
                                                 default => 'border-transparent bg-secondary text-secondary-foreground'
                                             };
                                             $statusLabel = match($shift->status) {
-                                                'verified' => 'Verified',
-                                                'in_progress' => 'Active',
-                                                'completed' => ($shift->end_km === null ? 'Flagged' : 'Pending Audit'),
-                                                'flagged' => 'Flagged',
+                                                'verified' => __('Verified'),
+                                                'in_progress' => __('Active'),
+                                                'completed' => ($shift->end_km === null ? __('Flagged') : __('Pending Audit')),
+                                                'flagged' => __('Flagged'),
                                                 default => ucfirst($shift->status)
                                             };
 
@@ -320,10 +320,10 @@
                                                 'bus_id' => $shift->bus?->display_id ?? 'Bus —',
                                                 'bus_plate' => $shift->bus?->plate ?? '—',
                                                 'bus_model' => $shift->bus?->model ?? 'Standard Chassis',
-                                                'driver_name' => $driverUser->name ?? 'Unassigned Driver',
+                                                'driver_name' => $driverUser->name ?? __('Unassigned Driver'),
                                                 'driver_badge' => $shift->driver?->badge_id ?? 'DRV-—',
                                                 'start_km' => number_format($shift->start_km) . ' km',
-                                                'end_km' => $shift->end_km ? number_format($shift->end_km) . ' km' : 'Pending Close',
+                                                'end_km' => $shift->end_km ? number_format($shift->end_km) . ' km' : __('Pending Close'),
                                                 'distance_km' => $shift->distance_km !== null ? number_format($shift->distance_km, 1) . ' km' : '—',
                                                 'status' => $shift->status,
                                                 'filter_status' => $filterStatus,
@@ -338,7 +338,7 @@
                                                 'end_notes' => $shift->end_notes ?? '',
                                                 'start_meter_image_url' => $shift->start_meter_image_url ?? '',
                                                 'end_meter_image_url' => $shift->end_meter_image_url ?? '',
-                                                'route_label' => $shift->trip ? ($shift->trip->origin . ' → ' . $shift->trip->destination . ' (' . $shift->trip->display_id . ')') : ($shift->bus ? $shift->bus->display_id . ' Depot Round' : 'No Scheduled Route'),
+                                                'route_label' => $shift->trip ? ($shift->trip->origin . ' → ' . $shift->trip->destination . ' (' . $shift->trip->display_id . ')') : ($shift->bus ? $shift->bus->display_id . ' Depot Round' : __('No Scheduled Route')),
                                             ];
                                         @endphp
                                         <tr id="shift-row-{{ $shift->id }}"
@@ -349,7 +349,7 @@
                                             <td class="p-4 align-middle font-mono font-bold">{{ $shift->display_id }}</td>
                                             <td class="p-4 align-middle">
                                                 <div class="font-mono font-bold text-xs">{{ $shift->bus?->display_id ?? 'Bus —' }}</div>
-                                                <span class="text-[11px] text-muted-foreground">{{ $driverUser->name ?? 'Unknown Driver' }}</span>
+                                                <span class="text-[11px] text-muted-foreground">{{ $driverUser->name ?? __('Unknown Driver') }}</span>
                                             </td>
                                             <td class="p-4 align-middle font-mono text-xs">
                                                 <div>{{ $shift->started_at?->format('M j, Y') ?? '—' }}</div>
@@ -357,7 +357,7 @@
                                             </td>
                                             <td class="p-4 align-middle font-mono text-xs">
                                                 <div>{{ number_format($shift->start_km) }} km</div>
-                                                <span class="text-muted-foreground text-[11px]">{{ $shift->end_km ? number_format($shift->end_km) . ' km' : 'En route' }}</span>
+                                                <span class="text-muted-foreground text-[11px]">{{ $shift->end_km ? number_format($shift->end_km) . ' km' : __('En route') }}</span>
                                             </td>
                                             <td class="p-4 align-middle font-mono font-bold text-xs">
                                                 {{ $shift->distance_km !== null ? number_format($shift->distance_km, 1) . ' km' : '—' }}
@@ -371,12 +371,12 @@
                                                 <div class="inline-flex items-center gap-1.5 justify-end">
                                                     <button type="button"
                                                             onclick="event.stopPropagation(); inspectShiftById('{{ $shift->id }}')"
-                                                            title="Inspect in side desk"
+                                                            title="{{ __('Inspect in side desk') }}"
                                                             class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-accent hover:text-accent-foreground text-muted-foreground shadow-xs transition-colors">
                                                         <i data-lucide="eye" class="w-3.5 h-3.5"></i>
                                                     </button>
                                                     <a href="{{ route('shifts.show', ['shift' => $shift->id, 'detail' => 1]) }}"
-                                                       title="Open Dedicated Shift Page with GPS Map"
+                                                       title="{{ __('Open Dedicated Shift Page with GPS Map') }}"
                                                        class="inline-flex items-center justify-center rounded-md border border-input bg-background h-8 w-8 hover:bg-primary/10 hover:text-primary text-muted-foreground shadow-xs transition-colors">
                                                         <i data-lucide="map" class="w-3.5 h-3.5"></i>
                                                     </a>
@@ -390,7 +390,7 @@
                                     @empty
                                         <tr class="empty-row">
                                             <td colspan="7" class="p-8 text-center text-muted-foreground">
-                                                No shifts found matching your query.
+                                                {{ __('No shifts found matching your query.') }}
                                             </td>
                                         </tr>
                                     @endforelse
@@ -404,29 +404,29 @@
                         <div class="flex items-center justify-between pb-3 border-b">
                             <div class="flex items-center gap-2">
                                 <i data-lucide="shield-check" class="w-4 h-4 text-primary"></i>
-                                <h3 class="text-sm font-semibold leading-none">Inspection Desk</h3>
+                                <h3 class="text-sm font-semibold leading-none">{{ __('Inspection Desk') }}</h3>
                             </div>
                             <div class="flex items-center gap-2">
                                 <span class="font-mono text-xs font-bold" id="deskShiftDisplayId">{{ $selected?->display_id ?? 'Shift #—' }}</span>
                                 <span id="deskStatusBadge" class="inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold">
-                                    {{ $selected ? ($selected->status === 'verified' ? 'Verified' : ($selected->status === 'in_progress' ? 'Active' : ($selected->end_km === null ? 'Flagged' : 'Pending Audit'))) : '—' }}
+                                    {{ $selected ? ($selected->status === 'verified' ? __('Verified') : ($selected->status === 'in_progress' ? __('Active') : ($selected->end_km === null ? __('Flagged') : __('Pending Audit')))) : '—' }}
                                 </span>
                                 <a id="deskFullPageLink" href="{{ $selected ? route('shifts.show', ['shift' => $selected->id, 'detail' => 1]) : '#' }}" target="_self" class="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline ml-1" title="Open Dedicated Page with Live Map">
                                     <i data-lucide="external-link" class="w-3 h-3"></i>
-                                    <span>Full Page</span>
+                                    <span>{{ __('Full Page') }}</span>
                                 </a>
                             </div>
                         </div>
 
                         <div id="deskEmptyState" class="{{ $selected ? 'hidden' : '' }} py-12 text-center text-xs text-muted-foreground">
-                            Select a shift row from the table to inspect telemetry &amp; meter images.
+                            {{ __('Select a shift row from the table to inspect telemetry & meter images.') }}
                         </div>
 
                         <div id="deskContentState" class="{{ $selected ? '' : 'hidden' }} space-y-4">
                             <!-- Visual Lifecycle Timeline -->
                             <div class="p-3.5 rounded-lg border bg-muted/30 space-y-2">
                                 <div class="flex items-center justify-between text-xs font-medium text-muted-foreground uppercase font-mono">
-                                    <span>Lifecycle Track</span>
+                                    <span>{{ __('Lifecycle Track') }}</span>
                                     <span id="deskLifecycleStatus" class="text-[11px] font-bold text-foreground font-sans"></span>
                                 </div>
                                 <div class="grid grid-cols-4 gap-1 text-[11px] pt-1">
@@ -435,7 +435,7 @@
                                         <div id="trackStartDot" class="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs">
                                             <i data-lucide="check" class="w-3.5 h-3.5"></i>
                                         </div>
-                                        <span class="font-medium text-[11px]">Start</span>
+                                        <span class="font-medium text-[11px]">{{ __('Start') }}</span>
                                         <span id="trackStartTime" class="text-[10px] text-muted-foreground"></span>
                                     </div>
                                     <!-- 2. Transit Duty -->
@@ -443,15 +443,15 @@
                                         <div id="trackTransitDot" class="w-6 h-6 rounded-full bg-muted border text-muted-foreground flex items-center justify-center text-[10px] font-bold shadow-xs">
                                             <i data-lucide="bus" class="w-3.5 h-3.5"></i>
                                         </div>
-                                        <span class="font-medium text-[11px]">Duty</span>
-                                        <span id="trackTransitSub" class="text-[10px] text-muted-foreground">Route</span>
+                                        <span class="font-medium text-[11px]">{{ __('Duty') }}</span>
+                                        <span id="trackTransitSub" class="text-[10px] text-muted-foreground">{{ __('Route') }}</span>
                                     </div>
                                     <!-- 3. End Shift -->
                                     <div class="flex flex-col items-center text-center gap-1">
                                         <div id="trackEndDot" class="w-6 h-6 rounded-full bg-muted border text-muted-foreground flex items-center justify-center text-[10px] font-bold shadow-xs">
                                             <i data-lucide="flag" class="w-3.5 h-3.5"></i>
                                         </div>
-                                        <span class="font-medium text-[11px]">End</span>
+                                        <span class="font-medium text-[11px]">{{ __('End') }}</span>
                                         <span id="trackEndTime" class="text-[10px] text-muted-foreground"></span>
                                     </div>
                                     <!-- 4. Desk Verification -->
@@ -459,8 +459,8 @@
                                         <div id="trackVerifyDot" class="w-6 h-6 rounded-full bg-muted border text-muted-foreground flex items-center justify-center text-[10px] font-bold shadow-xs">
                                             <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
                                         </div>
-                                        <span class="font-medium text-[11px]">Audit</span>
-                                        <span id="trackVerifySub" class="text-[10px] text-muted-foreground">Desk</span>
+                                        <span class="font-medium text-[11px]">{{ __('Audit') }}</span>
+                                        <span id="trackVerifySub" class="text-[10px] text-muted-foreground">{{ __('Desk') }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -468,42 +468,42 @@
                             <!-- Telemetry Specs Grid -->
                             <div class="space-y-2 text-xs">
                                 <div class="flex justify-between items-center py-1 border-b border-border/40">
-                                    <span class="text-muted-foreground">Vehicle:</span>
+                                    <span class="text-muted-foreground">{{ __('Vehicle:') }}</span>
                                     <span class="font-mono font-bold" id="deskBusInfo">
                                         {{ $selected?->bus?->display_id }} ({{ $selected?->bus?->plate }})
                                     </span>
                                 </div>
                                 <div class="flex justify-between items-center py-1 border-b border-border/40">
-                                    <span class="text-muted-foreground">Driver:</span>
+                                    <span class="text-muted-foreground">{{ __('Driver:') }}</span>
                                     <span class="font-medium" id="deskDriverInfo">
-                                        {{ $selected?->driver?->user?->name ?? 'Unassigned' }}
+                                        {{ $selected?->driver?->user?->name ?? __('Unassigned') }}
                                     </span>
                                 </div>
                                 <div class="flex justify-between items-center py-1 border-b border-border/40">
                                     <span class="text-muted-foreground flex items-center gap-1.5">
-                                        <span>Assigned Route:</span>
-                                        <button type="button" onclick="openAssignTripModal()" title="Assign or Change Trip for this Shift" class="inline-flex items-center text-primary hover:text-primary/80 transition-colors p-0.5 rounded hover:bg-muted">
+                                        <span>{{ __('Assigned Route:') }}</span>
+                                        <button type="button" onclick="openAssignTripModal()" title="{{ __('Assign or Change Trip for this Shift') }}" class="inline-flex items-center text-primary hover:text-primary/80 transition-colors p-0.5 rounded hover:bg-muted">
                                             <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
                                         </button>
                                     </span>
                                     <span class="font-medium text-foreground text-right" id="deskRouteLabel">
-                                        {{ $selected?->trip ? ($selected->trip->origin . ' → ' . $selected->trip->destination) : 'Depot Service Round' }}
+                                        {{ $selected?->trip ? ($selected->trip->origin . ' → ' . $selected->trip->destination) : __('Depot Service Round') }}
                                     </span>
                                 </div>
                                 <div class="flex justify-between items-center py-1 border-b border-border/40">
-                                    <span class="text-muted-foreground">Start Reading:</span>
+                                    <span class="text-muted-foreground">{{ __('Start Reading:') }}</span>
                                     <span class="font-mono font-bold" id="deskStartKm">
                                         {{ $selected ? number_format($selected->start_km) . ' km' : '—' }}
                                     </span>
                                 </div>
                                 <div class="flex justify-between items-center py-1 border-b border-border/40">
-                                    <span class="text-muted-foreground">End Reading:</span>
+                                    <span class="text-muted-foreground">{{ __('End Reading:') }}</span>
                                     <span class="font-mono font-bold" id="deskEndKm">
-                                        {{ $selected && $selected->end_km ? number_format($selected->end_km) . ' km' : 'Pending Close' }}
+                                        {{ $selected && $selected->end_km ? number_format($selected->end_km) . ' km' : __('Pending Close') }}
                                     </span>
                                 </div>
                                 <div class="flex justify-between items-center pt-2 font-medium">
-                                    <span>Distance Traveled:</span>
+                                    <span>{{ __('Distance Traveled:') }}</span>
                                     <span class="font-mono font-bold text-primary text-sm" id="deskDistanceKm">
                                         {{ $selected && $selected->distance_km !== null ? number_format($selected->distance_km, 1) . ' km' : '—' }}
                                     </span>
@@ -512,9 +512,9 @@
                                     <button type="button"
                                             onclick="openAdjustMileageModal()"
                                             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-input bg-card hover:bg-muted text-[11px] font-medium text-foreground hover:text-primary transition-colors cursor-pointer shadow-2xs"
-                                            title="Manually calibrate or adjust odometer numbers">
+                                            title="{{ __('Manually calibrate or adjust odometer numbers') }}">
                                         <i data-lucide="sliders" class="w-3 h-3 text-primary"></i>
-                                        <span>Adjust Mileage Range</span>
+                                        <span>{{ __('Adjust Mileage Range') }}</span>
                                     </button>
                                 </div>
                             </div>
@@ -522,8 +522,8 @@
                             <!-- Photo Proofs (Start & End Meter Images) -->
                             <div class="pt-2 border-t space-y-2.5">
                                 <div class="flex items-center justify-between">
-                                    <span class="text-xs font-medium text-muted-foreground uppercase font-mono">Meter Verification Photos</span>
-                                    <span class="text-[10px] text-muted-foreground">Click to inspect</span>
+                                    <span class="text-xs font-medium text-muted-foreground uppercase font-mono">{{ __('Meter Verification Photos') }}</span>
+                                    <span class="text-[10px] text-muted-foreground">{{ __('Click to inspect') }}</span>
                                 </div>
 
                                 <!-- Start Meter Box -->
@@ -536,11 +536,11 @@
                                              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"/>
                                         <span class="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-background/90 text-[10px] font-mono border flex items-center gap-1 shadow-xs">
                                             <i data-lucide="maximize-2" class="w-2.5 h-2.5"></i>
-                                            <span>Start Meter Capture</span>
+                                            <span>{{ __('Start Meter Capture') }}</span>
                                         </span>
                                     </div>
                                     <div id="deskStartMeterEmpty" class="{{ $selected && $selected->start_meter_image_url ? 'hidden' : '' }} rounded-lg border border-dashed p-3 text-center text-muted-foreground text-xs">
-                                        No start meter photo recorded
+                                        {{ __('No start meter photo recorded') }}
                                     </div>
                                 </div>
 
@@ -554,18 +554,18 @@
                                              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"/>
                                         <span class="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-background/90 text-[10px] font-mono border flex items-center gap-1 shadow-xs">
                                             <i data-lucide="maximize-2" class="w-2.5 h-2.5"></i>
-                                            <span>End Meter Capture</span>
+                                            <span>{{ __('End Meter Capture') }}</span>
                                         </span>
                                     </div>
                                     <div id="deskEndMeterEmpty" class="{{ $selected && $selected->end_meter_image_url ? 'hidden' : '' }} rounded-lg border border-dashed p-3 text-center text-muted-foreground text-xs mt-2">
-                                        End meter photo pending shift completion
+                                        {{ __('End meter photo pending shift completion') }}
                                     </div>
                                 </div>
                             </div>
 
                             <!-- Shift Notes (if any) -->
                             <div id="deskNotesContainer" class="{{ $selected && ($selected->start_notes || $selected->end_notes) ? '' : 'hidden' }} p-3 rounded-lg bg-muted/40 border text-xs space-y-1">
-                                <span class="font-medium text-foreground">Operator Notes:</span>
+                                <span class="font-medium text-foreground">{{ __('Operator Notes:') }}</span>
                                 <p class="text-muted-foreground italic text-[11px]" id="deskNotesText">
                                     {{ $selected?->start_notes ?: $selected?->end_notes }}
                                 </p>
@@ -577,10 +577,10 @@
                                 <div id="deskActionInProgress" class="p-3.5 rounded-lg border border-amber-500/25 bg-amber-500/10 space-y-1.5 hidden">
                                     <div class="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-xs font-semibold">
                                         <i data-lucide="clock" class="w-4 h-4 text-amber-500"></i>
-                                        <span>Shift In Progress &bull; Driver Active</span>
+                                        <span>{{ __('Shift In Progress • Driver Active') }}</span>
                                     </div>
                                     <p class="text-[11px] text-muted-foreground leading-relaxed">
-                                        Vehicle is en route. The approval &amp; verification desk unlocks automatically once the driver completes the trip and records the closing meter photo.
+                                        {{ __('Vehicle is en route. The approval & verification desk unlocks automatically once the driver completes the trip and records the closing meter photo.') }}
                                     </p>
                                 </div>
 
@@ -589,8 +589,8 @@
                                     <div class="p-3 rounded-lg border border-blue-500/25 bg-blue-500/10 flex items-start gap-2 text-xs">
                                         <i data-lucide="check-circle-2" class="w-4 h-4 text-blue-600 mt-0.5 shrink-0"></i>
                                         <div>
-                                            <span class="font-semibold text-blue-700 dark:text-blue-400">Ready for Verification</span>
-                                            <p class="text-[11px] text-muted-foreground mt-0.5">Start and end meter photos are logged. Review readings and approve shift mileage.</p>
+                                            <span class="font-semibold text-blue-700 dark:text-blue-400">{{ __('Ready for Verification') }}</span>
+                                            <p class="text-[11px] text-muted-foreground mt-0.5">{{ __('Start and end meter photos are logged. Review readings and approve shift mileage.') }}</p>
                                         </div>
                                     </div>
                                     <button type="button"
@@ -598,14 +598,14 @@
                                             onclick="verifyCurrentShift()"
                                             class="w-full inline-flex items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2.5 px-4 shadow transition-all gap-1.5 cursor-pointer">
                                         <i data-lucide="shield-check" class="w-4 h-4"></i>
-                                        <span>Approve &amp; Verify Shift</span>
+                                        <span>{{ __('Approve & Verify Shift') }}</span>
                                     </button>
                                     <button type="button"
                                             id="deskFlagBtn"
                                             onclick="flagCurrentShift()"
                                             class="w-full inline-flex items-center justify-center rounded-lg border border-input bg-card text-foreground hover:bg-muted text-xs font-medium py-2 px-4 shadow-xs transition-colors gap-1.5 cursor-pointer">
                                         <i data-lucide="flag" class="w-3.5 h-3.5 text-destructive"></i>
-                                        <span>Flag for Re-inspection</span>
+                                        <span>{{ __('Flag for Re-inspection') }}</span>
                                     </button>
                                 </div>
 
@@ -614,24 +614,24 @@
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400 text-xs">
                                             <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
-                                            <span>Shift Verified &amp; Approved</span>
+                                            <span>{{ __('Shift Verified & Approved') }}</span>
                                         </div>
                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600 text-white">
-                                            VERIFIED
+                                            {{ __('VERIFIED') }}
                                         </span>
                                     </div>
                                     <p class="text-[11px] text-muted-foreground leading-relaxed">
-                                        Start &amp; end meter readings, instrument cluster photos, and calculated mileage (<strong id="deskVerifiedDist" class="text-foreground"></strong>) verified by inspection desk.
+                                        {{ __('Start & end meter readings, instrument cluster photos, and calculated mileage') }} (<strong id="deskVerifiedDist" class="text-foreground"></strong>) {{ __('verified by inspection desk.') }}
                                     </p>
                                     <div class="pt-2 border-t border-emerald-500/20 flex items-center justify-between text-[11px]">
-                                        <span class="text-muted-foreground">Manage status:</span>
+                                        <span class="text-muted-foreground">{{ __('Manage status:') }}</span>
                                         <div class="flex items-center gap-2">
                                             <button type="button" onclick="revertShiftStatus('completed')" class="font-medium text-foreground hover:underline cursor-pointer">
-                                                Revert to Pending
+                                                {{ __('Revert to Pending') }}
                                             </button>
                                             <span class="text-muted-foreground">&bull;</span>
                                             <button type="button" onclick="flagCurrentShift()" class="font-medium text-destructive hover:underline cursor-pointer">
-                                                Flag Shift
+                                                {{ __('Flag Shift') }}
                                             </button>
                                         </div>
                                     </div>
@@ -641,24 +641,24 @@
                                 <div id="deskActionFlagged" class="p-3.5 rounded-lg border border-destructive/30 bg-destructive/10 space-y-2.5 text-xs hidden">
                                     <div class="flex items-center gap-2 font-bold text-destructive text-xs">
                                         <i data-lucide="alert-triangle" class="w-4 h-4"></i>
-                                        <span>Flagged for Audit Review</span>
+                                        <span>{{ __('Flagged for Audit Review') }}</span>
                                     </div>
                                     <p class="text-[11px] text-muted-foreground leading-relaxed">
-                                        Discrepancy detected in meter readings or closing photo. Requires supervisor physical recount.
+                                        {{ __('Discrepancy detected in meter readings or closing photo. Requires supervisor physical recount.') }}
                                     </p>
                                     <div class="flex items-center gap-2">
                                         <button type="button"
                                                 onclick="openAdjustMileageModal()"
                                                 class="flex-1 inline-flex items-center justify-center rounded-lg border border-input bg-card text-foreground hover:bg-muted text-xs font-semibold py-2 px-3 shadow-xs gap-1.5 cursor-pointer">
                                             <i data-lucide="sliders" class="w-3.5 h-3.5 text-primary"></i>
-                                            <span>Calibrate Mileage</span>
+                                            <span>{{ __('Calibrate Mileage') }}</span>
                                         </button>
                                         <button type="button"
                                                 id="deskClearFlagBtn"
                                                 onclick="verifyCurrentShift()"
                                                 class="flex-1 inline-flex items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold py-2 px-3 shadow-xs gap-1.5 cursor-pointer">
                                             <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
-                                            <span>Clear &amp; Verify</span>
+                                            <span>{{ __('Clear & Verify') }}</span>
                                         </button>
                                     </div>
                                 </div>
@@ -677,8 +677,8 @@
         <div class="relative w-full max-w-lg rounded-xl border bg-background p-6 shadow-lg modal-content text-left">
             <div class="flex items-center justify-between pb-3 border-b">
                 <div>
-                    <h3 class="text-base font-semibold leading-none tracking-tight" id="modalPhotoTitle">Meter Capture Inspection</h3>
-                    <p class="text-xs text-muted-foreground mt-1" id="modalPhotoSubtitle">Optical verification of instrument cluster</p>
+                    <h3 class="text-base font-semibold leading-none tracking-tight" id="modalPhotoTitle">{{ __('Meter Capture Inspection') }}</h3>
+                    <p class="text-xs text-muted-foreground mt-1" id="modalPhotoSubtitle">{{ __('Optical verification of instrument cluster') }}</p>
                 </div>
                 <button type="button" onclick="window.shadcnModal.close('photoModal')" class="text-muted-foreground hover:text-foreground">
                     <i data-lucide="x" class="w-4 h-4"></i>
@@ -688,7 +688,7 @@
                 <img id="modalPhotoImg" src="" alt="Meter High-Res" class="max-h-full max-w-full object-contain"/>
             </div>
             <div class="mt-4 flex justify-between items-center text-xs">
-                <span class="text-muted-foreground">Odometer Reading:</span>
+                <span class="text-muted-foreground">{{ __('Odometer Reading:') }}</span>
                 <span class="font-mono font-bold text-sm text-foreground" id="modalPhotoOdo"></span>
             </div>
         </div>
@@ -699,8 +699,8 @@
         <div class="relative w-full max-w-md rounded-xl border bg-background p-6 shadow-lg modal-content text-left">
             <div class="flex items-center justify-between pb-3 border-b">
                 <div>
-                    <h3 class="text-base font-semibold leading-none tracking-tight">Adjust Mileage Range</h3>
-                    <p class="text-xs text-muted-foreground mt-1" id="mileageShiftRef">Calibrate odometer meter readings</p>
+                    <h3 class="text-base font-semibold leading-none tracking-tight">{{ __('Adjust Mileage Range') }}</h3>
+                    <p class="text-xs text-muted-foreground mt-1" id="mileageShiftRef">{{ __('Calibrate odometer meter readings') }}</p>
                 </div>
                 <button type="button" onclick="window.shadcnModal.close('adjustMileageModal')" class="text-muted-foreground hover:text-foreground">
                     <i data-lucide="x" class="w-4 h-4"></i>
@@ -709,33 +709,33 @@
             <form onsubmit="submitAdjustMileage(event)" class="mt-4 space-y-4">
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="text-xs font-medium">Start Meter (KM)</label>
+                        <label class="text-xs font-medium">{{ __('Start Meter (KM)') }}</label>
                         <input type="number" id="adjustStartKm" step="0.1" min="0" required oninput="calculatePreviewDistance()"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs font-mono focus:ring-1 focus:ring-ring"/>
                     </div>
                     <div>
-                        <label class="text-xs font-medium">End Meter (KM)</label>
+                        <label class="text-xs font-medium">{{ __('End Meter (KM)') }}</label>
                         <input type="number" id="adjustEndKm" step="0.1" min="0" oninput="calculatePreviewDistance()"
-                               placeholder="Optional if active"
+                               placeholder="{{ __('Optional if active') }}"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs font-mono focus:ring-1 focus:ring-ring"/>
                     </div>
                 </div>
                 <div class="p-2.5 rounded-lg bg-muted/60 border text-xs flex items-center justify-between">
-                    <span class="text-muted-foreground">Calculated Distance:</span>
+                    <span class="text-muted-foreground">{{ __('Calculated Distance:') }}</span>
                     <span id="previewNetDistance" class="font-mono font-bold text-xs text-primary">—</span>
                 </div>
                 <div>
-                    <label class="text-xs font-medium">Adjustment Rationale / Supervisor Note</label>
+                    <label class="text-xs font-medium">{{ __('Adjustment Rationale / Supervisor Note') }}</label>
                     <textarea id="adjustReason" rows="2" placeholder="e.g. Optical OCR misread last digit; recalibrated with physical cluster capture."
                               class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-xs shadow-xs focus:ring-1 focus:ring-ring"></textarea>
                 </div>
                 <div class="flex justify-end gap-2 pt-2 border-t">
                     <button type="button" onclick="window.shadcnModal.close('adjustMileageModal')" class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted">
-                        Cancel
+                        {{ __('Cancel') }}
                     </button>
                     <button type="submit" id="submitAdjustMileageBtn" class="rounded-md bg-primary text-primary-foreground px-4 py-1.5 text-xs font-semibold hover:bg-primary/90 shadow-xs inline-flex items-center gap-1.5">
                         <i data-lucide="check" class="w-3.5 h-3.5"></i>
-                        <span>Save &amp; Recalculate</span>
+                        <span>{{ __('Save & Recalculate') }}</span>
                     </button>
                 </div>
             </form>
@@ -747,8 +747,8 @@
         <div class="relative w-full max-w-md rounded-xl border bg-background p-6 shadow-lg modal-content text-left">
             <div class="flex items-center justify-between pb-3 border-b">
                 <div>
-                    <h3 class="text-base font-semibold leading-none tracking-tight">Assign Trip to Shift</h3>
-                    <p class="text-xs text-muted-foreground mt-1" id="assignTripShiftRef">Link route timetable to shift</p>
+                    <h3 class="text-base font-semibold leading-none tracking-tight">{{ __('Assign Trip to Shift') }}</h3>
+                    <p class="text-xs text-muted-foreground mt-1" id="assignTripShiftRef">{{ __('Link route timetable to shift') }}</p>
                 </div>
                 <button type="button" onclick="window.shadcnModal.close('assignTripModal')" class="text-muted-foreground hover:text-foreground">
                     <i data-lucide="x" class="w-4 h-4"></i>
@@ -756,28 +756,28 @@
             </div>
             <form onsubmit="submitAssignTrip(event)" class="mt-4 space-y-4">
                 <div class="space-y-2">
-                    <label class="text-xs font-medium">Assignment Method</label>
+                    <label class="text-xs font-medium">{{ __('Assignment Method') }}</label>
                     <div class="grid grid-cols-2 gap-2">
                         <label class="flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer hover:bg-muted/50 bg-background text-xs">
                             <input type="radio" name="tripAssignMode" value="existing" checked onchange="toggleTripAssignMode(this.value)"/>
-                            <span class="font-medium">Existing Scheduled</span>
+                            <span class="font-medium">{{ __('Existing Scheduled') }}</span>
                         </label>
                         <label class="flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer hover:bg-muted/50 bg-background text-xs">
                             <input type="radio" name="tripAssignMode" value="new" onchange="toggleTripAssignMode(this.value)"/>
-                            <span class="font-medium">Quick Create New</span>
+                            <span class="font-medium">{{ __('Quick Create New') }}</span>
                         </label>
                     </div>
                 </div>
 
                 <!-- Mode A: Existing Scheduled Trip -->
                 <div id="tripAssignModeExisting" class="space-y-2">
-                    <label class="text-xs font-medium">Select Scheduled Trip</label>
+                    <label class="text-xs font-medium">{{ __('Select Scheduled Trip') }}</label>
                     <select id="assignExistingTripSelect" class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring">
-                        <option value="">-- Choose a scheduled trip --</option>
+                        <option value="">-- {{ __('Choose a scheduled trip') }} --</option>
                         @isset($tripsList)
                             @foreach($tripsList as $t)
                                 <option value="{{ $t->id }}">
-                                    {{ $t->display_id }}: {{ $t->origin }} → {{ $t->destination }} ({{ $t->departure_time ? substr($t->departure_time, 0, 5) : '08:00' }} &bull; {{ $t->bus?->display_id ?? 'Unassigned' }})
+                                    {{ $t->display_id }}: {{ $t->origin }} → {{ $t->destination }} ({{ $t->departure_time ? substr($t->departure_time, 0, 5) : '08:00' }} &bull; {{ $t->bus?->display_id ?? __('Unassigned') }})
                                 </option>
                             @endforeach
                         @endisset
@@ -788,24 +788,24 @@
                 <div id="tripAssignModeNew" class="space-y-3 hidden">
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="text-xs font-medium">Origin Terminal</label>
-                            <input id="quickTripOrigin" placeholder="e.g. Central Depot"
+                            <label class="text-xs font-medium">{{ __('Origin Terminal') }}</label>
+                            <input id="quickTripOrigin" placeholder="{{ __('e.g. Central Depot') }}"
                                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring"/>
                         </div>
                         <div>
-                            <label class="text-xs font-medium">Destination</label>
-                            <input id="quickTripDest" placeholder="e.g. Uptown Terminal"
+                            <label class="text-xs font-medium">{{ __('Destination') }}</label>
+                            <input id="quickTripDest" placeholder="{{ __('e.g. Uptown Terminal') }}"
                                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring"/>
                         </div>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div>
-                            <label class="text-xs font-medium">Departure Time</label>
+                            <label class="text-xs font-medium">{{ __('Departure Time') }}</label>
                             <input id="quickTripTime" type="time" value="{{ now()->format('H:i') }}"
                                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring"/>
                         </div>
                         <div>
-                            <label class="text-xs font-medium">Est. Distance (km)</label>
+                            <label class="text-xs font-medium">{{ __('Est. Distance (km)') }}</label>
                             <input id="quickTripDistance" type="number" step="0.1" placeholder="45.0"
                                    class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:ring-1 focus:ring-ring font-mono"/>
                         </div>
@@ -814,11 +814,11 @@
 
                 <div class="flex justify-end gap-2 pt-2 border-t">
                     <button type="button" onclick="window.shadcnModal.close('assignTripModal')" class="rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted">
-                        Cancel
+                        {{ __('Cancel') }}
                     </button>
                     <button type="submit" id="assignTripSubmitBtn" class="rounded-md bg-primary text-primary-foreground px-4 py-1.5 text-xs font-semibold hover:bg-primary/90 shadow-xs inline-flex items-center gap-1.5">
                         <i data-lucide="check" class="w-3.5 h-3.5"></i>
-                        <span>Attach to Shift</span>
+                        <span>{{ __('Attach to Shift') }}</span>
                     </button>
                 </div>
             </form>
@@ -830,8 +830,8 @@
         <div class="relative w-full max-w-lg rounded-xl border bg-background p-6 shadow-lg modal-content text-left">
             <div class="flex items-center justify-between pb-3 border-b">
                 <div>
-                    <h3 class="text-base font-semibold leading-none tracking-tight">Schedule New Transit Trip</h3>
-                    <p class="text-xs text-muted-foreground mt-1">Create a route timetable and link to fleet vehicle</p>
+                    <h3 class="text-base font-semibold leading-none tracking-tight">{{ __('Schedule New Transit Trip') }}</h3>
+                    <p class="text-xs text-muted-foreground mt-1">{{ __('Create a route timetable and link to fleet vehicle') }}</p>
                 </div>
                 <button type="button" onclick="window.shadcnModal.close('createTripModal')" class="text-muted-foreground hover:text-foreground">
                     <i data-lucide="x" class="w-4 h-4"></i>
@@ -841,43 +841,43 @@
             <form id="createTripForm" onsubmit="submitCreateTrip(event)" class="mt-4 space-y-3">
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Trip Number</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Trip Number') }}</label>
                         <input name="trip_number" required placeholder="e.g. TR-204" value="TR-{{ rand(100, 999) }}"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs font-mono focus:ring-1 focus:ring-ring"/>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Route Code</label>
-                        <input name="route_label" placeholder="e.g. Line 14 Express"
+                        <label class="text-xs font-medium leading-none">{{ __('Route Code') }}</label>
+                        <input name="route_label" placeholder="{{ __('e.g. Line 14 Express') }}"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring"/>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Origin Terminal</label>
-                        <input name="origin" required placeholder="e.g. Central Depot"
+                        <label class="text-xs font-medium leading-none">{{ __('Origin Terminal') }}</label>
+                        <input name="origin" required placeholder="{{ __('e.g. Central Depot') }}"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring"/>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Destination</label>
-                        <input name="destination" required placeholder="e.g. North Terminal"
+                        <label class="text-xs font-medium leading-none">{{ __('Destination') }}</label>
+                        <input name="destination" required placeholder="{{ __('e.g. North Terminal') }}"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring"/>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-3 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Date</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Date') }}</label>
                         <input name="trip_date" type="date" required value="{{ date('Y-m-d') }}"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring"/>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Departure</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Departure') }}</label>
                         <input name="departure_time" type="time" required value="{{ now()->format('H:i') }}"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring"/>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Est. Distance (km)</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Est. Distance (km)') }}</label>
                         <input name="distance_km" type="number" step="0.1" placeholder="45.0"
                                class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs font-mono focus:ring-1 focus:ring-ring"/>
                     </div>
@@ -885,20 +885,20 @@
 
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Assigned Bus</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Assigned Bus') }}</label>
                         <select name="bus_id" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring">
-                            <option value="">-- Unassigned (Standby) --</option>
+                            <option value="">{{ __('-- Unassigned (Standby) --') }}</option>
                             @foreach($buses as $b)
-                                <option value="{{ $b->id }}">{{ $b->display_id }} ({{ $b->plate }}) - {{ $b->driver?->user?->name ?? 'No Driver' }}</option>
+                                <option value="{{ $b->id }}">{{ $b->display_id }} ({{ $b->plate }}) - {{ $b->driver?->user?->name ?? __('No Driver') }}</option>
                             @endforeach
                         </select>
                     </div>
                     <div class="space-y-1">
-                        <label class="text-xs font-medium leading-none">Status</label>
+                        <label class="text-xs font-medium leading-none">{{ __('Status') }}</label>
                         <select name="status" class="flex h-9 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs focus:ring-1 focus:ring-ring">
-                            <option value="scheduled">Scheduled</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="completed">Completed</option>
+                            <option value="scheduled">{{ __('Scheduled') }}</option>
+                            <option value="in_progress">{{ __('In Progress') }}</option>
+                            <option value="completed">{{ __('Completed') }}</option>
                         </select>
                     </div>
                 </div>
@@ -906,12 +906,12 @@
                 <div class="flex justify-end gap-2 pt-3 border-t">
                     <button type="button" onclick="window.shadcnModal.close('createTripModal')"
                             class="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-muted">
-                        Cancel
+                        {{ __('Cancel') }}
                     </button>
                     <button type="submit" id="createTripSubmitBtn"
                             class="rounded-md bg-primary text-primary-foreground px-4 py-1.5 text-xs font-semibold shadow hover:bg-primary/90 inline-flex items-center gap-1.5">
                         <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                        <span>Schedule Trip</span>
+                        <span>{{ __('Schedule Trip') }}</span>
                     </button>
                 </div>
             </form>
@@ -948,12 +948,12 @@
             const approveBtn = document.getElementById('deskApproveBtn');
             if (approveBtn) {
                 approveBtn.disabled = false;
-                approveBtn.innerHTML = '<i data-lucide="shield-check" class="w-4 h-4"></i><span>Approve &amp; Verify Shift</span>';
+                approveBtn.innerHTML = '<i data-lucide="shield-check" class="w-4 h-4"></i><span>{{ __('Approve & Verify Shift') }}</span>';
             }
             const clearFlagBtn = document.getElementById('deskClearFlagBtn');
             if (clearFlagBtn) {
                 clearFlagBtn.disabled = false;
-                clearFlagBtn.innerHTML = '<i data-lucide="shield-check" class="w-3.5 h-3.5"></i><span>Clear &amp; Verify</span>';
+                clearFlagBtn.innerHTML = '<i data-lucide="shield-check" class="w-3.5 h-3.5"></i><span>{{ __('Clear & Verify') }}</span>';
             }
 
             document.getElementById('deskShiftDisplayId').textContent = shift.display_id;
@@ -986,50 +986,50 @@
             const trackVerifyDot = document.getElementById('trackVerifyDot');
             const trackVerifySub = document.getElementById('trackVerifySub');
 
-            if (trackStartTime) trackStartTime.textContent = shift.started_at_time || 'Started';
-            if (trackEndTime) trackEndTime.textContent = shift.ended_at_time && shift.ended_at_time !== '—' ? shift.ended_at_time : 'Pending';
+            if (trackStartTime) trackStartTime.textContent = shift.started_at_time || '{{ __('Started') }}';
+            if (trackEndTime) trackEndTime.textContent = shift.ended_at_time && shift.ended_at_time !== '—' ? shift.ended_at_time : '{{ __('Pending') }}';
 
             if (shift.status === 'in_progress' || !shift.has_start_and_end) {
                 if (lifecycleStatus) {
-                    lifecycleStatus.textContent = 'Active On Route';
+                    lifecycleStatus.textContent = '{{ __('Active On Route') }}';
                     lifecycleStatus.className = 'text-[11px] font-bold text-amber-500 font-sans';
                 }
                 if (trackTransitDot) trackTransitDot.className = 'w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] font-bold animate-pulse shadow-xs';
-                if (trackTransitSub) trackTransitSub.textContent = 'Underway';
+                if (trackTransitSub) trackTransitSub.textContent = '{{ __('Underway') }}';
                 if (trackEndDot) trackEndDot.className = 'w-6 h-6 rounded-full bg-muted border text-muted-foreground flex items-center justify-center text-[10px] font-bold shadow-xs';
                 if (trackVerifyDot) trackVerifyDot.className = 'w-6 h-6 rounded-full bg-muted border text-muted-foreground flex items-center justify-center text-[10px] font-bold shadow-xs';
-                if (trackVerifySub) trackVerifySub.textContent = 'Locked';
+                if (trackVerifySub) trackVerifySub.textContent = '{{ __('Locked') }}';
             } else if (shift.status === 'verified') {
                 if (lifecycleStatus) {
-                    lifecycleStatus.textContent = 'Verified & Approved';
+                    lifecycleStatus.textContent = '{{ __('Verified & Approved') }}';
                     lifecycleStatus.className = 'text-[11px] font-bold text-emerald-600 font-sans';
                 }
                 if (trackTransitDot) trackTransitDot.className = 'w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
-                if (trackTransitSub) trackTransitSub.textContent = 'Complete';
+                if (trackTransitSub) trackTransitSub.textContent = '{{ __('Complete') }}';
                 if (trackEndDot) trackEndDot.className = 'w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
                 if (trackVerifyDot) trackVerifyDot.className = 'w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
-                if (trackVerifySub) trackVerifySub.textContent = 'Approved';
+                if (trackVerifySub) trackVerifySub.textContent = '{{ __('Approved') }}';
             } else if (shift.status === 'flagged') {
                 if (lifecycleStatus) {
-                    lifecycleStatus.textContent = 'Flagged for Audit';
+                    lifecycleStatus.textContent = '{{ __('Flagged for Audit') }}';
                     lifecycleStatus.className = 'text-[11px] font-bold text-destructive font-sans';
                 }
                 if (trackTransitDot) trackTransitDot.className = 'w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
-                if (trackTransitSub) trackTransitSub.textContent = 'Complete';
+                if (trackTransitSub) trackTransitSub.textContent = '{{ __('Complete') }}';
                 if (trackEndDot) trackEndDot.className = 'w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
                 if (trackVerifyDot) trackVerifyDot.className = 'w-6 h-6 rounded-full bg-destructive text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
-                if (trackVerifySub) trackVerifySub.textContent = 'Flagged';
+                if (trackVerifySub) trackVerifySub.textContent = '{{ __('Flagged') }}';
             } else {
                 // Completed & Pending audit
                 if (lifecycleStatus) {
-                    lifecycleStatus.textContent = 'Ready for Verification';
+                    lifecycleStatus.textContent = '{{ __('Ready for Verification') }}';
                     lifecycleStatus.className = 'text-[11px] font-bold text-blue-600 font-sans';
                 }
                 if (trackTransitDot) trackTransitDot.className = 'w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
-                if (trackTransitSub) trackTransitSub.textContent = 'Complete';
+                if (trackTransitSub) trackTransitSub.textContent = '{{ __('Complete') }}';
                 if (trackEndDot) trackEndDot.className = 'w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold shadow-xs';
                 if (trackVerifyDot) trackVerifyDot.className = 'w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-[10px] font-bold shadow-xs animate-bounce';
-                if (trackVerifySub) trackVerifySub.textContent = 'Action Ready';
+                if (trackVerifySub) trackVerifySub.textContent = '{{ __('Action Ready') }}';
             }
 
             // Photos

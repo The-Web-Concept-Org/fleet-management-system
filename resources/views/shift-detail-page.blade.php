@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <meta name="csrf-token" content="{{ csrf_token() }}"/>
-    <title>Shift Detail: {{ $shift->display_id }} &bull; {{ config('app.name', 'Lancotri') }}</title>
+    <title>{{ __('Shift Detail') }}: {{ $shift->display_id }} &bull; {{ config('app.name', 'Lancotri') }}</title>
     @include('partials.brand-styles')
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/lancotri-mark.svg') }}">
     <!-- Leaflet CSS for Map rendering -->
@@ -50,9 +50,9 @@
 
     <div class="pl-64 flex flex-col min-h-screen">
         @include('partials.topbar', [
-            'topbarSearchPlaceholder' => 'Search shift records...',
+            'topbarSearchPlaceholder' => __('Search shift records...'),
             'topbarSearchId' => 'shiftNavSearch',
-            'topbarStatus' => 'Shift Inspection Desk',
+            'topbarStatus' => __('Shift Inspection Desk'),
         ])
 
         @php
@@ -70,10 +70,10 @@
                 default => 'border-transparent bg-secondary text-secondary-foreground'
             };
             $statusLabel = match($shift->status) {
-                'verified' => 'Verified & Approved',
-                'in_progress' => 'Active On-Shift',
-                'completed' => ($shift->end_km === null ? 'Flagged (Missing Meter)' : 'Completed &bull; Pending Audit'),
-                'flagged' => 'Flagged for Supervisor',
+                'verified' => __('Verified & Approved'),
+                'in_progress' => __('Active On-Shift'),
+                'completed' => ($shift->end_km === null ? __('Flagged (Missing Meter)') : __('Completed') . ' &bull; ' . __('Pending Audit')),
+                'flagged' => __('Flagged for Supervisor'),
                 default => ucfirst($shift->status)
             };
 
@@ -86,7 +86,7 @@
                 $duration = intdiv($mins, 60) . 'h ' . ($mins % 60) . 'm';
             } elseif ($shift->started_at) {
                 $mins = (int) round($shift->started_at->diffInMinutes(now()));
-                $duration = intdiv($mins, 60) . 'h ' . ($mins % 60) . 'm (elapsed)';
+                $duration = intdiv($mins, 60) . 'h ' . ($mins % 60) . 'm (' . __('elapsed') . ')';
             }
 
             $locationsCount = $shift->locations->count();
@@ -125,7 +125,7 @@
                     <div class="flex items-center gap-2 text-sm text-muted-foreground">
                         <a href="{{ route('shifts') }}" class="hover:text-foreground flex items-center gap-1.5 transition-colors">
                             <i data-lucide="arrow-left" class="w-4 h-4"></i>
-                            <span>Shifts Roster</span>
+                            <span>{{ __('Shifts Roster') }}</span>
                         </a>
                         <span>/</span>
                         <span class="font-mono text-foreground font-semibold">{{ $shift->display_id }}</span>
@@ -138,20 +138,20 @@
                     <div class="flex items-center gap-2">
                         <a href="{{ route('shifts') }}" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-3 gap-1.5">
                             <i data-lucide="layout-list" class="w-4 h-4 text-muted-foreground"></i>
-                            <span>All Shifts</span>
+                            <span>{{ __('All Shifts') }}</span>
                         </a>
 
                         @if($shift->status !== \App\Models\ShiftLog::STATUS_VERIFIED && $shift->end_km !== null)
                             <button type="button" onclick="verifyShift({{ $shift->id }})" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs h-9 px-4 gap-1.5 transition-colors">
                                 <i data-lucide="shield-check" class="w-4 h-4"></i>
-                                <span>Approve Shift</span>
+                                <span>{{ __('Approve Shift') }}</span>
                             </button>
                         @endif
 
                         @if($shift->status !== \App\Models\ShiftLog::STATUS_FLAGGED)
                             <button type="button" onclick="openFlagModal({{ $shift->id }})" class="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium border border-destructive/40 text-destructive hover:bg-destructive/10 shadow-xs h-9 px-3 gap-1.5 transition-colors">
                                 <i data-lucide="flag" class="w-4 h-4"></i>
-                                <span>Flag Audit</span>
+                                <span>{{ __('Flag Audit') }}</span>
                             </button>
                         @endif
                     </div>
@@ -166,10 +166,10 @@
                                 {{ strtoupper(substr($driverUser->name ?? 'D', 0, 2)) }}
                             </div>
                             <div>
-                                <div class="text-xs font-mono uppercase text-muted-foreground">Driver in Charge</div>
-                                <div class="text-base font-bold text-foreground leading-snug">{{ $driverUser->name ?? 'Unassigned' }}</div>
+                                <div class="text-xs font-mono uppercase text-muted-foreground">{{ __('Driver in Charge') }}</div>
+                                <div class="text-base font-bold text-foreground leading-snug">{{ $driverUser->name ?? __('Unassigned') }}</div>
                                 <div class="text-xs text-muted-foreground font-mono flex items-center gap-1.5 mt-0.5">
-                                    <span>Badge: {{ $driver?->display_id ?? 'DRV-—' }}</span>
+                                    <span>{{ __('Badge') }}: {{ $driver?->display_id ?? 'DRV-—' }}</span>
                                     @if($driver?->phone)
                                         <span>&bull;</span>
                                         <span>{{ $driver->phone }}</span>
@@ -184,12 +184,12 @@
                                 <i data-lucide="bus" class="w-6 h-6 text-primary"></i>
                             </div>
                             <div>
-                                <div class="text-xs font-mono uppercase text-muted-foreground">Assigned Vehicle</div>
+                                <div class="text-xs font-mono uppercase text-muted-foreground">{{ __('Assigned Vehicle') }}</div>
                                 <div class="text-base font-bold text-foreground leading-snug">{{ $bus?->display_id ?? 'Bus —' }}</div>
                                 <div class="text-xs text-muted-foreground font-mono flex items-center gap-1.5 mt-0.5">
-                                    <span>Plate: {{ $bus?->plate ?? '—' }}</span>
+                                    <span>{{ __('Plate') }}: {{ $bus?->plate ?? '—' }}</span>
                                     <span>&bull;</span>
-                                    <span>{{ $bus?->model ?? 'Standard Coach' }}</span>
+                                    <span>{{ $bus?->model ?? __('Standard Coach') }}</span>
                                 </div>
                             </div>
                         </div>
@@ -200,14 +200,14 @@
                                 <i data-lucide="route" class="w-6 h-6"></i>
                             </div>
                             <div>
-                                <div class="text-xs font-mono uppercase text-muted-foreground">Assigned Transit Route / Trip</div>
+                                <div class="text-xs font-mono uppercase text-muted-foreground">{{ __('Assigned Transit Route / Trip') }}</div>
                                 @if($trip)
                                     <div class="text-base font-bold text-foreground leading-snug flex items-center gap-1.5">
                                         <span class="font-mono text-primary">{{ $trip->display_id }}</span>
                                         <span class="truncate">{{ $trip->origin }} &rarr; {{ $trip->destination }}</span>
                                     </div>
                                     <div class="text-xs text-muted-foreground truncate mt-0.5">
-                                        {{ $trip->route_label ?: ($route ? $route->name : 'Scheduled Timetable') }} &bull; Dep: {{ $trip->departure_time ? substr($trip->departure_time, 0, 5) : '08:00' }}
+                                        {{ $trip->route_label ?: ($route ? $route->name : __('Scheduled Timetable')) }} &bull; Dep: {{ $trip->departure_time ? substr($trip->departure_time, 0, 5) : '08:00' }}
                                     </div>
                                 @elseif($route)
                                     <div class="text-base font-bold text-foreground leading-snug flex items-center gap-1.5">
@@ -218,8 +218,8 @@
                                         {{ $route->origin }} &rarr; {{ $route->destination }}
                                     </div>
                                 @else
-                                    <div class="text-base font-bold text-muted-foreground leading-snug">No Route Assigned</div>
-                                    <div class="text-xs text-muted-foreground">Free dispatch / On-demand</div>
+                                    <div class="text-base font-bold text-muted-foreground leading-snug">{{ __('No Route Assigned') }}</div>
+                                    <div class="text-xs text-muted-foreground">{{ __('Free dispatch / On-demand') }}</div>
                                 @endif
                             </div>
                         </div>
@@ -230,19 +230,19 @@
                                 <i data-lucide="activity" class="w-6 h-6"></i>
                             </div>
                             <div>
-                                <div class="text-xs font-mono uppercase text-muted-foreground">Shift Duration &amp; GPS</div>
+                                <div class="text-xs font-mono uppercase text-muted-foreground">{{ __('Shift Duration & GPS') }}</div>
                                 <div class="text-base font-bold text-foreground font-mono leading-snug">{{ $duration }}</div>
                                 <div class="text-xs text-muted-foreground font-mono flex items-center gap-1.5 mt-0.5">
                                     @if($locationsCount >= 2)
-                                        <span class="text-emerald-600 font-semibold">Start &amp; End GPS Checkpoints</span>
+                                        <span class="text-emerald-600 font-semibold">{{ __('Start & End GPS Checkpoints') }}</span>
                                     @elseif($locationsCount === 1)
-                                        <span class="text-emerald-600 font-semibold">1 GPS Checkpoint Recorded</span>
+                                        <span class="text-emerald-600 font-semibold">{{ __('1 GPS Checkpoint Recorded') }}</span>
                                     @else
-                                        <span class="text-muted-foreground">No GPS check logged</span>
+                                        <span class="text-muted-foreground">{{ __('No GPS check logged') }}</span>
                                     @endif
                                     @if($offlineSyncedCount > 0)
                                         <span>&bull;</span>
-                                        <span class="text-amber-500">{{ $offlineSyncedCount }} offline buffered</span>
+                                        <span class="text-amber-500">{{ $offlineSyncedCount }} {{ __('offline buffered') }}</span>
                                     @endif
                                 </div>
                             </div>
@@ -254,7 +254,7 @@
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4">
                         <div class="flex items-center justify-between text-xs text-muted-foreground font-mono uppercase">
-                            <span>Start Odometer</span>
+                            <span>{{ __('Start Odometer') }}</span>
                             <i data-lucide="gauge" class="w-4 h-4 text-muted-foreground"></i>
                         </div>
                         <div class="text-2xl font-bold font-mono text-foreground mt-2">
@@ -267,24 +267,24 @@
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4">
                         <div class="flex items-center justify-between text-xs text-muted-foreground font-mono uppercase">
-                            <span>End Odometer</span>
+                            <span>{{ __('End Odometer') }}</span>
                             <i data-lucide="flag" class="w-4 h-4 text-muted-foreground"></i>
                         </div>
                         <div class="text-2xl font-bold font-mono text-foreground mt-2">
                             @if($shift->end_km)
                                 {{ number_format($shift->end_km) }} <span class="text-xs font-normal text-muted-foreground">KM</span>
                             @else
-                                <span class="text-amber-500 font-sans text-base">In Progress</span>
+                                <span class="text-amber-500 font-sans text-base">{{ __('In Progress') }}</span>
                             @endif
                         </div>
                         <div class="text-xs text-muted-foreground mt-1">
-                            {{ $shift->ended_at ? $shift->ended_at->format('M d, Y • H:i') : 'Shift is ongoing' }}
+                            {{ $shift->ended_at ? $shift->ended_at->format('M d, Y • H:i') : __('Shift is ongoing') }}
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4">
                         <div class="flex items-center justify-between text-xs text-muted-foreground font-mono uppercase">
-                            <span>Audited Distance</span>
+                            <span>{{ __('Audited Distance') }}</span>
                             <i data-lucide="milestone" class="w-4 h-4 text-primary"></i>
                         </div>
                         <div class="text-2xl font-bold font-mono text-primary mt-2">
@@ -292,23 +292,23 @@
                         </div>
                         <div class="text-xs text-muted-foreground mt-1">
                             @if($route && $route->distance_km && $shift->distance_km)
-                                Variance: {{ number_format($shift->distance_km - $route->distance_km, 1) }} KM vs Route
+                                {{ __('Variance') }}: {{ number_format($shift->distance_km - $route->distance_km, 1) }} KM {{ __('vs Route') }}
                             @else
-                                Meter difference
+                                {{ __('Meter difference') }}
                             @endif
                         </div>
                     </div>
 
                     <div class="rounded-xl border bg-card text-card-foreground shadow-xs p-4">
                         <div class="flex items-center justify-between text-xs text-muted-foreground font-mono uppercase">
-                            <span>Telemetry Health</span>
+                            <span>{{ __('Telemetry Health') }}</span>
                             <i data-lucide="satellite" class="w-4 h-4 text-emerald-500"></i>
                         </div>
                         <div class="text-2xl font-bold font-mono mt-2 {{ $bus?->is_live_online ? 'text-emerald-500' : 'text-muted-foreground' }}">
-                            {{ $bus?->is_live_online ? 'ONLINE' : 'OFFLINE' }}
+                            {{ $bus?->is_live_online ? __('ONLINE') : __('OFFLINE') }}
                         </div>
                         <div class="text-xs text-muted-foreground mt-1">
-                            Last ping: {{ $lastLocation?->recorded_at ? $lastLocation->recorded_at->diffForHumans() : ($bus?->last_seen_human ?? 'No pings recorded') }}
+                            {{ __('Last ping') }}: {{ $lastLocation?->recorded_at ? $lastLocation->recorded_at->diffForHumans() : ($bus?->last_seen_human ?? __('No pings recorded')) }}
                         </div>
                     </div>
                 </div>
@@ -321,26 +321,26 @@
                                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                                 <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
                             </span>
-                            <h2 class="text-base font-semibold text-foreground">Interactive Route Corridor &amp; GPS Telemetry Path</h2>
-                            <span class="text-xs text-muted-foreground font-mono">&bull; OpenStreetMap Leaflet Engine</span>
+                            <h2 class="text-base font-semibold text-foreground">{{ __('Interactive Route Corridor & GPS Telemetry Path') }}</h2>
+                            <span class="text-xs text-muted-foreground font-mono">&bull; {{ __('OpenStreetMap Leaflet Engine') }}</span>
                         </div>
 
                         <!-- Map Legend & Layer Controls -->
                         <div class="flex flex-wrap items-center gap-3 text-xs">
                             <div class="flex items-center gap-1.5 text-muted-foreground font-medium">
                                 <span class="w-3.5 h-1 bg-blue-500 rounded"></span>
-                                <span>Planned Corridor</span>
+                                <span>{{ __('Planned Corridor') }}</span>
                             </div>
                             <div class="flex items-center gap-1.5 text-muted-foreground font-medium">
                                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-                                <span>Start Checkpoint</span>
+                                <span>{{ __('Start Checkpoint') }}</span>
                             </div>
                             <div class="flex items-center gap-1.5 text-muted-foreground font-medium">
                                 <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-                                <span>End / Current Position</span>
+                                <span>{{ __('End / Current Position') }}</span>
                             </div>
                             <button type="button" id="btnFitMap" class="px-2.5 py-1 text-xs rounded border bg-background hover:bg-accent text-foreground font-mono">
-                                Fit View
+                                {{ __('Fit View') }}
                             </button>
                         </div>
                     </div>
@@ -360,8 +360,8 @@
                                         <i data-lucide="log-in" class="w-4 h-4"></i>
                                     </span>
                                     <div>
-                                        <h3 class="text-sm font-semibold text-foreground">Start Shift Meter Photo</h3>
-                                        <p class="text-xs text-muted-foreground">Captured at depot dispatch</p>
+                                        <h3 class="text-sm font-semibold text-foreground">{{ __('Start Shift Meter Photo') }}</h3>
+                                        <p class="text-xs text-muted-foreground">{{ __('Captured at depot dispatch') }}</p>
                                     </div>
                                 </div>
                                 <span class="font-mono text-sm font-bold text-foreground bg-muted px-2.5 py-1 rounded">
@@ -371,26 +371,26 @@
 
                             <div class="relative w-full h-64 rounded-lg overflow-hidden border bg-muted/40 group flex items-center justify-center">
                                 @if($startImage)
-                                    <img src="{{ $startImage }}" alt="Start meter reading" class="w-full h-full object-cover transition-transform group-hover:scale-105 duration-200 cursor-pointer" onclick="openPhotoModal('{{ $startImage }}', 'Start Shift Meter: {{ number_format($shift->start_km) }} KM')">
+                                    <img src="{{ $startImage }}" alt="{{ __('Start meter reading') }}" class="w-full h-full object-cover transition-transform group-hover:scale-105 duration-200 cursor-pointer" onclick="openPhotoModal('{{ $startImage }}', '{{ __('Start Shift Meter') }}: {{ number_format($shift->start_km) }} KM')">
                                     <div class="absolute bottom-2 left-2 right-2 bg-background/80 backdrop-blur text-xs p-2 rounded flex items-center justify-between">
-                                        <span class="text-muted-foreground font-mono">{{ $shift->started_at ? $shift->started_at->format('M d, Y H:i:s') : 'Time unrecorded' }}</span>
-                                        <span class="text-primary font-medium flex items-center gap-1 cursor-pointer" onclick="openPhotoModal('{{ $startImage }}', 'Start Shift Meter: {{ number_format($shift->start_km) }} KM')">
-                                            <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i> Expand
+                                        <span class="text-muted-foreground font-mono">{{ $shift->started_at ? $shift->started_at->format('M d, Y H:i:s') : __('Time unrecorded') }}</span>
+                                        <span class="text-primary font-medium flex items-center gap-1 cursor-pointer" onclick="openPhotoModal('{{ $startImage }}', '{{ __('Start Shift Meter') }}: {{ number_format($shift->start_km) }} KM')">
+                                            <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i> {{ __('Expand') }}
                                         </span>
                                     </div>
                                 @else
                                     <div class="text-center p-6 text-muted-foreground">
                                         <i data-lucide="image-off" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
-                                        <p class="text-sm">No start meter photo recorded</p>
-                                        <p class="text-xs text-muted-foreground mt-1">Manual entry or legacy upload</p>
+                                        <p class="text-sm">{{ __('No start meter photo recorded') }}</p>
+                                        <p class="text-xs text-muted-foreground mt-1">{{ __('Manual entry or legacy upload') }}</p>
                                     </div>
                                 @endif
                             </div>
                         </div>
 
                         <div class="mt-4 pt-3 border-t text-xs text-muted-foreground">
-                            <span class="font-semibold text-foreground">Notes:</span>
-                            <span>{{ $shift->start_notes ?: 'No start remarks provided.' }}</span>
+                            <span class="font-semibold text-foreground">{{ __('Notes:') }}</span>
+                            <span>{{ $shift->start_notes ? __($shift->start_notes) : __('No start remarks provided.') }}</span>
                         </div>
                     </div>
 
@@ -403,37 +403,37 @@
                                         <i data-lucide="log-out" class="w-4 h-4"></i>
                                     </span>
                                     <div>
-                                        <h3 class="text-sm font-semibold text-foreground">End Shift Meter Photo</h3>
-                                        <p class="text-xs text-muted-foreground">Captured at shift completion</p>
+                                        <h3 class="text-sm font-semibold text-foreground">{{ __('End Shift Meter Photo') }}</h3>
+                                        <p class="text-xs text-muted-foreground">{{ __('Captured at shift completion') }}</p>
                                     </div>
                                 </div>
                                 <span class="font-mono text-sm font-bold text-foreground bg-muted px-2.5 py-1 rounded">
-                                    {{ $shift->end_km ? number_format($shift->end_km) . ' KM' : 'Pending' }}
+                                    {{ $shift->end_km ? number_format($shift->end_km) . ' KM' : __('Pending') }}
                                 </span>
                             </div>
 
                             <div class="relative w-full h-64 rounded-lg overflow-hidden border bg-muted/40 group flex items-center justify-center">
                                 @if($endImage)
-                                    <img src="{{ $endImage }}" alt="End meter reading" class="w-full h-full object-cover transition-transform group-hover:scale-105 duration-200 cursor-pointer" onclick="openPhotoModal('{{ $endImage }}', 'End Shift Meter: {{ number_format($shift->end_km) }} KM')">
+                                    <img src="{{ $endImage }}" alt="{{ __('End meter reading') }}" class="w-full h-full object-cover transition-transform group-hover:scale-105 duration-200 cursor-pointer" onclick="openPhotoModal('{{ $endImage }}', '{{ __('End Shift Meter') }}: {{ number_format($shift->end_km) }} KM')">
                                     <div class="absolute bottom-2 left-2 right-2 bg-background/80 backdrop-blur text-xs p-2 rounded flex items-center justify-between">
-                                        <span class="text-muted-foreground font-mono">{{ $shift->ended_at ? $shift->ended_at->format('M d, Y H:i:s') : 'Time unrecorded' }}</span>
-                                        <span class="text-primary font-medium flex items-center gap-1 cursor-pointer" onclick="openPhotoModal('{{ $endImage }}', 'End Shift Meter: {{ number_format($shift->end_km) }} KM')">
-                                            <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i> Expand
+                                        <span class="text-muted-foreground font-mono">{{ $shift->ended_at ? $shift->ended_at->format('M d, Y H:i:s') : __('Time unrecorded') }}</span>
+                                        <span class="text-primary font-medium flex items-center gap-1 cursor-pointer" onclick="openPhotoModal('{{ $endImage }}', '{{ __('End Shift Meter') }}: {{ number_format($shift->end_km) }} KM')">
+                                            <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i> {{ __('Expand') }}
                                         </span>
                                     </div>
                                 @else
                                     <div class="text-center p-6 text-muted-foreground">
                                         <i data-lucide="clock" class="w-8 h-8 mx-auto mb-2 text-amber-500 opacity-60"></i>
-                                        <p class="text-sm font-medium text-foreground">Awaiting end meter photo</p>
-                                        <p class="text-xs text-muted-foreground mt-1">Shift is currently open or ended without photo attachment</p>
+                                        <p class="text-sm font-medium text-foreground">{{ __('Awaiting end meter photo') }}</p>
+                                        <p class="text-xs text-muted-foreground mt-1">{{ __('Shift is currently open or ended without photo attachment') }}</p>
                                     </div>
                                 @endif
                             </div>
                         </div>
 
                         <div class="mt-4 pt-3 border-t text-xs text-muted-foreground">
-                            <span class="font-semibold text-foreground">Notes:</span>
-                            <span>{{ $shift->end_notes ?: 'No end remarks provided.' }}</span>
+                            <span class="font-semibold text-foreground">{{ __('Notes:') }}</span>
+                            <span>{{ $shift->end_notes ? __($shift->end_notes) : __('No end remarks provided.') }}</span>
                         </div>
                     </div>
                 </div>
@@ -443,10 +443,10 @@
                     <div class="p-4 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-muted/20">
                         <div class="flex items-center gap-2">
                             <i data-lucide="map-pin" class="w-4 h-4 text-primary"></i>
-                            <h3 class="text-sm font-semibold text-foreground">Shift GPS Location Checkpoints ({{ $locationsCount }} Recorded)</h3>
+                            <h3 class="text-sm font-semibold text-foreground">{{ __('Shift GPS Location Checkpoints') }} ({{ $locationsCount }} {{ __('Recorded') }})</h3>
                         </div>
                         <span class="text-xs text-muted-foreground font-mono">
-                            Optimized: Preserving Driver Start &amp; End Locations Only
+                            {{ __('Optimized: Preserving Driver Start & End Locations Only') }}
                         </span>
                     </div>
 
@@ -455,12 +455,12 @@
                             <table class="w-full text-xs font-mono">
                                 <thead class="border-b bg-muted/40 text-muted-foreground uppercase text-[10px]">
                                     <tr>
-                                        <th class="py-2.5 px-4 text-left">Checkpoint</th>
-                                        <th class="py-2.5 px-4 text-left">Recorded Time</th>
-                                        <th class="py-2.5 px-4 text-left">Coordinates (Lat, Lng)</th>
-                                        <th class="py-2.5 px-4 text-left">Speed &amp; Heading</th>
-                                        <th class="py-2.5 px-4 text-left">GPS Accuracy</th>
-                                        <th class="py-2.5 px-4 text-right">Data Source</th>
+                                        <th class="py-2.5 px-4 text-left">{{ __('Checkpoint') }}</th>
+                                        <th class="py-2.5 px-4 text-left">{{ __('Recorded Time') }}</th>
+                                        <th class="py-2.5 px-4 text-left">{{ __('Coordinates (Lat, Lng)') }}</th>
+                                        <th class="py-2.5 px-4 text-left">{{ __('Speed & Heading') }}</th>
+                                        <th class="py-2.5 px-4 text-left">{{ __('GPS Accuracy') }}</th>
+                                        <th class="py-2.5 px-4 text-right">{{ __('Data Source') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-border/60">
@@ -477,16 +477,16 @@
                                                 @if($isFirst)
                                                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">
                                                         <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                                        START CHECKPOINT
+                                                        {{ __('START CHECKPOINT') }}
                                                     </span>
                                                 @elseif($isLast)
                                                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold {{ $shift->status === 'completed' ? 'bg-blue-500/15 text-blue-600 border border-blue-500/30' : 'bg-amber-500/15 text-amber-600 border border-amber-500/30' }}">
                                                         <span class="w-2 h-2 rounded-full {{ $shift->status === 'completed' ? 'bg-blue-500' : 'bg-amber-500 animate-pulse' }}"></span>
-                                                        {{ $shift->status === 'completed' ? 'END CHECKPOINT' : 'CURRENT POSITION' }}
+                                                        {{ $shift->status === 'completed' ? __('END CHECKPOINT') : __('CURRENT POSITION') }}
                                                     </span>
                                                 @else
                                                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-muted text-muted-foreground font-medium">
-                                                        CHECKPOINT #{{ $index + 1 }}
+                                                        {{ __('CHECKPOINT') }} #{{ $index + 1 }}
                                                     </span>
                                                 @endif
                                             </td>
@@ -509,9 +509,9 @@
                                             </td>
                                             <td class="py-3 px-4 text-right">
                                                 @if($loc->is_offline_sync)
-                                                    <span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 font-semibold border border-amber-500/30">Offline Synced</span>
+                                                    <span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 font-semibold border border-amber-500/30">{{ __('Offline Synced') }}</span>
                                                 @else
-                                                    <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/15 text-emerald-600 font-semibold border border-emerald-500/30">Live Realtime</span>
+                                                    <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/15 text-emerald-600 font-semibold border border-emerald-500/30">{{ __('Live Realtime') }}</span>
                                                 @endif
                                             </td>
                                         </tr>
@@ -522,7 +522,7 @@
                     @else
                         <div class="p-8 text-center text-muted-foreground text-xs">
                             <i data-lucide="map-pin-off" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
-                            No GPS telemetry coordinates received yet for this shift. Location checkpoints are automatically recorded at shift start and completion.
+                            {{ __('No GPS telemetry coordinates received yet for this shift. Location checkpoints are automatically recorded at shift start and completion.') }}
                         </div>
                     @endif
                 </div>
@@ -535,7 +535,7 @@
     <div id="photoModal" class="fixed inset-0 z-50 bg-black/80 hidden items-center justify-center p-4 backdrop-blur-xs" onclick="closePhotoModal()">
         <div class="relative max-w-4xl max-h-[90vh] bg-card rounded-xl p-4 shadow-2xl flex flex-col gap-3" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between pb-2 border-b">
-                <h4 id="photoModalTitle" class="text-sm font-semibold text-foreground">Meter Photo</h4>
+                <h4 id="photoModalTitle" class="text-sm font-semibold text-foreground">{{ __('Meter Photo') }}</h4>
                 <button type="button" onclick="closePhotoModal()" class="text-muted-foreground hover:text-foreground p-1">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
@@ -552,22 +552,22 @@
             <div class="flex items-center justify-between pb-2 border-b">
                 <div class="flex items-center gap-2 text-destructive">
                     <i data-lucide="alert-triangle" class="w-5 h-5"></i>
-                    <h3 class="text-base font-bold text-foreground">Flag Shift for Audit</h3>
+                    <h3 class="text-base font-bold text-foreground">{{ __('Flag Shift for Audit') }}</h3>
                 </div>
                 <button type="button" onclick="closeFlagModal()" class="text-muted-foreground hover:text-foreground">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
             <p class="text-xs text-muted-foreground">
-                Marking this shift will alert supervisor review. Please state the discrepancy (e.g. meter blur, odometer mismatch, route deviation).
+                {{ __('Marking this shift will alert supervisor review. Please state the discrepancy (e.g. meter blur, odometer mismatch, route deviation).') }}
             </p>
             <div>
-                <label class="text-xs font-semibold uppercase text-muted-foreground mb-1 block">Audit Note / Reason</label>
-                <textarea id="flagReason" rows="3" class="w-full rounded-md border border-input bg-background p-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" placeholder="State reason for flagging this shift..."></textarea>
+                <label class="text-xs font-semibold uppercase text-muted-foreground mb-1 block">{{ __('Audit Note / Reason') }}</label>
+                <textarea id="flagReason" rows="3" class="w-full rounded-md border border-input bg-background p-2.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring" placeholder="{{ __('State reason for flagging this shift...') }}"></textarea>
             </div>
             <div class="flex items-center justify-end gap-2 pt-2">
-                <button type="button" onclick="closeFlagModal()" class="px-3 py-1.5 text-xs rounded border hover:bg-muted font-medium">Cancel</button>
-                <button type="button" onclick="submitFlag()" class="px-3 py-1.5 text-xs rounded bg-destructive text-white hover:bg-destructive/90 font-medium">Confirm Flag</button>
+                <button type="button" onclick="closeFlagModal()" class="px-3 py-1.5 text-xs rounded border hover:bg-muted font-medium">{{ __('Cancel') }}</button>
+                <button type="button" onclick="submitFlag()" class="px-3 py-1.5 text-xs rounded bg-destructive text-white hover:bg-destructive/90 font-medium">{{ __('Confirm Flag') }}</button>
             </div>
         </div>
     </div>
@@ -788,7 +788,7 @@
 
         // Verify Shift
         async function verifyShift(id) {
-            if (!confirm('Are you sure you want to approve and verify this shift? This certifies meter mileage & telemetry.')) return;
+            if (!confirm('{{ __('Are you sure you want to approve and verify this shift? This certifies meter mileage & telemetry.') }}')) return;
             const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
 
             try {
